@@ -5,12 +5,14 @@ import json
 import logging
 import os
 import pathlib
+import pwd
 import signal
 import sys
 import textwrap
 import threading
 import time
 import uuid
+from dataclasses import asdict
 
 import click
 import lockfile
@@ -23,8 +25,15 @@ from globus_compute_endpoint.endpoint.config import (
     ManagerEndpointConfig,
     UserEndpointConfig,
 )
-from globus_compute_endpoint.endpoint.config.utils import get_config, load_config_yaml
+from globus_compute_endpoint.endpoint.config.utils import (
+    get_config,
+    load_config_yaml,
+    load_user_config_schema,
+    load_user_config_template,
+    render_config_user_template,
+)
 from globus_compute_endpoint.endpoint.endpoint import Endpoint
+from globus_compute_endpoint.endpoint.identity_mapper import MappedPosixIdentity
 from globus_compute_endpoint.endpoint.utils import (
     is_privileged,
     send_endpoint_startup_failure_to_amqp,
@@ -34,6 +43,7 @@ from globus_compute_endpoint.exception_handling import handle_auth_errors
 from globus_compute_endpoint.logging_config import setup_logging
 from globus_compute_sdk.sdk.auth.auth_client import ComputeAuthClient
 from globus_compute_sdk.sdk.auth.whoami import print_whoami_info
+from globus_compute_sdk.sdk.batch import create_user_runtime
 from globus_compute_sdk.sdk.compute_dir import ensure_compute_dir
 from globus_compute_sdk.sdk.diagnostic import do_diagnostic_base
 from globus_compute_sdk.sdk.utils.gare import gare_handler
@@ -1032,6 +1042,83 @@ def enable_on_boot_cmd(ep_dir: pathlib.Path):
 @name_or_uuid_arg
 def disable_on_boot_cmd(ep_dir: pathlib.Path):
     disable_on_boot(ep_dir)
+
+
+@app.command(
+    "render-user-config",
+    help="Render the user configuration template to stdout",
+)
+@click.option(
+    "--user-options",
+    help=(
+        "Path to a JSON-formatted user options object."
+        " If not provided, reads from stdin"
+    ),
+)
+@name_or_uuid_arg
+def render_user_config(ep_dir: pathlib.Path, user_options: str | None):
+    _do_render_user_config(ep_dir, user_options)
+
+
+def _do_render_user_config(ep_dir: pathlib.Path, user_options: str | None):
+    parent_config = get_config(ep_dir)
+    if not isinstance(parent_config, ManagerEndpointConfig):
+        raise ClickException(f"Endpoint {ep_dir.name} is not template capable")
+
+    user_opts: dict | None = None
+    if user_options:
+        try:
+            with open(user_options) as f:
+                user_opts = json.load(f)
+        except Exception as e:
+            raise ClickException(
+                f"Failed to load user options from {user_options}: {e}"
+            )
+    else:
+        if not sys.stdin or sys.stdin.closed:
+            raise ClickException(
+                "User options path not provided and stdin is not available"
+            )
+        if sys.stdin.isatty():
+            log.info(
+                "Awaiting JSON user options object; Ctrl+D on empty line when done."
+            )
+        try:
+            user_opts_text = sys.stdin.read().strip()
+            if user_opts_text:
+                user_opts = json.loads(user_opts_text)
+        except Exception as e:
+            raise ClickException(f"Failed to load user options from stdin: {e}")
+
+    user_config_template_path = (
+        parent_config.user_config_template_path
+        or Endpoint.user_config_template_path(ep_dir)
+    )
+    user_config_template = load_user_config_template(user_config_template_path)
+    user_config_schema = load_user_config_schema(
+        parent_config.user_config_schema_path
+        or Endpoint.user_config_schema_path(ep_dir)
+    )
+
+    mapped_identity = MappedPosixIdentity(
+        local_user_record=pwd.getpwuid(os.getuid()),
+        matched_identity=uuid.UUID(int=0),
+        globus_identity_candidates=[],  # not used for rendering
+    )
+    user_runtime = asdict(create_user_runtime())
+
+    rendered_config = render_config_user_template(
+        parent_config=parent_config,
+        user_config_template=user_config_template,
+        user_config_template_path=user_config_template_path,
+        mapped_identity=mapped_identity,
+        user_config_schema=user_config_schema,
+        user_opts=user_opts,
+        user_runtime=user_runtime,
+    )
+
+    log.info("Rendered config:")
+    print(rendered_config)
 
 
 @app.command(

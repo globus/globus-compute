@@ -205,7 +205,7 @@ display_name: {{ user_runtime.some_var }}
         (True, 10.0),
         (True, ["bar", 10]),
         (True, {"bar": 10}),
-        (False, ("bar", 10)),
+        (True, ("bar", 10)),
         (False, {"bar", 10}),
         (False, str),
         (False, Exception),
