@@ -85,7 +85,6 @@ setup(
     classifiers=[
         "Development Status :: 3 - Alpha",
         "Intended Audience :: Science/Research",
-        "License :: OSI Approved :: Apache Software License",
         "Natural Language :: English",
         "Operating System :: OS Independent",
         "Programming Language :: Python :: 3",
@@ -94,7 +93,7 @@ setup(
     keywords=["Globus Compute", "FaaS", "Function Serving"],
     author="Globus Compute Team",
     author_email="support@globus.org",
-    license="Apache License, Version 2.0",
+    license="Apache-2.0",
     url="https://github.com/globus/globus-compute",
     project_urls={
         "Changelog": "https://globus-compute.readthedocs.io/en/latest/changelog.html",  # noqa: E501
