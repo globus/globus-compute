@@ -16,7 +16,7 @@ export DEB_BUILD_MAINT_OPTIONS = hardening=+all
 
 name := @PACKAGE_NAME@
 package_executable := @PIP_NAME@
-VIRTUAL_ENV := /opt/$(name)/venv-py39
+VIRTUAL_ENV := /opt/$(name)/@VIRTUALENV@
 TMP_BUILD_DIR := debian/$(name)-tmp
 TMP_VIRTUAL_ENV := $(TMP_BUILD_DIR)$(VIRTUAL_ENV)
 DEST_ROOT := debian/$(name)

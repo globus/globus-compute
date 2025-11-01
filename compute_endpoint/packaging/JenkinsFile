@@ -1,5 +1,7 @@
 #! groovy
 
+env.EPIC = "python313"
+
 @Library('gcs-build-scripts') _
 
 pipeline {
@@ -17,7 +19,7 @@ pipeline {
     }
     stages {
         stage ("Prep source") {
-            agent {label "package_creator"}
+            agent {label "package_creator_py313"}
             steps {
                 script {
 
