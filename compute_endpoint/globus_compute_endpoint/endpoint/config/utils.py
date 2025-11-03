@@ -8,6 +8,7 @@ import os
 import pathlib
 import re
 import shlex
+import typing as t
 import uuid
 
 import yaml
@@ -23,6 +24,7 @@ log = logging.getLogger(__name__)
 RESERVED_USER_CONFIG_TEMPLATE_VARIABLES = (
     "parent_config",
     "user_runtime",
+    "mapped_identity",
 )
 
 
@@ -200,26 +202,30 @@ def _validate_user_opts(user_opts: dict, schema: dict | None) -> None:
         raise
 
 
-def _sanitize_user_opts(data):
+def _sanitize_user_json(user_json: dict) -> dict:
     """Prevent YAML injection via special characters.
     Note that this will enforce double quoted YAML strings.
     """
-    if isinstance(data, dict):
-        return {k: _sanitize_user_opts(v) for k, v in data.items()}
-    elif isinstance(data, list):
-        return [_sanitize_user_opts(v) for v in data]
-    elif isinstance(data, str):
-        return json.dumps(data)
-    elif isinstance(data, (int, float)):
-        return data
-    elif data is None:
-        return "null"
-    else:
-        # We do not expect to hit this because user options are passed
-        # from the web service as JSON
-        raise ValueError(
-            f"{type(data).__name__} is not a valid user config option type"
-        )
+
+    def inner(data: t.Any) -> t.Any:
+        if isinstance(data, dict):
+            return {k: inner(v) for k, v in data.items()}
+        elif isinstance(data, list):
+            return [inner(v) for v in data]
+        elif isinstance(data, str):
+            return json.dumps(data)
+        elif isinstance(data, (int, float)):
+            return data
+        elif data is None:
+            return "null"
+        else:
+            # We do not expect to hit this because data is coming
+            # from the web service as JSON
+            raise ValueError(
+                f"{type(data).__name__} is not a valid user config option type"
+            )
+
+    return inner(user_json)
 
 
 def _shell_escape_filter(val):
@@ -283,12 +289,13 @@ def render_config_user_template(
 
     _user_opts = user_opts or {}
     _validate_user_opts(_user_opts, user_config_schema)
-    _user_opts = _sanitize_user_opts(_user_opts)
+    _user_opts = _sanitize_user_json(_user_opts)
 
-    _user_runtime = user_runtime or {}
-    _user_runtime = _sanitize_user_opts(_user_runtime)
-
-    _mapped_identity = _parse_mapped_identity(mapped_identity)
+    _render_payload = _user_opts | {
+        "parent_config": parent_config,
+        "mapped_identity": _parse_mapped_identity(mapped_identity),
+        "user_runtime": _sanitize_user_json(user_runtime or {}),
+    }
 
     user_config_template_dir = user_config_template_path.parent
     try:
@@ -308,12 +315,7 @@ def render_config_user_template(
     template = environment.from_string(user_config_template)
 
     try:
-        return template.render(
-            **_user_opts,
-            parent_config=parent_config,
-            user_runtime=_user_runtime,
-            mapped_identity=_mapped_identity,
-        )
+        return template.render(**_render_payload)
     except jinja2.exceptions.UndefinedError as e:
         log.debug("Missing required user option: %s", e)
         raise

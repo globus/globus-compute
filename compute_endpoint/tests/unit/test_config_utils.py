@@ -245,7 +245,7 @@ def test_render_user_config_sandbox(
     jinja_op, val = data
     template = f"foo: {jinja_op}"
     user_opts = {"foo": val}
-    with mock.patch(f"{_MOCK_BASE}_sanitize_user_opts", return_value=user_opts):
+    with mock.patch(f"{_MOCK_BASE}_sanitize_user_json", return_value=user_opts):
         with pytest.raises(jinja2.exceptions.SecurityError):
             render_config_user_template(
                 conf_no_exec, template, pathlib.Path("/"), mapped_ident, {}, user_opts
@@ -335,7 +335,7 @@ def test_render_user_config_shell_escape(
 
 @pytest.mark.parametrize("schema_exists", (True, False))
 def test_render_user_config_apply_schema(
-    conf_no_exec, schema_exists: bool, mapped_ident: MappedPosixIdentity
+    conf_no_exec, schema_exists: bool, mapped_ident: MappedPosixIdentity, randomstring
 ):
     template = "foo: {{ foo }}"
     schema = {}
@@ -348,7 +348,7 @@ def test_render_user_config_apply_schema(
             },
         }
 
-    user_opts = {"foo": "bar"}
+    user_opts = {"foo": randomstring()}
     with mock.patch.object(jsonschema, "validate") as mock_validate:
         render_config_user_template(
             conf_no_exec, template, pathlib.Path("/"), mapped_ident, schema, user_opts
@@ -357,8 +357,10 @@ def test_render_user_config_apply_schema(
     if schema_exists:
         assert mock_validate.called
         *_, kwargs = mock_validate.call_args
-        assert kwargs["instance"] == user_opts
         assert kwargs["schema"] == schema
+        # user options is modified by the time it gets to jsonschema.validate
+        validated_opts = kwargs["instance"]
+        assert validated_opts["foo"] == user_opts["foo"]
     else:
         assert not mock_validate.called
 
@@ -376,11 +378,13 @@ def test_render_config_passes_parent_config(
     assert rendered_dict["parent_heartbeat"] == conf_no_exec.heartbeat_period
 
 
+@pytest.mark.parametrize("user_runtime", [None, {}, {"python": {"version": "X.Y.Z"}}])
 def test_render_config_passes_user_runtime(
-    conf_no_exec, mapped_ident: MappedPosixIdentity
+    conf_no_exec, mapped_ident: MappedPosixIdentity, user_runtime
 ):
-    template = "user_python: {{ user_runtime.python.version }}"
-    user_runtime = {"python": {"version": "X.Y.Z"}}
+    template = (
+        "user_python: {{ user_runtime.python.version if user_runtime else '<none>' }}"
+    )
 
     rendered = render_config_user_template(
         conf_no_exec,
@@ -391,7 +395,10 @@ def test_render_config_passes_user_runtime(
     )
 
     rendered_dict = yaml.safe_load(rendered)
-    assert rendered_dict["user_python"] == user_runtime["python"]["version"]
+    if user_runtime:
+        assert rendered_dict["user_python"] == user_runtime["python"]["version"]
+    else:
+        assert rendered_dict["user_python"] == "<none>"
 
 
 def test_render_config_passes_mapped_identity(mocker, conf_no_exec):
@@ -433,6 +440,27 @@ def test_render_config_passes_mapped_identity(mocker, conf_no_exec):
     assert rendered_dict["home_dir"] == mock_struct_passwd.pw_dir
     assert rendered_dict["groups"] == mock_groups
     assert rendered_dict["globus_id"] == mock_matched_identity
+
+
+@pytest.mark.parametrize("reserved_word", RESERVED_USER_CONFIG_TEMPLATE_VARIABLES)
+def test_render_config_passes_all_reserved_variables(
+    conf_no_exec, mapped_ident: MappedPosixIdentity, reserved_word, randomstring
+):
+    template = f"""
+{{% if {reserved_word} is defined %}}
+# "{reserved_word}" is defined
+{{% endif %}}
+{{% if {randomstring(len(reserved_word) - 1)} is defined %}}
+# unreachable
+{{% endif %}}
+"""
+
+    rendered = render_config_user_template(
+        conf_no_exec, template, pathlib.Path("/"), mapped_ident
+    )
+
+    assert f'# "{reserved_word}" is defined' in rendered
+    assert "# unreachable" not in rendered
 
 
 @pytest.mark.parametrize(
