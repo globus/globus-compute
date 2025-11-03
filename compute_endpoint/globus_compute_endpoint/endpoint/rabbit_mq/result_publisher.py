@@ -104,6 +104,18 @@ class ResultPublisher(threading.Thread):
             self._total_published,
         )
 
+    def __enter__(self):
+        if self._stop_event.is_set():
+            raise RuntimeError(f"{self!r} Already stopped; cannot start again.")
+
+        if not self.is_alive():
+            self.start()
+
+        return self
+
+    def __exit__(self, _exc_type, _exc_val, _exc_tb):
+        self.stop(block=False)
+
     def run(self) -> None:
         log.debug("%r thread begins", self)
         self._thread_id = threading.get_ident()

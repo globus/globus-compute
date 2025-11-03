@@ -31,14 +31,14 @@ def mock_log():
 
 @pytest.fixture
 def mock_tqs():
-    m = mock.Mock(spec=TaskQueueSubscriber)
+    m = mock.MagicMock(spec=TaskQueueSubscriber)
     with mock.patch(f"{_mock_base}TaskQueueSubscriber", return_value=m):
         yield m
 
 
 @pytest.fixture
 def mock_rp():
-    m = mock.Mock(spec=ResultPublisher)
+    m = mock.MagicMock(spec=ResultPublisher)
     with mock.patch(f"{_mock_base}ResultPublisher", return_value=m):
         yield m
 
@@ -210,3 +210,15 @@ def test_audit_func_cleared_if_not_ha(mock_gce, task_uuid, audit_fd, is_ha, mock
 
     ei.audit(TaskState.RECEIVED, f)
     assert ei.time_to_quit is not exp_cleared, "non-cleared invokes self.stop()"
+
+
+def test_amqp_threads_stop_at_quiesce(mock_log, mock_gce, mock_rp, mock_tqs):
+    conf = UserEndpointConfig(engine=mock_gce)
+    mock_gce.get_status_report.side_effect = MemoryError("bad things!")
+    ei = EndpointInterchange(conf, reg_info=empty_reg_info(), ep_info={})
+
+    with pytest.raises(MemoryError):
+        ei._main_loop()
+
+    assert mock_rp.__exit__.call_count == 2, "AMQP threads stop at quiesce"
+    assert mock_tqs.__exit__.called, "AMQP thread stops at quiesce"

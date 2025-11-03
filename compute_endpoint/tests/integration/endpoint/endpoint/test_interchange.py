@@ -62,7 +62,7 @@ def mock_conf(mock_engine):
 def mock_rp():
     pub_f = Future()
     pub_f.set_result(None)
-    m = mock.Mock(spec=ResultPublisher)
+    m = mock.MagicMock(spec=ResultPublisher)
     m.publish.return_value = pub_f
     with mock.patch(f"{_MOCK_BASE}ResultPublisher", return_value=m):
         yield m
@@ -70,7 +70,7 @@ def mock_rp():
 
 @pytest.fixture
 def mock_tqs():
-    m = mock.Mock(spec=TaskQueueSubscriber)
+    m = mock.MagicMock(spec=TaskQueueSubscriber)
     with mock.patch(f"{_MOCK_BASE}TaskQueueSubscriber", return_value=m):
         yield m
 
@@ -238,7 +238,7 @@ def test_soft_idle_honored(
 
     shut_down_s = f"{(idle_limit - 1) * mock_conf.heartbeat_period:,}"
     idle_msg = next(m for m in log_args if "In idle state" in m)
-    assert "due to" in idle_msg, "expected to find reason"
+    assert "no task or result movement" in idle_msg, "expected to find reason"
     assert "idle_heartbeats_soft" in idle_msg, "expected to find setting name"
     assert f" shut down in {shut_down_s}" in idle_msg, "expected to find timeout time"
 
@@ -280,7 +280,7 @@ def test_hard_idle_honored(
     shut_down_s = f"{(idle_limit - idle_soft_limit - 1) * mock_conf.heartbeat_period:,}"
     idle_msg = next(m for m in log_args if "Possibly idle" in m)
     assert "idle_heartbeats_hard" in idle_msg, "expected to find setting name"
-    assert f" shut down in {shut_down_s}" in idle_msg, "expected to find timeout time"
+    assert f" Shutting down in {shut_down_s}" in idle_msg, "expected timeout time"
 
     idle_msg = mock_log.warning.call_args[0][0]
     assert "Shutting down" in idle_msg, "expected to find action taken"

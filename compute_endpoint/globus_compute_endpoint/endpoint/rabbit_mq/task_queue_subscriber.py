@@ -104,6 +104,18 @@ class TaskQueueSubscriber(threading.Thread):
 
         logger.debug("Init done")
 
+    def __enter__(self):
+        if self._stop_event.is_set():
+            raise RuntimeError(f"{self!r} Already stopped; cannot start again.")
+
+        if not self.is_alive():
+            self.start()
+
+        return self
+
+    def __exit__(self, _exc_type, _exc_val, _exc_tb):
+        self.stop()
+
     def run(self):
         logger.debug("%s AMQP thread begins", self)
         idle_for_s = 0.0

@@ -12,18 +12,33 @@ from globus_compute_endpoint.endpoint.rabbit_mq import (
     RabbitPublisherStatus,
     ResultPublisher,
 )
+from tests.utils import try_assert
 
 _MOCK_BASE = "globus_compute_endpoint.endpoint.rabbit_mq.result_publisher."
 q_info = {"queue_publish_kwargs": {"exchange": "results"}, "exchange": "results"}
 
 
 @pytest.fixture
-def mock_log(mocker):
-    yield mocker.patch(f"{_MOCK_BASE}log", autospec=True)
+def mock_log():
+    with mock.patch(f"{_MOCK_BASE}log", autospec=True) as m:
+        yield m
 
 
-def test_rp_callbacks_hooked_up(mocker, randomstring):
-    mock_pika = mocker.patch(f"{_MOCK_BASE}pika")
+@pytest.fixture
+def mock_pika():
+    with mock.patch(f"{_MOCK_BASE}pika", autospec=True) as m:
+        yield m
+
+
+def test_rp_as_contextmanager(randomstring, mock_pika):
+    queue_info = {"queue": randomstring(), **q_info, "connection_url": "amqp:///"}
+    with ResultPublisher(queue_info=queue_info) as rp:
+        try_assert(rp.is_alive, "Context manager starts thread")
+
+    try_assert(lambda: not rp.is_alive(), "Context manager stops thread")
+
+
+def test_rp_callbacks_hooked_up(randomstring, mock_pika):
     queue_info = {"queue": randomstring(), **q_info, "connection_url": "amqp:///"}
     rp = ResultPublisher(queue_info=queue_info)
     rp._connect()
