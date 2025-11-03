@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import concurrent.futures
+import contextlib
 import json
 import logging
 import os
@@ -319,19 +320,6 @@ class EndpointInterchange:
         """
         log.debug("_main_loop begins")
 
-        task_q_subscriber = TaskQueueSubscriber(
-            queue_info=self.task_q_info,
-            pending_task_queue=self.pending_task_queue,
-            thread_name="TQS",
-        )
-        task_q_subscriber.start()
-
-        results_publisher = ResultPublisher(queue_info=self.result_q_info)
-        results_publisher.start()
-
-        heartbeat_publisher = ResultPublisher(queue_info=self.heartbeat_q_info)
-        heartbeat_publisher.start()
-
         engine = self.engine
 
         num_tasks_received = 0
@@ -530,134 +518,146 @@ class EndpointInterchange:
                 f.set_exception(e)
             return f
 
+        task_q_subscriber = TaskQueueSubscriber(
+            queue_info=self.task_q_info,
+            pending_task_queue=self.pending_task_queue,
+            thread_name="TQS",
+        )
+        results_publisher = ResultPublisher(queue_info=self.result_q_info)
+        heartbeat_publisher = ResultPublisher(queue_info=self.heartbeat_q_info)
         stored_processor_thread = threading.Thread(
             target=process_stored_results, daemon=True, name="Stored Result Handler"
         )
         task_processor_thread = threading.Thread(
             target=process_pending_tasks, daemon=True, name="Pending Task Handler"
         )
-        stored_processor_thread.start()
-        task_processor_thread.start()
 
-        if hasattr(engine, "executor_exception"):
+        with contextlib.ExitStack() as stk:
+            stk.enter_context(results_publisher)
+            stk.enter_context(heartbeat_publisher)
+            stk.enter_context(task_q_subscriber)
 
-            def engine_bad_state_watcher():
-                while not self._quiesce_event.wait(0.5):
-                    if engine.executor_exception:
+            stored_processor_thread.start()
+            task_processor_thread.start()
+
+            if hasattr(engine, "executor_exception"):
+
+                def engine_bad_state_watcher():
+                    while not self._quiesce_event.wait(0.5):
+                        if engine.executor_exception:
+                            self.stop()
+                            log.exception(engine.executor_exception)
+
+                threading.Thread(
+                    target=engine_bad_state_watcher, daemon=True, name="BadStateWatcher"
+                ).start()
+
+            connection_stable_hearbeats = 0
+            last_t, last_r = 0, 0
+
+            soft_idle_limit = max(0, self.config.idle_heartbeats_soft)
+            hard_idle_limit = max(soft_idle_limit + 1, self.config.idle_heartbeats_hard)
+            soft_idle_heartbeats = 0  # "happy path" idle timeout
+            hard_idle_heartbeats = 0  # catch-all idle timeout
+
+            live_proc_title = setproctitle.getproctitle()
+            log.debug("_main_loop entered running state")
+            heartbeat()
+            while not self._quiesce_event.wait(self.heartbeat_period):
+                with hb_lock:
+                    num_t = num_tasks_received
+                    num_r = num_results_forwarded
+                    diff_t, diff_r = num_t - last_t, num_r - last_r
+                    log.debug(
+                        "Heartbeat.  Approximate Tasks received and Results forwarded"
+                        " since last heartbeat: %s (T), %s (R)",
+                        diff_t,
+                        diff_r,
+                    )
+                    last_t, last_r = num_t, num_r
+
+                    # only reset come 2 heartbeats and still alive
+                    if self._reconnect_fail_counter:
+                        connection_stable_hearbeats += 1
+                        if connection_stable_hearbeats > 1:
+                            log.info(
+                                "Connection stable for 2 heartbeats; reset fail count"
+                            )
+                            self._reconnect_fail_counter = 0
+
+                    heartbeat()
+                    if not soft_idle_limit:
+                        # idle timeout not enabled; "always on"
+                        continue
+
+                    if diff_t or diff_r:
+                        # a task moved; reset idle heartbeat counter
+                        if soft_idle_heartbeats or hard_idle_heartbeats:
+                            log.info(
+                                "Moved to active state (due to tasks processed since"
+                                " last heartbeat)."
+                            )
+                        setproctitle.setproctitle(live_proc_title)
+                        soft_idle_heartbeats = 0
+                        hard_idle_heartbeats = 0
+                        continue
+
+                    # only start "timer" if we've at least done *some* work
+                    hard_idle_heartbeats += 1
+                    if (num_t or num_r) and num_r >= num_t:
+                        # similar to above, only start "timer" if *idle* ... but
+                        # note that given self.result_store, it's possible to
+                        # have forwarded more results than tasks received.
+                        soft_idle_heartbeats += 1
+                        shutdown_s = soft_idle_limit - soft_idle_heartbeats
+                        shutdown_s *= self.heartbeat_period
+
+                        if soft_idle_heartbeats == 1:
+                            log.info(
+                                "In idle state (no task or result movement); shut down"
+                                f" in {shutdown_s:,}s.  (idle_heartbeats_soft)"
+                            )
+                        idle_proc_title = "[idle; shut down in {:,}s] {}"
+                        setproctitle.setproctitle(
+                            idle_proc_title.format(shutdown_s, live_proc_title)
+                        )
+
+                        if soft_idle_heartbeats >= soft_idle_limit:
+                            log.info("Idle heartbeats reached.  Shutting down.")
+                            self.stop()
+
+                    elif hard_idle_heartbeats > hard_idle_limit:
+                        log.warning("Shutting down due to idle heartbeats HARD limit.")
                         self.stop()
-                        log.exception(engine.executor_exception)
 
-            threading.Thread(
-                target=engine_bad_state_watcher, daemon=True, name="Bad State Watcher"
-            ).start()
+                    elif hard_idle_heartbeats > soft_idle_limit:
+                        # Reminder: this branch only hit if EP started and no tasks
+                        # or results have moved.  If *any* movement occurs, this branch
+                        # won't get executed.
+                        shutdown_s = hard_idle_limit - hard_idle_heartbeats
+                        shutdown_s *= self.heartbeat_period
+                        if hard_idle_heartbeats == soft_idle_limit + 1:
+                            # only log the first time; no sense in filling logs
+                            log.info(
+                                "Possibly idle -- no task or result movement.  Shutting"
+                                f" down in {shutdown_s:,}s.  (idle_heartbeats_hard)"
+                            )
+                        idle_proc_title = "[possibly idle; shut down in {:,}s] {}"
+                        setproctitle.setproctitle(
+                            idle_proc_title.format(shutdown_s, live_proc_title)
+                        )
 
-        connection_stable_hearbeats = 0
-        last_t, last_r = 0, 0
+            self.pending_task_queue.put(None)
+            task_processor_thread.join()
+            stored_processor_thread.join()
 
-        soft_idle_limit = max(0, self.config.idle_heartbeats_soft)
-        hard_idle_limit = max(soft_idle_limit + 1, self.config.idle_heartbeats_hard)
-        soft_idle_heartbeats = 0  # "happy path" idle timeout
-        hard_idle_heartbeats = 0  # catch-all idle timeout
-
-        live_proc_title = setproctitle.getproctitle()
-        log.debug("_main_loop entered running state")
-        heartbeat()
-        while not self._quiesce_event.wait(self.heartbeat_period):
-            with hb_lock:
-                num_t = num_tasks_received
-                num_r = num_results_forwarded
-                diff_t, diff_r = num_t - last_t, num_r - last_r
-                log.debug(
-                    "Heartbeat.  Approximate Tasks received and Results forwarded"
-                    " since last heartbeat: %s (T), %s (R)",
-                    diff_t,
-                    diff_r,
+            # let higher-level error handling take over if the following excepts
+            try:
+                heartbeat(active=False).result(timeout=5)
+            except concurrent.futures.TimeoutError:
+                log.warning(
+                    "Unable to send final heartbeat (timeout sending);"
+                    " ignoring for quiesce"
                 )
-                last_t, last_r = num_t, num_r
-
-                # only reset come 2 heartbeats and still alive
-                if self._reconnect_fail_counter:
-                    connection_stable_hearbeats += 1
-                    if connection_stable_hearbeats > 1:
-                        log.info("Connection stable for 2 heartbeats; reset fail count")
-                        self._reconnect_fail_counter = 0
-
-                heartbeat()
-                if not soft_idle_limit:
-                    # idle timeout not enabled; "always on"
-                    continue
-
-                if diff_t or diff_r:
-                    # a task moved; reset idle heartbeat counter
-                    if soft_idle_heartbeats or hard_idle_heartbeats:
-                        log.info(
-                            "Moved to active state (due to tasks processed since"
-                            " last heartbeat)."
-                        )
-                    setproctitle.setproctitle(live_proc_title)
-                    soft_idle_heartbeats = 0
-                    hard_idle_heartbeats = 0
-                    continue
-
-                # only start "timer" if we've at least done *some* work
-                hard_idle_heartbeats += 1
-                if (num_t or num_r) and num_r >= num_t:
-                    # similar to above, only start "timer" if *idle* ... but
-                    # note that given self.result_store, it's possible to
-                    # have forwarded more results than tasks received.
-                    soft_idle_heartbeats += 1
-                    shutdown_s = soft_idle_limit - soft_idle_heartbeats
-                    shutdown_s *= self.heartbeat_period
-
-                    if soft_idle_heartbeats == 1:
-                        log.info(
-                            "In idle state (due to no task or result movement);"
-                            f" shut down in {shutdown_s:,}s.  (idle_heartbeats_soft)"
-                        )
-                    idle_proc_title = "[idle; shut down in {:,}s] {}"
-                    setproctitle.setproctitle(
-                        idle_proc_title.format(shutdown_s, live_proc_title)
-                    )
-
-                    if soft_idle_heartbeats >= soft_idle_limit:
-                        log.info("Idle heartbeats reached.  Shutting down.")
-                        self.stop()
-
-                elif hard_idle_heartbeats > hard_idle_limit:
-                    log.warning("Shutting down due to idle heartbeats HARD limit.")
-                    self.stop()
-
-                elif hard_idle_heartbeats > soft_idle_limit:
-                    # Reminder: this branch only hit if EP started and no tasks
-                    # or results have moved.  If *any* movement occurs, this branch
-                    # won't get executed.
-                    shutdown_s = hard_idle_limit - hard_idle_heartbeats
-                    shutdown_s *= self.heartbeat_period
-                    if hard_idle_heartbeats == soft_idle_limit + 1:
-                        # only log the first time; no sense in filling logs
-                        log.info(
-                            "Possibly idle -- no task or result movement.  Will"
-                            f" shut down in {shutdown_s:,}s.  (idle_heartbeats_hard)"
-                        )
-                    idle_proc_title = "[possibly idle; shut down in {:,}s] {}"
-                    setproctitle.setproctitle(
-                        idle_proc_title.format(shutdown_s, live_proc_title)
-                    )
-
-        self.pending_task_queue.put(None)
-        task_processor_thread.join()
-        stored_processor_thread.join()
-
-        # let higher-level error handling take over if the following excepts
-        try:
-            heartbeat(active=False).result(timeout=5)
-        except concurrent.futures.TimeoutError:
-            log.warning(
-                "Unable to send final heartbeat (timeout sending); ignoring for quiesce"
-            )
-
-        task_q_subscriber.stop()
-        results_publisher.stop(block=False)
-        heartbeat_publisher.stop(block=False)
 
         log.debug("_main_loop exits")
