@@ -4,10 +4,10 @@ Subscriptions
 What is a Subscription?
 ***********************
 
-A `Globus subscription`_ is a paid, organization-level plan that adds additional
+A `Globus subscription`_ is a paid, organization-level plan that enables additional
 capabilities across the entire `Globus`_ platform.  It is not a personal account; the
-subscription is purchased by an institution, research group, or company and applied to
-users in that organization.
+subscription is purchased by an institution, research group, or company and applies to
+all users in that organization.
 
 While an `organizational subscription`_ is an add-on, many Globus features are
 available without one.  For example, the core of Globus Compute |nbsp| --- |nbsp|
