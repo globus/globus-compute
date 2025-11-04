@@ -704,7 +704,27 @@ def _do_start_endpoint(
 
             raise
 
+    @contextlib.contextmanager
+    def _restart_on_usr1():
+        should_exec = False
+
+        def _handler(*a, **k):
+            nonlocal should_exec
+            should_exec = True
+            os.kill(os.getpid(), signal.SIGTERM)
+
+        env = dict(os.environ)
+        args = list(sys.argv)
+        try:
+            signal.signal(signal.SIGUSR1, _handler)
+            yield
+        finally:
+            if should_exec:
+                print(f"EXECUTING AFRESH: {args=}", flush=True)
+                os.execvpe(args[0], args=args, env=env)
+
     with contextlib.ExitStack() as stk:
+        stk.enter_context(_restart_on_usr1())
         stk.enter_context(_send_message_on_error_exit())
         try:
             if config_str is not None:
