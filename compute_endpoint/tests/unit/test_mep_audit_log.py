@@ -16,7 +16,7 @@ from globus_compute_endpoint.endpoint.endpoint_manager import (
 from tests.utils import try_assert
 
 _MOCK_BASE = "globus_compute_endpoint.endpoint.endpoint_manager."
-_GOOD_UNPRIVILEGED_EC = 83
+_GOOD_UNPRIVILEGED_EC = 84
 
 
 @pytest.fixture(autouse=True, scope="module")
