@@ -1260,6 +1260,14 @@ class EndpointManager:
             stdin_data = json.dumps(stdin_data_dict, separators=(",", ":"))
             exit_code += 1
 
+            # Reminder: this is *os*.open, not *open*.  Descriptors will not be closed
+            # unless we explicitly do so, so `null_fd =` in loop will work.
+            null_fd = os.open(os.devnull, os.O_WRONLY, mode=0o200)
+            while null_fd < 3:  # reminder 0/1/2 == std in/out/err, so ...
+                # ... overkill, but "just in case": don't step on them
+                null_fd = os.open(os.devnull, os.O_WRONLY, mode=0o200)
+            exit_code += 1
+
             log.debug("Setting up process stdin")
             read_handle, write_handle = os.pipe()
 

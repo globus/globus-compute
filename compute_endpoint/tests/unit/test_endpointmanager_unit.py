@@ -53,7 +53,7 @@ else:
 
 
 _MOCK_BASE = "globus_compute_endpoint.endpoint.endpoint_manager."
-_GOOD_EC = 87  # SPoA for "good/happy-path" exit code
+_GOOD_EC = 88  # SPoA for "good/happy-path" exit code
 
 _mock_rootuser_rec = pwd.struct_passwd(
     ("root", "", 0, 0, "Mock Root User", "/mock_root", "/bin/false")
@@ -2085,7 +2085,7 @@ def test_run_as_same_user_does_not_change_uid(successful_exec_from_mocked_root):
     with pytest.raises(SystemExit) as pyexc:
         em._event_loop()
 
-    assert pyexc.value.code == 83, "Q&D: verify we exec'ed, but no privilege drop"
+    assert pyexc.value.code == 84, "Q&D: verify we exec'ed, but no privilege drop"
 
     assert not mock_os.initgroups.called
     assert not mock_os.setresuid.called
