@@ -526,6 +526,46 @@ def test_validate_user_opts_reserved_words(
     assert "reserved" in str(pyt_exc)
 
 
+def test_render_user_config_validates_before_sanitize(
+    mocker, conf_no_exec, mapped_ident
+):
+    user_opts = {"foo": "bar"}
+    user_opts_calls = []
+
+    def spy(msg, *, exit_early=False):
+        def side_effect(arg1, *_a, **_k):
+            if arg1 != user_opts:
+                return
+
+            user_opts_calls.append(msg)
+            if exit_early:
+                raise Exception("early exit")
+
+        return side_effect
+
+    mocker.patch(f"{_MOCK_BASE}_validate_user_opts", side_effect=spy("validate"))
+    mocker.patch(
+        f"{_MOCK_BASE}_sanitize_user_json",
+        side_effect=spy("sanitize", exit_early=True),
+    )
+
+    with pytest.raises(Exception) as pyt_exc:
+        render_config_user_template(
+            conf_no_exec,
+            "foo: {{ foo }}",
+            pathlib.Path("/"),
+            mapped_ident,
+            {},
+            user_opts,
+        )
+
+    assert "early exit" in str(pyt_exc.value), "ensure we're testing the right path"
+    assert user_opts_calls == [
+        "validate",
+        "sanitize",
+    ], "sanitize can change user_opts; validate must happen first"
+
+
 @pytest.mark.parametrize("conftext", ("display_name: test-name", "", None))
 def test_get_config_missing_ok(fs, conftext):
     conf_dir = pathlib.Path("/")
