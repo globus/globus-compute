@@ -7,6 +7,7 @@ import logging
 import os
 import pathlib
 import random
+import shutil
 import time
 import uuid
 from collections import namedtuple
@@ -38,6 +39,11 @@ _mock_base = "globus_compute_endpoint.endpoint.endpoint."
 
 # bloody line length ...
 _whitespace_msg = "no whitespace (spaces, newlines, tabs), slashes, or prefixed '.'"
+
+
+@pytest.fixture()
+def conf_dir(fs_ep_templates):
+    yield fs_ep_templates
 
 
 @pytest.fixture
@@ -81,7 +87,7 @@ def mock_get_config():
 
 @pytest.fixture
 def conf():
-    _conf = UserEndpointConfig(engine=ThreadPoolEngine)
+    _conf = UserEndpointConfig(engine=ThreadPoolEngine(), detach_endpoint=False)
     _conf.source_content = "# test source content"
     _conf.source_content += "\nengine:\n  type: ThreadPoolEngine"
     yield _conf
@@ -123,6 +129,12 @@ def mock_ep_dir(fs, mock_ep_data, mock_get_config):
 
 
 @pytest.fixture
+def mock_print():
+    with mock.patch(f"{_mock_base}print") as m:
+        yield m
+
+
+@pytest.fixture
 def umask():
     orig_umask = os.umask(0)
     os.umask(orig_umask)
@@ -158,8 +170,103 @@ def mock_reg_info(ep_uuid, uname, pword):
     }
 
 
+def test_configure_happy_path(mock_print, conf_dir):
+    Endpoint.configure_endpoint(conf_dir, None)
+    assert conf_dir.exists() and conf_dir.is_dir()
+
+
+def test_double_configure_exists(mock_print, conf_dir):
+    Endpoint.configure_endpoint(conf_dir, None)
+    with pytest.raises(Exception, match="ConfigExists"):
+        Endpoint.configure_endpoint(conf_dir, None)
+
+
+@pytest.mark.parametrize("ha", (None, True, False))
+def test_configure_ha_existing_config(mock_print, conf_dir, ha):
+    config_file = Endpoint._config_file_path(conf_dir)
+    config_copy = str(conf_dir.parent / "config2.yaml")
+
+    # First, make an entry with no ha
+    Endpoint.configure_endpoint(conf_dir, None, high_assurance=False)
+    shutil.move(config_file, config_copy)
+    shutil.rmtree(conf_dir)
+
+    # Then, modify it with new settings
+    Endpoint.configure_endpoint(conf_dir, config_copy, high_assurance=ha)
+
+    with open(config_file) as f:
+        config_dict = yaml.safe_load(f)
+    assert ("high_assurance" in config_dict) is (ha is True)
+
+
+@pytest.mark.parametrize("ha", (False, True))
+def test_configure_ha_audit_default(mock_print, conf_dir, ha):
+    config_file = Endpoint._config_file_path(conf_dir)
+    audit_path = Endpoint._audit_log_path(conf_dir)
+
+    Endpoint.configure_endpoint(conf_dir, None, high_assurance=ha)
+
+    assert config_file.exists(), "Verify setup"
+    conf = yaml.safe_load(config_file.read_text())
+    if not ha:
+        assert "audit_log_path" not in conf
+    else:
+        assert conf.get("high_assurance"), conf
+        assert conf.get("audit_log_path") == str(audit_path), conf
+
+
+def test_start_without_engine(caplog, conf_dir, conf):
+    conf.engine = None
+    with pytest.raises(ValueError, match="has no engines defined"):
+        Endpoint().start_endpoint(
+            conf_dir,
+            endpoint_uuid=None,
+            endpoint_config=conf,
+            log_to_console=False,
+            no_color=True,
+            reg_info={},
+            ep_info={},
+        )
+    r = caplog.records[-1]
+    assert r.levelno == logging.CRITICAL, r
+    assert "Endpoint will not start" in r.message, "Expect action"
+    assert " no engines defined" in r.message, "Expect cause"
+
+
+def test_start_ha_non_compliant(caplog, randomstring, mock_print, conf_dir, conf):
+    conf.high_assurance = True
+    Endpoint.configure_endpoint(conf_dir, endpoint_config=None)
+
+    exc_str = randomstring()
+
+    conf.engine.assert_ha_compliant = mock.Mock(side_effect=ValueError(exc_str))
+    with pytest.raises(
+        ValueError, match="Engine configuration is not High Assurance compliant"
+    ):
+        Endpoint().start_endpoint(
+            conf_dir,
+            endpoint_uuid=None,
+            endpoint_config=conf,
+            log_to_console=False,
+            no_color=True,
+            reg_info={},
+            ep_info={},
+        )
+    r = caplog.records[-1]
+    assert r.levelno == logging.CRITICAL, r
+    assert "Engine configuration" in r.message, "expect the 'what' in *log*"
+    assert "not High Assurance" in r.message, "expect the reason in *log*"
+    assert exc_str in r.message, "Verify expected path tested"
+
+
 def test_start_endpoint_no_reg_provided_registers(
-    mock_daemon, mock_launch, mock_log, mock_get_client, mock_ep_data, ep_uuid
+    mock_print,
+    mock_daemon,
+    mock_launch,
+    mock_log,
+    mock_get_client,
+    mock_ep_data,
+    ep_uuid,
 ):
     ep, ep_dir, log_to_console, no_color, ep_conf = mock_ep_data
     ep_args = (ep_dir, ep_uuid, ep_conf, log_to_console, no_color)
@@ -191,6 +298,7 @@ def test_endpoint_needs_no_client_if_reg_info(
 
 
 def test_start_endpoint_redacts_url_creds_from_logs(
+    mock_print,
     mock_daemon,
     mock_launch,
     mock_log,
@@ -212,7 +320,7 @@ def test_start_endpoint_redacts_url_creds_from_logs(
 
 
 def test_start_endpoint_populates_ep_static_info(
-    mock_daemon, mock_ep_data, mock_reg_info, ep_uuid, randomstring
+    mock_print, mock_daemon, mock_ep_data, mock_reg_info, ep_uuid, randomstring
 ):
     ep, ep_dir, log_to_console, no_color, ep_conf = mock_ep_data
     ep_args = (ep_dir, ep_uuid, ep_conf, log_to_console, no_color)
@@ -435,8 +543,11 @@ def test_pid_file_check(fs, is_running, is_active):
     assert pid_status["active"] is is_active
 
 
-def test_daemon_creates_pid(randomstring, mock_ep_data, mock_reg_info, ep_uuid):
+def test_daemon_creates_pid(
+    randomstring, mock_print, mock_ep_data, mock_reg_info, ep_uuid
+):
     ep, ep_dir, log_to_console, no_color, ep_conf = mock_ep_data
+    ep_conf.detach_endpoint = True
 
     mock_stk = mock.MagicMock()
     mock_stk.__enter__.return_value = mock_stk
@@ -721,6 +832,7 @@ def test_get_endpoint_id(tmp_path: pathlib.Path, json_exists: bool, ep_uuid):
 
 
 def test_handles_provided_endpoint_id_no_json(
+    mock_print,
     mock_daemon,
     mock_launch,
     mock_gcc,
@@ -740,6 +852,7 @@ def test_handles_provided_endpoint_id_no_json(
 
 
 def test_handles_provided_endpoint_id_with_json(
+    mock_print,
     mock_daemon,
     mock_launch,
     mock_gcc,

@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import os
+import pathlib
 import random
 import signal
 import string
@@ -15,6 +16,7 @@ import globus_sdk
 import pytest
 import responses
 from globus_compute_endpoint import engines
+from globus_compute_endpoint.endpoint import config
 from globus_compute_endpoint.engines.base import GlobusComputeEngineBase
 from globus_compute_sdk.sdk.web_client import WebClient
 from globus_compute_sdk.serialize import ComputeSerializer
@@ -22,6 +24,8 @@ from parsl.launchers import SimpleLauncher
 from parsl.providers import LocalProvider
 
 from .utils import create_task_packer
+
+DEF_CONFIG_DIR = pathlib.Path(config.__file__).parent
 
 
 @pytest.fixture(autouse=True)
@@ -245,3 +249,18 @@ def serde():
 @pytest.fixture
 def ez_pack_task(serde, task_uuid, container_uuid):
     return create_task_packer(serde, task_uuid, container_uuid)
+
+
+@pytest.fixture()
+def fs_ep_templates(fs):
+    # pyfakefs will take care of newly created files, not existing config
+    fs.add_real_file(DEF_CONFIG_DIR / "default_config.yaml")
+    fs.add_real_file(DEF_CONFIG_DIR / "user_config_template.yaml.j2")
+    fs.add_real_file(DEF_CONFIG_DIR / "user_config_schema.json")
+    fs.add_real_file(DEF_CONFIG_DIR / "user_environment.yaml")
+    fs.add_real_file(DEF_CONFIG_DIR / "example_identity_mapping_config.json")
+
+    config_dir = pathlib.Path(os.getcwd()) / "mock_endpoint"
+    assert not config_dir.exists()
+
+    yield config_dir
