@@ -2,23 +2,39 @@ import json
 import os
 import pathlib
 import random
+import shutil
 import uuid
 from unittest import mock
 
 import globus_compute_sdk.sdk.client
 import globus_compute_sdk.sdk.login_manager
 import pytest
+import requests
 import responses
 from click.testing import CliRunner
 from globus_compute_endpoint.cli import _do_stop_endpoint, app
 from globus_compute_endpoint.endpoint import endpoint
 from globus_compute_endpoint.endpoint.config import UserEndpointConfig
 from globus_compute_sdk.sdk.client import _ComputeWebClient
-from globus_sdk import UserApp
+from globus_sdk import GlobusAPIError, UserApp
 from pytest_mock import MockFixture
 
 _MOCK_BASE = "globus_compute_endpoint.endpoint.endpoint."
 _SVC_ADDY = "http://api.funcx.fqdn"  # something clearly not correct
+
+
+@pytest.fixture()
+def conf_dir(fs_ep_templates):
+    yield fs_ep_templates
+
+
+def _fake_http_response(*, status: int = 200, method: str = "GET") -> requests.Response:
+    req = requests.Request(method, "https://funcx.example.org/")
+    p_req = req.prepare()
+    res = requests.Response()
+    res.request = p_req
+    res.status_code = status
+    return res
 
 
 @pytest.fixture(autouse=True)
@@ -209,3 +225,54 @@ def test_endpoint_teardown_execution(mocker, tmp_path, randomstring):
 
     info_txt = "\n".join(a[0] for a, _k in mock_log.info.call_args_list)
     assert tmp_file_content in info_txt
+
+
+@pytest.mark.parametrize("web_svc_ok", (True, False))
+@pytest.mark.parametrize("force", (True, False))
+def test_delete_endpoint(conf_dir, mocker, web_svc_ok, force, ep_uuid):
+    mock_stop_endpoint = mocker.patch.object(endpoint.Endpoint, "stop_endpoint")
+    mock_rmtree = mocker.patch.object(shutil, "rmtree")
+
+    endpoint.Endpoint.configure_endpoint(conf_dir, None)
+
+    mock_gcc = mocker.Mock()
+    mocker.patch(f"{_MOCK_BASE}Endpoint.get_funcx_client").return_value = mock_gcc
+
+    # Exit if the web service call fails and we're not force deleting
+    if not web_svc_ok:
+        exc = GlobusAPIError(_fake_http_response(status=500, method="POST"))
+        mock_gcc.delete_endpoint.side_effect = exc
+        mock_gcc.get_endopint_status.side_effect = exc
+
+        if not force:
+            with pytest.raises(SystemExit), mock.patch(f"{_MOCK_BASE}log") as mock_log:
+                endpoint.Endpoint.delete_endpoint(
+                    conf_dir, force=force, ep_uuid=ep_uuid
+                )
+            a, _k = mock_log.critical.call_args
+            assert "without deleting the local endpoint" in a[0], "expected notice"
+
+            assert not mock_stop_endpoint.called
+            assert not mock_rmtree.called
+            return
+    else:
+        mock_gcc.get_endpoint_status.return_value = {
+            # "offline" is tested in test_endpoint_unit
+            "status": "online"
+        }
+
+    try:
+        endpoint.Endpoint.delete_endpoint(
+            conf_dir, ep_config=None, force=force, ep_uuid=ep_uuid
+        )
+
+        if web_svc_ok:
+            mock_stop_endpoint.assert_called_with(conf_dir, None, remote=False)
+        assert mock_gcc.delete_endpoint.called
+        assert mock_gcc.delete_endpoint.call_args[0][0] == ep_uuid
+        mock_rmtree.assert_called_with(conf_dir)
+    except SystemExit as e:
+        # If currently running, error out if force is not specified
+        # the message str itself is confirmed in test_endpoint_unit
+        assert not force
+        assert e.code == -1
