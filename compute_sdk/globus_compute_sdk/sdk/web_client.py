@@ -17,10 +17,6 @@ from globus_compute_sdk.sdk._environments import get_web_service_url, remove_url
 from globus_compute_sdk.sdk.utils.uuid_like import UUID_LIKE_T
 from globus_compute_sdk.serialize import ComputeSerializer
 from globus_compute_sdk.version import __version__
-from globus_sdk import Scope
-
-from .auth.scopes import ComputeScopes
-from .utils import get_py_version_str
 
 
 class FunctionRegistrationMetadata:
