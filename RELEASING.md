@@ -147,9 +147,10 @@ tag names as detailed below and then click the green **Build** button.
         * After GCS push during deploy day (or if we ping them to do so), the public images will be located at:
             * https://downloads.globus.org/globus-connect-server/stable/rpm/el/9/x86_64/
       [publishResults.groovy line 85](https://github.com/globusonline/gcs-build-scripts/blob/168617a0ccbb0aee7b3bee04ee67940bbe2a80f6/vars/publishResults.groovy#L85)
-1. (Access on VPN) For each release, update the Pipeline -> SCM -> Branch Specifier to the current release branch name e.g. v3.14.0 in [Build Configuration](https://builds.globus.org/jenkins/job/BuildGlobusComputeAgentPackages/configure)
-1. Enter the alpha or prod release name e.g. v3.14.0a0 or v3.14.0 in the input textbox of the [build page here](https://builds.globus.org/jenkins/job/BuildGlobusComputeAgentPackages/build?delay=0sec).  Check the ``BUILD_FOR_STABLE`` box if building for production
-1. Wait 20-30 minutes and confirm that the [build is green](https://builds.globus.org/jenkins/job/BuildGlobusComputeAgentPackages/)
+1. (Access on VPN) For each release, confirm that the Pipeline -> SCM -> Branch Specifier is `${BRANCH_OR_TAG}` in [Build Configuration](https://builds.globus.org/jenkins/job/BuildGlobusComputeAgentPackages/configure)
+1. Enter the alpha or prod release name e.g. v4.1.0a0 or v4.1.0 in the input textbox of the [Build with Parameters](https://builds.globus.org/jenkins/job/BuildGlobusComputeAgentPackages/build?delay=0sec) page.
+1. Check the ``BUILD_FOR_STABLE`` box if building for production, leave it unchecked otherwise
+1. Wait 15-30 minutes and confirm that the [build is green](https://builds.globus.org/jenkins/job/BuildGlobusComputeAgentPackages/)
 1. For production release cycles where there is also a GCS release, if we push our packages before they do, skip the following (also not necessary for alpha releases)
     * If there isn't a concurrent GCS release, or if GCS finishes their deploy before we finish building our packages, we need to manually run the downloads sync Jenkins script:
     * https://builds.globus.org/jenkins/view/all/job/Synchronize%20GCSv5%20Stable/build?delay=0sec

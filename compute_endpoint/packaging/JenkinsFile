@@ -34,8 +34,6 @@ pipeline {
                     env.BRANCH_NAME = params.BRANCH_OR_TAG
                     env.TAG_NAME = params.BRANCH_OR_TAG
                     env.BUILD_FOR_STABLE = params.BUILD_FOR_STABLE
-                    echo "Checking out env.BRANCH_NAME = ${env.BRANCH_NAME} with BUILD_FOR_STABLE = ${env.BUILD_FOR_STABLE}"
-                    sh "git checkout ${env.BRANCH_NAME}"
 
                     dir("compute_endpoint/packaging/") {
                         sh(script: "make show_vars")
