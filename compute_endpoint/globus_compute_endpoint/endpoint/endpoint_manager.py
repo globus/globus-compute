@@ -526,7 +526,7 @@ class EndpointManager:
             # hide cursor, highlight color, reset
             hc, hl, r = "\033[?25l", "\033[104m", "\033[m"
             pld = f"{hl}{self._endpoint_uuid_str}{r}"
-            print(f"{hc}        >>> Multi-User Endpoint ID: {pld} <<<", file=msg_out)
+            print(f"{hc}        >>> Endpoint ID: {pld} <<<", file=msg_out)
 
         self._install_signal_handlers()
 
