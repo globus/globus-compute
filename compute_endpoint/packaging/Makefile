@@ -9,7 +9,7 @@ PY_MAJOR_VERSION := $(shell echo -n $(PY_FULL_VERSION) | cut -d . -f1 )
 PY_MINOR_VERSION := $(shell echo -n $(PY_FULL_VERSION) | cut -d . -f2 )
 PY_VERSION := $(PY_MAJOR_VERSION)$(PY_MINOR_VERSION)
 
-VIRTUALENV := venv-$(PY_VERSION)
+VIRTUALENV := venv-py$(PY_VERSION)
 VENV_PIP := $(VIRTUALENV)/bin/pip
 VENV_PY := $(shell pwd)/$(VIRTUALENV)/bin/python
 
@@ -103,8 +103,8 @@ _build_needs:
 
 .PHONY: $(VENV_PY)
 $(VENV_PY): _build_needs
-	@if [ "$(PY_MAJOR_VERSION)" -ne 3 ] || [ "$(PY_MINOR_VERSION)" -lt 9 ]; then \
-		echo "Unsupported python version $(PY_FULL_VERSION). At least 3.9 is required."; \
+	@if [ "$(PY_MAJOR_VERSION)" -ne 3 ] || [ "$(PY_MINOR_VERSION)" -lt 10 ]; then \
+		echo "Unsupported python version $(PY_FULL_VERSION). At least 3.10 is required."; \
 		echo "To override python path, use the following"; \
 		echo "    make PYTHON3=/path/to/python"; \
 		exit 1; \
@@ -113,6 +113,7 @@ $(VENV_PY): _build_needs
 	ln -sf "$(VIRTUALENV)" venv
 	. venv/bin/activate
 	@"$(VENV_PY)" -m pip install -U pip -U setuptools -U build
+	rm -f "$(VENV_PY)"/.gitignore  # Python 3.13 now adds this to new venvs!  :facepalm:
 
 $(PKG_WHEEL): $(VENV_PY)
 	(   rm -rf build/ \
@@ -174,6 +175,7 @@ _setup_dist_for_deb:
 	    -e "s/@PACKAGE_NAME@/$(PKG_NAME)/g" \
 	    -e "s/@PACKAGE_VERSION@/$(PKG_VERSION)/g" \
 	    -e "s/@PIP_NAME@/$(PIP_NAME_D)/g" \
+	    -e "s/@VIRTUALENV@/$(VIRTUALENV)/g" \
 	)
 
 setup_dist_for_deb: dist _setup_dist_for_deb  ##-Place Debian-build required files in dist/
@@ -183,7 +185,7 @@ deb_build_needs:  ##-Check that necessary executables are available before start
 	@dpkg-checkbuilddeps
 
 _deb:
-	(   cd dist/ \
+	(   cd dist/; \
 	 sed -i debian/changelog.in -e "s/@distro@/$(OS_CODENAME)/g" \
 	 && mv debian/changelog.in debian/changelog \
 	 && rm -rf debbuild/ \
