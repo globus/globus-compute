@@ -341,20 +341,25 @@ class GlobusComputeEngine(GlobusComputeEngineBase):
 
     def _submit(
         self,
-        func: t.Callable,
         resource_specification: t.Dict,
-        *args: t.Any,
-        **kwargs: t.Any,
+        func: t.Callable,
+        packed_task: bytes,
+        args: tuple[t.Any, ...] = (),
+        kwargs: dict | None = None,
     ) -> GCExecutorFuture:
+        self.executor.validate_resource_spec(resource_specification)
+
+        exec_func_import = f"{func.__module__}.{func.__name__}"
+        context = {
+            "task_executor": {
+                "f": exec_func_import,
+                "a": args,
+                "k": kwargs or {},
+            },
+        }
         if resource_specification:
-            raise ValueError(
-                "resource_specification is not supported on GlobusComputeEngine."
-                " For MPI apps, use GlobusMPIEngine."
-            )
-        f = t.cast(
-            GCExecutorFuture,
-            self.executor.submit(func, resource_specification, *args, **kwargs),
-        )
+            context["resource_spec"] = resource_specification
+        f = t.cast(GCExecutorFuture, self.executor.submit_payload(context, packed_task))
         f.executor_task_id = f.parsl_executor_task_id  # type: ignore[attr-defined]
         return f
 
