@@ -117,7 +117,7 @@ class FunctionRegistrationData:
         return f"FunctionRegistrationData({args})"
 
 
-class WebClient(globus_sdk.ComputeClientV3):
+class WebClient(globus_sdk.BaseClient):
     # the `service_name` is used in the Globus SDK to lookup the service URL from
     # config. However, Globus Compute has its own logic for determining the base URL.
     # set `service_name` to allow the check which ensures this is set to pass

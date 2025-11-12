@@ -34,8 +34,11 @@ class LoginManager:
     """
 
     SCOPES: dict[str, list[str]] = {
-        ComputeScopes.resource_server: [ComputeScopes.all],
-        AuthScopes.resource_server: [AuthScopes.openid, AuthScopes.manage_projects],
+        ComputeScopes.resource_server: [ComputeScopes.all.scope_string],
+        AuthScopes.resource_server: [
+            AuthScopes.openid.scope_string,
+            AuthScopes.manage_projects.scope_string,
+        ],
     }
 
     def __init__(self, *, environment: str | None = None) -> None:
