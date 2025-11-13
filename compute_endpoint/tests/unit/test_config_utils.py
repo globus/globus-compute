@@ -631,7 +631,7 @@ def test_load_user_config_template_tries_yaml_if_j2_not_found(mock_log):
     template_path_j2 = conf_dir / "user_config_template.yaml.j2"
 
     assert load_user_config_template(template_path_j2) == "yaml"
-    a, *_ = mock_log.info.call_args
+    a, *_ = mock_log.debug.call_args
     assert "user_config_template.yaml.j2 does not exist" in a[0]
 
 
