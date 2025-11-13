@@ -267,7 +267,7 @@ def load_user_config_template(template_path: pathlib.Path) -> str:
     # load the file data into a string before dropping privileges.
     if not template_path.exists():
         file_name = template_path.name
-        log.info(f"{file_name} does not exist; trying .yaml")
+        log.debug(f"{file_name} does not exist; trying .yaml")
         template_path = pathlib.Path(re.sub(r"\.j2$", "", str(template_path)))
     return _read_config_file(template_path)
 
