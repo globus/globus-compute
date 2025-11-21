@@ -3,6 +3,17 @@ Changelog
 
 .. scriv-insert-here
 
+.. _changelog-4.2.0:
+
+globus-compute-sdk & globus-compute-endpoint v4.2.0
+---------------------------------------------------
+
+Bug Fixes
+^^^^^^^^^
+
+- Address a shutdown bug where the UEP process could take a long time to
+  shutdown, long after it had stated it had shutdown in the logs.
+
 .. _changelog-4.0.0:
 
 globus-compute-sdk & globus-compute-endpoint v4.0.0
