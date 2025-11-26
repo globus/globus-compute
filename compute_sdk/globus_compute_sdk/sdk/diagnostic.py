@@ -278,7 +278,42 @@ def general_commands_list(gc_base: Path):
     ]
 
 
-def get_diagnostic_commands(log_bytes: int, config_dir: str | None = None):
+def get_recent_endpoints(base_dir: Path, ep_names: list) -> list[Path]:
+    """
+    Get recently active endpoints based on latest file in endpoint
+    directory or the date of the directory itself.
+    The results are filtered by the given names, if provided
+
+    :param base_dir:   The base GC directory, normally ~/.globus_compute
+    :param ep_names:   List of endpoint names to filter by
+    :return:           List of endpoints in descending modified time (latest first)
+    """
+    ep_list_by_ts = list()
+    if ep_names:
+        ep_list = [base_dir / n for n in ep_names]
+    else:
+        ep_list = []
+        ep_names = []
+        for p in base_dir.iterdir():
+            if p.is_dir():
+                ep_list.append(p)
+                ep_names.append(p.name)
+
+    for ep in ep_list:
+        if ep.is_dir() and ep.name in ep_names:
+            latest_ts = max(
+                ep.stat().st_mtime, *(p.stat().st_mtime for p in ep.iterdir())
+            )
+            ep_list_by_ts.append([latest_ts, ep])
+    return [e[1] for e in sorted(ep_list_by_ts, reverse=True)]
+
+
+def get_diagnostic_commands(
+    log_bytes: int,
+    config_dir: str | None = None,
+    ep_names: str | None = None,
+    recent_only: int = -1,
+):
 
     commands = filter_by_os(hardware_commands_list())
 
@@ -308,21 +343,38 @@ def get_diagnostic_commands(log_bytes: int, config_dir: str | None = None):
         )
 
         if log_bytes > 0:
+            log_paths = []
+            ep_paths: list[Path] = []
             # Specifying 0 means we don't want to collect logs.
             # Do we want to disallow 0 for real world use?
-            commands.append(
-                cat(
+            if recent_only > 0 or ep_names:
+                ep_list = ep_names.split(",") if ep_names else []
+                if recent_only > 0:
+                    ep_paths = get_recent_endpoints(gc_base_dir, ep_list)[:recent_only]
+                else:
+                    for name in ep_list:
+                        # Check each input endpoint name to verify spelling
+                        ep_dir: Path = gc_base_dir / name
+                        if ep_dir.exists() and ep_dir.is_dir():
+                            ep_paths.append(ep_dir)
+                        else:
+                            print(
+                                f"Could not locate endpoint {name} as"
+                                f" {ep_dir.resolve()} is not a valid directory",
+                                file=sys.stderr,
+                            )
+                            sys.exit(os.EX_NOINPUT)
+            else:
+                ep_paths = [p for p in gc_base_dir.iterdir() if p.is_dir()]
+
+            for p in ep_paths:
+                log_paths.extend(
                     [
-                        f"{gc_base_dir}/*/*.yaml",
-                        f"{gc_base_dir}/*/*.log",
-                        f"{gc_base_dir}/*/*.py",
-                        f"{gc_base_dir}/*/*.j2",
-                        f"{gc_base_dir}/*/*.json",
-                    ],
-                    wildcard=True,
-                    max_bytes=log_bytes,
+                        f"{p.resolve()}/*{ext}"
+                        for ext in (".yaml", ".log", ".py", ".j2", ".json")
+                    ]
                 )
-            )
+            commands.append(cat(log_paths, wildcard=True, max_bytes=log_bytes))
     else:
         ep_install_dir = ""
 
@@ -377,6 +429,8 @@ def run_all_diags_wrapper(
     verbose: bool,
     ep_uuid: str | None = None,
     config_dir: str | None = None,
+    ep_names: str | None = None,
+    recent_only: int = -1,
 ):
     """
     This is the diagnostic wrapper that obtains the list of commands to be run
@@ -405,6 +459,8 @@ def run_all_diags_wrapper(
                                 send a task that uses the function UUID to the
                                 endpoint to test end to end connectivity
     :param config_dir:         The base directory to use when gathering config/logs
+    :param ep_names:           A comma separated list of endpoint names to gather logs
+    :param recent_only:        Gather logs from the most recent n endpoints
     """
 
     current_time = dt.now().astimezone(timezone.utc).strftime("%Y-%m-%d-%H-%M-%SZ")
@@ -412,7 +468,9 @@ def run_all_diags_wrapper(
 
     diagnostic_output = []
 
-    diag_cmds, ep_install_dir = get_diagnostic_commands(log_bytes, config_dir)
+    diag_cmds, ep_install_dir = get_diagnostic_commands(
+        log_bytes, config_dir, ep_names, recent_only
+    )
 
     if ep_install_dir or ep_uuid:
         # If the Endpoint is installed we will be running ``whoami`` and ``list``
@@ -589,6 +647,28 @@ def do_diagnostic_base(diagnostic_args):
             " what is set in $GLOBUS_COMPUTE_USER_DIR"
         ),
     )
+    parser.add_argument(
+        "-l",
+        "--endpoint-log-dirs",
+        default=None,
+        type=str,
+        help=(
+            "Gather endpoint configuration and log info only from the specified"
+            " endpoints in the config directory, instead of all endpoints."
+            " Multiple directories can be specified in a comma separated list"
+            " e.g. '-l ep_name' or '-l my_ep_1,my_ep_2'"
+        ),
+    )
+    parser.add_argument(
+        "-r",
+        "--recent-endpoints",
+        default=2,
+        type=int,
+        help=(
+            "Gather endpoint logs and configurations from only the most recently"
+            " active endpoints (default 2), e.g. '-r 3'"
+        ),
+    )
 
     args = parser.parse_args(diagnostic_args)
     run_all_diags_wrapper(
@@ -597,6 +677,8 @@ def do_diagnostic_base(diagnostic_args):
         args.verbose,
         args.endpoint_uuid,
         args.config_dir,
+        args.endpoint_log_dirs,
+        args.recent_endpoints,
     )
 
 
