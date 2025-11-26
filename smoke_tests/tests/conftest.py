@@ -254,6 +254,11 @@ def linear_backoff(timeout_s: int):
     return LinearBackoff(timeout_s, 1).backoff
 
 
+@pytest.fixture(scope="function")
+def linear_backoff_zero_based(timeout_s: int):
+    return LinearBackoff(timeout_s, 0).backoff
+
+
 @pytest.fixture
 def submit_function_and_get_result(compute_client: Client, linear_backoff: t.Callable):
     def submit_fn(endpoint_id, func=None, func_args=None, func_kwargs=None):
