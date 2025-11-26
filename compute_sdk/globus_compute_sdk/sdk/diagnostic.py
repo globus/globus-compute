@@ -360,7 +360,7 @@ def get_diagnostic_commands(
                                 f" {ep_dir.resolve()} is not a valid directory",
                                 file=sys.stderr,
                             )
-                            sys.exit(os.EX_NOTFOUND)
+                            sys.exit(os.EX_NOINPUT)
 
                 for p in ep_paths:
                     log_paths.extend(
