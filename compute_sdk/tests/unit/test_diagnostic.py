@@ -354,6 +354,34 @@ def test_diagnostic_gzip(
     assert contents.count("== Diagnostic:") == len(mock_all_reports)
 
 
+def test_diagnostic_log_recent_eps(
+    change_test_dir,
+    capsys,
+    mock_all_reports,
+    mock_endpoint_config_dir_data,
+    mock_gc_home,
+    mocker,
+):
+    mocker.patch(f"{MOCK_DIAG_BASE}.Client")
+    test_config = mock_endpoint_config_dir_data(mock_gc_home)
+    constant_diag_args = DIAG_ZIP_ARGS + ["--recent-endpoints", 1, "-p"]
+
+    appended_to_log = False
+    log_extra = "Some more log data blah blah 1 2 3 recent file"
+    for log_file in test_config.keys():
+        if str(log_file).endswith(".log"):
+            with open(log_file, "a") as f:
+                # Write more than a few words just to make sure
+                for _ in range(3):
+                    f.write(log_extra + "\n")
+            appended_to_log = True
+    assert appended_to_log
+
+    do_diagnostic_base(constant_diag_args)
+    captured = capsys.readouterr()
+    assert log_extra in captured
+
+
 def test_diagnostic_log_size_limit(
     change_test_dir,
     mock_all_reports,
