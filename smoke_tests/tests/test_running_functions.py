@@ -24,7 +24,7 @@ def double(x):
 def ohai():
     import time
 
-    time.sleep(5)
+    time.sleep(0.9)
     return "ohai"
 
 
@@ -54,12 +54,12 @@ def test_batch(compute_client: Client, endpoint: str, linear_backoff: t.Callable
 
 
 def test_wait_on_new_hello_world_func(
-    compute_client: Client, endpoint, linear_backoff: t.Callable
+    compute_client: Client, endpoint, linear_backoff_zero_based: t.Callable
 ):
     func_id = compute_client.register_function(ohai)
     task_id = compute_client.run(endpoint_id=endpoint, function_id=func_id)
 
-    while linear_backoff():
+    while linear_backoff_zero_based():
         try:
             result = compute_client.get_result(task_id)
             break
