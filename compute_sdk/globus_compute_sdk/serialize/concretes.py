@@ -466,6 +466,8 @@ SELECTABLE_STRATEGIES = [
     for t in SerializationStrategy._CACHE.values()
     if not getattr(t, "_DEPRECATED", False)
 ]
+SELECTABLE_CODE_STRATEGIES = [t for t in SELECTABLE_STRATEGIES if t.for_code]
+SELECTABLE_DATA_STRATEGIES = [t for t in SELECTABLE_STRATEGIES if not t.for_code]
 
 #: The *code* serialization strategy used by :class:`ComputeSerializer`
 #: when one is not specified.
