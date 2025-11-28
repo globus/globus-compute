@@ -1,5 +1,7 @@
 #! groovy
 
+env.EPIC = "python313"
+
 @Library('gcs-build-scripts') _
 
 pipeline {
@@ -17,7 +19,7 @@ pipeline {
     }
     stages {
         stage ("Prep source") {
-            agent {label "package_creator"}
+            agent {label "package_creator_py313"}
             steps {
                 script {
 
@@ -68,13 +70,15 @@ pipeline {
                                 env.SOURCE_STASH_NAME,
                                 env.PKG_TARBALL,
                                 require_gcs5_repo: true,
+                                epic: getClubhouseEpic(),
                                 extra_tarball_map: extra_tarball_map
                             )
                         }, "rpm": {
                             env.RPM_ARTIFACTS_STASH = buildMock(
                                 env.SOURCE_STASH_NAME,
                                 env.PKG_TARBALL,
-                                true
+                                true,
+                                getClubhouseEpic()
                             )
                         }, "failFast": false
                     }
