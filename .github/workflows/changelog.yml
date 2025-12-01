@@ -11,7 +11,7 @@ jobs:
       )
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@v6
         with:  # do a deep fetch to allow merge-base and diff
           fetch-depth: 0
       - name: check PR adds a news file
