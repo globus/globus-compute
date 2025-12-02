@@ -329,8 +329,257 @@ processing:
             print("Received:", f.result())
 
 
-.. include:: shell_functions.rst
+Shell Functions
+---------------
 
+|ShellFunction| is the solution to executing commands remotely using Globus Compute.
+The |ShellFunction| class allows for the specification of a command string, along
+with runtime details such as a run directory, per-task sandboxing, walltime, etc and
+returns a |ShellResult|. |ShellResult| encapsulates the outputs from executing the
+command line string by wrapping the return code and snippets from the standard
+streams (``stdout`` and ``stderr``).
+
+Here's a basic example that demonstrates specifying a |ShellFunction| that is to be
+formatted with a list of values at launch time.
+
+.. code-block:: python
+    :caption: globus_compute_shell_function.py
+
+    from globus_compute_sdk import ShellFunction, Executor
+
+    ep_id = "<SPECIFY_ENDPOINT_ID>"
+    # The cmd will be formatted with kwargs at invocation time
+    bf = ShellFunction("echo '{message}'")
+    with Executor(endpoint_id=ep_id) as ex:
+        for msg in ("hello", "hola", "bonjour"):
+            future = ex.submit(bf, message=msg)
+            shell_result = future.result()  # ShellFunctions return ShellResults
+            print(shell_result.stdout)
+
+Executing the above prints:
+
+.. code-block:: text
+
+    hello
+
+    hola
+
+    bonjour
+
+
+The |ShellResult| object captures outputs relevant to simplify debugging when execution
+failures. By default, |ShellFunction| captures 1,000 lines of stdout and stderr, but this
+can be changed via the ``ShellFunction(snippet_lines)`` kwarg.
+
+
+Shell Results
+^^^^^^^^^^^^^
+
+The output from a |ShellFunction| is encapsulated in a |ShellResult|. Here are the various fields made
+available through the |ShellResult|:
+
+* ``returncode``: The return code from the execution of the command supplied
+* ``stdout``: A snippet of upto the last 1K lines captured from the stdout stream
+* ``stderr``: A snippet of upto the last 1K lines captures form the stderr stream
+* ``cmd``: The formatted command string executed on the endpoint
+
+To return a JSON-compatible dict instead of a |ShellResult| object, set the ``return_dict`` argument to
+``True`` when instantiating a |ShellFunction|:
+
+.. code-block:: python
+   :emphasize-lines: 3, 8
+
+    from globus_compute_sdk import Executor, ShellFunction
+
+    func = ShellFunction("echo '{message}'", return_dict=True)
+    with Executor(endpoint_id="...") as ex:
+        for msg in ("hello", "hola", "bonjour"):
+            fut = ex.submit(func, message=msg)
+            res = future.result()
+            assert isinstance(res, dict)
+            assert msg in res["stdout"]
+
+.. note::
+    Bear in mind that the snippet lines count toward the 10 MiB payload size limit.  The
+    number of lines captured from ``stdout`` and ``stderr`` can be modified by setting
+    the :doc:`snippet_lines <../reference/shell_function>` keyword argument.
+
+Working Directory
+^^^^^^^^^^^^^^^^^
+
+Since ShellFunctions operate on files, overwriting files unintentionally is a
+possibility.  To mitigate this, |ShellFunction| recommends enabling sandboxing through
+the endpoint configuration.  By default the working directory is:
+``~/.globus_compute/<ENDPOINT_NAME>/tasks_working_dir/``.  With sandboxing enabled, each
+|ShellFunction| executes within a task specific directory named:
+``~/.globus_compute/<ENDPOINT_NAME>/tasks_working_dir/<TASK_UUID>``.
+
+Here's an example configuration:
+
+.. code-block:: yaml
+
+    display_name: SandboxExample
+    engine:
+      type: GlobusComputeEngine
+
+      # Enable sandboxing
+      run_in_sandbox: True
+
+
+Walltime
+^^^^^^^^
+
+The ``walltime`` keyword argument to |ShellFunction| can be used to specify the maximum duration (in seconds)
+after which execution should be interrupted. If the execution was prematurely terminated due to reaching
+the walltime, the return code will be set to ``124``, which matches the behavior of the
+`timeout <https://ss64.com/bash/timeout.html>`_ command.
+
+Here's an example:
+
+.. code-block:: python
+
+    # Limit execution to 1s
+    bf = ShellFunction("sleep 2", walltime=1)
+    future = executor.submit(bf)
+    print(future.returncode)
+
+Executing the above prints:
+
+.. code-block:: text
+
+    124
+
+MPI Functions
+-------------
+
+|MPIFunction| is the solution for executing MPI applications remotely using Globus Compute.
+As an extension to |ShellFunction|, the |MPIFunction| supports the same interface
+to specify the command to invoke on the endpoint as well as the capture of output
+streams. However, |MPIFunction| diverges from |ShellFunction| in the following ways:
+
+1. An |MPIFunction| requires a specification of the resources for its execution. This
+   specification must be set on the executor on the client-side. The ``resource_specification: dict``
+   takes the following options:
+
+   .. code-block:: python
+
+        executor.resource_specification = {
+            'num_nodes': <int>,        # Number of nodes required for the application instance
+            'ranks_per_node': <int>,   # Number of ranks / application elements to be launched per node
+            'num_ranks': <int>,        # Number of ranks in total
+        }
+
+2. |MPIFunction| is designed to be used with |GlobusMPIEngine| on the endpoint.
+   |GlobusMPIEngine| is required for the partitioning of a batch job (blocks) dynamically
+   based on the ``resource_specification`` of the |MPIFunction|.
+
+
+3. |MPIFunction| automatically prefixes the supplied command with ``$PARSL_MPI_PREFIX``
+   which resolves to an appropriate mpi launcher prefix (for e.g, ``mpiexec -n 4 -host <NODE1,NODE2>``).
+
+
+Multi-line commands
+^^^^^^^^^^^^^^^^^^^
+
+|MPIFunction| allows for multi-line commands, however the MPI launcher prefix is applied only to
+the entire command. If multiple commands need to be launched, explicitly use the ``$PARSL_MPI_PREFIX``.
+Here's an example:
+
+.. code-block:: python
+
+    MPIFunction("""true; # force the default prefix to launch a no-op
+    $PARSL_MPI_PREFIX <command_1>
+    $PARSL_MPI_PREFIX <command_2>
+    """)
+
+
+Here is an example configuration for an HPC system that uses PBSPro scheduler:
+
+.. code-block:: yaml
+
+    # Example configuration for a PBSPro based HPC system
+    display_name: PBSProHPC
+    engine:
+      type: GlobusMPIEngine
+      mpi_launcher: mpiexec
+
+      provider:
+        type: PBSProProvider
+
+        # Specify # of nodes per batch job that will be
+        # shared by multiple MPIFunctions
+        nodes_per_block: 4
+
+        launcher:
+          type: SimpleLauncher
+
+
+Here's another trimmed example for an HPC system that uses Slurm as the scheduler:
+
+.. code-block:: yaml
+
+    # Example configuration for a Slurm based HPC system
+    display_name: SlurmHPC
+    engine:
+      type: GlobusMPIEngine
+      mpi_launcher: srun
+
+      provider:
+        type: SlurmProvider
+
+        launcher:
+          type: SimpleLauncher
+
+        # Specify # of nodes per batch job that will be
+        # shared by multiple MPIFunctions
+        nodes_per_block: 4
+
+
+.. code-block:: python
+    :caption: globus_compute_mpi_function_example.py
+
+    from globus_compute_sdk import Executor, MPIFunction
+
+    ep_id = "<SPECIFY_ENDPOINT_ID>"
+    func = MPIFunction("hostname")
+    with Executor(endpoint_id=ep_id) as ex:
+        for nodes in range(1, 4):  # reminder: 1, 2, 3; 4 not included
+            ex.resource_specification = {
+                "num_nodes": 2,
+                "ranks_per_node": nodes
+            }
+            fu = ex.submit(func)
+            mpi_result = fu.result()
+            print(mpi_result.stdout)
+
+Expect output similar to:
+
+.. code-block:: text
+
+    exp-14-08
+    exp-14-20
+
+    exp-14-08
+    exp-14-20
+    exp-14-08
+    exp-14-20
+
+    exp-14-08
+    exp-14-20
+    exp-14-08
+    exp-14-08
+    exp-14-20
+    exp-14-20
+
+The |ShellResult| object captures outputs relevant to simplify debugging when execution
+failures. By default, |MPIFunction| captures 1,000 lines of stdout and stderr, but this
+can be changed via the ``MPIFunction(snippet_lines:int = <NUM_LINES>)`` kwarg.
+
+Results
+^^^^^^^
+
+|MPIFunction| encapsulates its output in a |ShellResult|. Please refer to
+our `documentation section on shell results <#shell-results>`_ for more information.
 
 .. _specifying-serde-strategy:
 
@@ -485,3 +734,7 @@ like BinderHub:
 .. _concurrent.futures.as_completed: https://docs.python.org/3/library/concurrent.futures.html#concurrent.futures.as_completed
 .. |dill| replace:: ``dill``
 .. _dill: https://dill.readthedocs.io/en/latest/#basic-usage
+.. |MPIFunction| replace:: :class:`~globus_compute_sdk.sdk.mpi_function.MPIFunction`
+.. |ShellFunction| replace:: :class:`~globus_compute_sdk.sdk.shell_function.ShellFunction`
+.. |ShellResult| replace:: :class:`~globus_compute_sdk.sdk.shell_function.ShellResult`
+.. |GlobusMPIEngine| replace:: :class:`~globus_compute_endpoint.engines.GlobusMPIEngine`
