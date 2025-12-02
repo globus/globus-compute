@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/usr/bin/env bash
 
 # Take advantage of FS-events to avoid an up-enter cycle.  Just save any file within
 # the documentation directory and then go reload the page.
