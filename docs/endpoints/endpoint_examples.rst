@@ -290,10 +290,5 @@ environment variables set to the worker specific identity assigned:
 
 .. _#help channel: https://funcx.slack.com/archives/C017637NZFA
 
-.. |GlobusComputeEngine| replace:: ``GlobusComputeEngine``
-.. _GCEngine: reference/engine.html
-.. |HighThroughputExecutor| replace:: ``HighThroughputExecutor``
-.. _HighThroughputExecutor: https://parsl.readthedocs.io/en/stable/stubs/parsl.executors.HighThroughputExecutor.html
-
 .. |GlobusMPIEngine| replace:: ``GlobusMPIEngine``
-.. _GlobusMPIEngine: reference/mpi_engine.html
+.. _GlobusMPIEngine: ../reference/mpi_engine.html
