@@ -339,6 +339,7 @@ def get_diagnostic_commands(
             ]
         )
 
+        print(f"Before checking log_bytes {log_bytes}")
         if log_bytes > 0:
             # Specifying 0 means we don't want to collect logs.
             # Do we want to disallow 0 for real world use?

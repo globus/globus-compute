@@ -36,6 +36,7 @@ behavior.  ie. an empty list [] for creating zip files if that is the default,
 ["-p"] if the default is creating a zip file and printing to console is needed.
 """
 DIAG_PRINT_ARGS = ["-p"]
+DIAG_PRINT_LOG_ARGS = ["-p", "-k", "1"]
 DIAG_ZIP_ARGS = []
 
 
@@ -340,7 +341,7 @@ def test_diagnostic_gzip(
                 diagnostic_heading_count += 1
         assert diagnostic_heading_count >= 5
     else:
-        assert len(captured_stdout) == 2
+        assert len(captured_stdout) == 2, f"Output is \n<--{captured_stdout}-->"
 
     assert captured_stdout[-2].startswith(
         "Compressed diagnostic output successfully written"
@@ -363,17 +364,21 @@ def test_diagnostic_log_recent_eps(
     mocker,
 ):
     mocker.patch(f"{MOCK_DIAG_BASE}.Client")
+    mock_ep_dir = mocker.patch(f"{MOCK_DIAG_BASE}.print_endpoint_install_dir")
+    mock_ep_dir.return_value = str(mock_gc_home)
 
     num_eps = 4
     # Create some random EPs with data, min 3 for test logic
     ep_names = [f"ep_{i}" for i in range(1, num_eps + 1)]
     test_config = mock_endpoint_config_dir_data(mock_gc_home, ep_names)
+
     diag_args = DIAG_PRINT_ARGS + ["--recent-endpoints", "1"]
 
     log_line = "Some more log data blah blah"
     time.sleep(0.01)
     idx = 1
     for log_file in test_config.keys():
+        print(f"\n*****\nAppending to {log_file.resolve()}\n")
         if str(log_file).endswith(".log"):
             with open(log_file, "a") as f:
                 for _ in range(3):
@@ -384,12 +389,21 @@ def test_diagnostic_log_recent_eps(
 
     do_diagnostic_base(diag_args)
     captured = capsys.readouterr()
-    assert f"{log_line} recent_{num_eps}" in captured.out
+    all_lines = captured.out.split("\n")
+
+    # REMOVE after debugging
+    recent_txt = "\n".join([ln for ln in all_lines if "recent_" in ln])
+
+    if f"{log_line} recent_{num_eps}" not in captured.out:
+        print(recent_txt + "\n*****XYZ*****\n")
+        print(captured.out)
+
+    assert f"{log_line} recent_{num_eps}" in captured.out, f"\n{recent_txt}\n"
     # First file shouldn't get gathered
-    assert "recent_1" not in log_line
+    assert "recent_1" not in log_line, f"\n{log_line}\n"
 
     # Now make the 2nd endpoint 'fresh' by touching the ep dir instead of log file
-    (next(iter(test_config)).parent.parent / "ep_2").touch()
+    (mock_gc_home / "ep_2").touch()
     diag_args = diag_args[:-1] + [
         # Change # of recent EPs to 2
         "2",
@@ -400,10 +414,12 @@ def test_diagnostic_log_recent_eps(
     do_diagnostic_base(diag_args)
     captured = capsys.readouterr()
 
+    recent_txt = "\n".join([ln for ln in all_lines if "recent_" in ln])
+
     # The 2nd's ep directory and the last EP's endpoint.log should be latest
-    assert f"{log_line} recent_2" in captured.out
-    assert f"{log_line} recent_{num_eps}" in captured.out
-    assert f"{log_line} recent_{num_eps - 1}" not in captured.out
+    assert f"{log_line} recent_2" in captured.out, recent_txt
+    assert f"{log_line} recent_{num_eps}" in captured.out, recent_txt
+    assert f"{log_line} recent_{num_eps - 1}" not in captured.out, recent_txt
 
 
 def test_diagnostic_log_size_limit(
@@ -478,7 +494,6 @@ def test_diagnostic_base_dir_GC_HOME_or_config_param(
     capsys,
 ):
     mocker.patch(f"{MOCK_DIAG_BASE}.Client")
-    mocker.patch(f"{MOCK_DIAG_BASE}.run_single_command")
 
     ep_names = [randomstring(), randomstring()]
 
