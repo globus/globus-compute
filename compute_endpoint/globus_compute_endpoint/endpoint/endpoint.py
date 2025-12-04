@@ -185,7 +185,7 @@ class Endpoint:
             world_readable = 0o0644
 
             dst_user_tmpl_path = Endpoint.user_config_template_path(endpoint_dir)
-            dst_user_schem_path = Endpoint.user_config_schema_path(endpoint_dir)
+            dst_user_schema_path = Endpoint.user_config_schema_path(endpoint_dir)
             dst_user_env_path = Endpoint._user_environment_path(endpoint_dir)
             dst_idmap_conf_path = Endpoint._example_identity_mapping_configuration_path(
                 endpoint_dir
@@ -193,12 +193,12 @@ class Endpoint:
 
             _src_conf_dir = package_dir / "config"
             src_user_tmpl_path = _src_conf_dir / dst_user_tmpl_path.name
-            src_user_schem_path = _src_conf_dir / dst_user_schem_path.name
+            src_user_schema_path = _src_conf_dir / dst_user_schema_path.name
             src_user_env_path = _src_conf_dir / dst_user_env_path.name
             src_example_idmap_path = _src_conf_dir / dst_idmap_conf_path.name
 
             shutil.copyfile(src_user_tmpl_path, dst_user_tmpl_path)
-            shutil.copyfile(src_user_schem_path, dst_user_schem_path)
+            shutil.copyfile(src_user_schema_path, dst_user_schema_path)
             shutil.copyfile(src_user_env_path, dst_user_env_path)
             if id_mapping:
                 shutil.copyfile(src_example_idmap_path, dst_idmap_conf_path)
