@@ -35,6 +35,7 @@ behavior.  ie. an empty list [] for creating zip files if that is the default,
 ["-p"] if the default is creating a zip file and printing to console is needed.
 """
 DIAG_PRINT_ARGS = ["-p"]
+DIAG_PRINT_LOG_ARGS = ["-p", "-k", "1"]
 DIAG_ZIP_ARGS = []
 
 
@@ -352,6 +353,59 @@ def test_diagnostic_gzip(
         assert random_file_data in contents
 
     assert contents.count("== Diagnostic:") == len(mock_all_reports)
+
+
+def test_diagnostic_log_recent_eps(
+    change_test_dir,
+    capsys,
+    mock_endpoint_config_dir_data,
+    mock_gc_home,
+    mocker,
+):
+    mocker.patch(f"{MOCK_DIAG_BASE}.Client")
+    mock_ep_dir = mocker.patch(f"{MOCK_DIAG_BASE}.print_endpoint_install_dir")
+    mock_ep_dir.return_value = str(mock_gc_home)
+
+    num_eps = 4
+    # Create some random EPs with data, min 3 for test logic
+    ep_names = [f"ep_{i}" for i in range(1, num_eps + 1)]
+    test_config = mock_endpoint_config_dir_data(mock_gc_home, ep_names)
+
+    diag_args = DIAG_PRINT_ARGS + ["--recent-endpoints", "1"]
+
+    log_line = "Some more log data blah blah"
+    idx = 1
+    for log_file in test_config.keys():
+        if str(log_file).endswith(".log"):
+            with open(log_file, "a") as f:
+                for _ in range(3):
+                    # Write the index of the log, the latest should be highest
+                    f.write(f"{log_line} recent_{idx} for {log_file.resolve()}\n")
+            idx += 1
+
+    do_diagnostic_base(diag_args)
+    captured = capsys.readouterr()
+
+    assert f"{log_line} recent_{num_eps}" in captured.out
+    # First file shouldn't get gathered
+    assert "recent_1" not in log_line
+
+    # Now make the 2nd endpoint 'fresh' by touching the ep dir instead of log file
+    (mock_gc_home / "ep_2").touch()
+    diag_args = diag_args[:-1] + [
+        # Change # of recent EPs to 2
+        "2",
+        # specify all the endpoint names except for the first
+        "-l",
+        ",".join([f"ep_{i}" for i in range(2, num_eps + 1)]),
+    ]
+    do_diagnostic_base(diag_args)
+    captured = capsys.readouterr()
+
+    # The 2nd's ep directory and the last EP's endpoint.log should be latest
+    assert f"{log_line} recent_2" in captured.out
+    assert f"{log_line} recent_{num_eps}" in captured.out
+    assert f"{log_line} recent_{num_eps - 1}" not in captured.out
 
 
 def test_diagnostic_log_size_limit(
