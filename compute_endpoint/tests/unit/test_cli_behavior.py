@@ -512,6 +512,14 @@ def test_configure_ep_subscription_id_in_config(
     assert conf_dict["subscription_id"] == subscription_id
 
 
+def test_configure_ep_endpoint_config_deprecated(run_line, randomstring):
+    res = run_line(
+        f"configure {randomstring()} --endpoint-config {randomstring()}",
+        assert_exit_code=1,
+    )
+    assert "--endpoint-config is deprecated" in res.stderr
+
+
 @pytest.mark.parametrize("display_name", [None, "None"])
 def test_config_yaml_display_none(run_line, mock_command_ensure, display_name):
     ep_name = "test_display_none"

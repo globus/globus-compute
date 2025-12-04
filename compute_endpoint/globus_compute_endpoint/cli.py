@@ -290,7 +290,23 @@ def version_command():
 
 
 @app.command(name="configure", help="Configure an endpoint")
-@click.option("--endpoint-config", default=None, help="a template config to use")
+@click.option(
+    "--endpoint-config",
+    default=None,
+    help="DEPRECATED: use --manager-config or --template-config",
+)
+@click.option(
+    "--manager-config",
+    type=click.Path(exists=True, dir_okay=False, path_type=pathlib.Path),
+    default=None,
+    help="TODO",
+)
+@click.option(
+    "--template-config",
+    type=click.Path(exists=True, dir_okay=False, path_type=pathlib.Path),
+    default=None,
+    help="TODO",
+)
 @click.option(
     "--multi-user",
     type=click.BOOL,
@@ -376,6 +392,8 @@ def configure_endpoint(
     *,
     name: str,
     endpoint_config: str | None,
+    manager_config: pathlib.Path | None,
+    template_config: pathlib.Path | None,
     multi_user: bool | None,
     high_assurance: bool,
     display_name: str | None,
@@ -398,6 +416,12 @@ def configure_endpoint(
         raise ClickException(
             "Unable to configure new endpoints; Manager Endpoint Processes are not"
             " supported on this system"
+        )
+
+    if endpoint_config is not None:
+        raise ClickException(
+            "--endpoint-config is deprecated; please use --manager-config or"
+            " --template-config"
         )
 
     try:
@@ -463,7 +487,8 @@ def configure_endpoint(
     ep_dir = compute_dir / name
     Endpoint.configure_endpoint(
         ep_dir,
-        endpoint_config,
+        manager_config,
+        template_config,
         id_mapping,
         high_assurance,
         display_name,
