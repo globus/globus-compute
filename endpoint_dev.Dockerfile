@@ -8,6 +8,7 @@ RUN mkdir -p /opt/globus-compute
 COPY . /opt/globus-compute
 
 RUN python -m pip install -U pip
+RUN python -m pip install tox
 RUN python -m pip install -e /opt/globus-compute/compute_endpoint
 RUN python -m pip install -e /opt/globus-compute/compute_sdk
 
