@@ -98,6 +98,14 @@ class Endpoint:
     ):
         config_text = original_path.read_text()
         config_dict = yaml.safe_load(config_text)
+
+        if not isinstance(config_dict, dict):
+            yaml_type = "sequence" if isinstance(config_dict, list) else "scalar"
+            raise ValueError(
+                f"Source config file ({original_path}) must be a valid YAML mapping"
+                f" (got a {yaml_type})"
+            )
+
         config_dict.pop("engine", None)
 
         if display_name:
