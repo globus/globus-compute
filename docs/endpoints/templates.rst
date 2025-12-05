@@ -13,6 +13,58 @@ which focuses on the unique features and peculiarities of Globus Compute
 configuration templates.
 
 
+.. _testing-templates:
+
+Testing Templates
+=================
+
+The Compute Endpoint CLI includes a tool, ``globus-compute-endpoint render-user-config``, which can be used to test the template rendering process without having to submit a task or even configure an endpoint.
+
+In its simplest mode, calling the tool might look like this:
+
+.. code-block:: console
+   :caption: Example usage with local endpoint
+
+   $ globus-compute-endpoint render-user-config -e my_endpoint -o user_options.json
+   > Rendered user config:
+   engine:
+   type: GlobusComputeEngine
+   provider:
+         type: LocalProvider
+         worker_init: "echo 'hello world'"
+
+.. code-block:: yaml+jinja
+   :caption: ``~/.globus_compute/my_endpoint/user_config_template.yaml.j2``
+
+   engine:
+      type: GlobusComputeEngine
+      provider:
+         type: LocalProvider
+         worker_init: {{ worker_init }}
+
+.. code-block:: json
+   :caption: ``user_options.json``
+
+   { "worker_init": "echo 'hello world'" }
+
+The ``-e`` option, short for ``--endpoint``, takes a local endpoint name/UUID, and the ``-o`` option, short for ``--user-options``, takes a filename pointing to JSON data. Here, the tool reads the endpoint's config, renders the associated template with any values in ``user_options.json`` included, and outputs the rendered template to ``stdout``.
+
+Alternatively, the render tool can be pointed directly to the template file, along with any other files it might need:
+
+.. code-block:: console
+   :caption: Example "offline" usage without an endpoint
+
+   $ cat user_options.json | globus-compute-endpoint render-user-config \
+      --template user_config_template.yaml.j2 \
+      --user-options-file - \
+      <other options...>
+
+This applies the same rendering logic and also outputs the final value to ``stdout`` as before - the main difference is that this approach does not require a pre-configured endpoint. Note that the ``-`` argument used here for ``--user-options-file`` indicates that the file should be read from ``stdin``, which works with any other file-based options as well.
+
+These approaches can also be mixed. Whenever the ``--endpoint`` option is present, file paths are pulled from the endpoint's config by default, but any file paths supplied as options take precedence. This makes it easy to A/B test changes without modifying files in production.
+
+For more details on available options, run ``globus-compute-endpoint render-user-config --help``.
+
 User Input Security
 ===================
 
