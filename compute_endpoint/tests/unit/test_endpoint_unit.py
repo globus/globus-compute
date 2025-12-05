@@ -1004,6 +1004,25 @@ def test_update_config_file_empty_comment(fs):
     assert "is currently empty" in target_config
 
 
+@pytest.mark.parametrize("original_config", ("", "   \n  \n", "- item1\n- item2\n"))
+def test_update_config_file_original_must_be_mapping(fs, original_config):
+    target_path = pathlib.Path("target_config.yaml")
+    original_path = pathlib.Path("original_config.yaml")
+
+    original_path.write_text(original_config)
+
+    with pytest.raises(ValueError, match="must be a valid YAML mapping"):
+        Endpoint.update_config_file(
+            original_path,
+            target_path,
+            id_mapping=False,
+            high_assurance=False,
+            display_name=None,
+            auth_policy=None,
+            subscription_id=None,
+        )
+
+
 @pytest.mark.parametrize(
     "config_keys",
     (
