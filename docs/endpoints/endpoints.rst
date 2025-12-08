@@ -845,7 +845,7 @@ will make the necessary changes to ``config.yaml``:
 .. _high-assurance:
 
 High-Assurance
---------------
+==============
 
 Globus Compute endpoints may be designated as High-Assurance (HA) to meet
 stricter security, compliance, and operational requirements.  HA endpoints
@@ -871,7 +871,7 @@ processing.
 
 
 HA Configuration
-^^^^^^^^^^^^^^^^
+----------------
 
 High-Assurance functionality requires a HA-enabled `Globus subscription`_, to be
 explicitly marked as HA, and to be associated with a HA
@@ -934,7 +934,7 @@ available:
 .. _ha-functions:
 
 High-Assurance Functions
-^^^^^^^^^^^^^^^^^^^^^^^^
+------------------------
 
 A High-Assurance function is one that has been registered with the Globus
 Compute API as associated with a HA endpoint.  In other words, a HA function
@@ -1006,7 +1006,7 @@ Line 15 shows the standard disclaimer when working with an HA function.
 .. _audit-logging:
 
 Audit Logging
-^^^^^^^^^^^^^
+-------------
 
 Audit logging is available only to High-Assurance endpoints, and is enabled by
 the ``audit_log_path`` |ManagerEndpointConfig| item:
@@ -1071,7 +1071,7 @@ the audit record was emitted:
 
 
 Additional High-Assurance Resources
-^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+-----------------------------------
 
 - Globus Subscriptions:
 
