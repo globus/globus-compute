@@ -35,9 +35,12 @@ from globus_compute_endpoint.endpoint.config.utils import (
     render_config_user_template,
 )
 from globus_compute_endpoint.endpoint.endpoint import Endpoint
+from globus_compute_endpoint.endpoint.endpoint_manager import EndpointManager
 from globus_compute_endpoint.endpoint.identity_mapper import MappedPosixIdentity
+from globus_compute_endpoint.endpoint.utils import has_pyprctl as _has_multi_user
 from globus_compute_endpoint.endpoint.utils import (
     is_privileged,
+    pyprctl_import_error,
     send_endpoint_startup_failure_to_amqp,
     user_input_select,
 )
@@ -51,23 +54,15 @@ from globus_compute_sdk.sdk.diagnostic import do_diagnostic_base
 from globus_compute_sdk.sdk.utils.gare import gare_handler
 from globus_sdk import MISSING, AuthClient, GlobusAPIError, MissingType
 
-try:
-    from globus_compute_endpoint.endpoint.endpoint_manager import (
-        EndpointManager,
-        _import_pam,
-        _import_pyprctl,
+if not _has_multi_user and "--debug" in sys.argv and sys.stderr.isatty():
+    # We haven't set up logging yet so manually print for now
+    _e = pyprctl_import_error
+    print(
+        f"(DEBUG) {__file__}: pyprctl not available; MEPs will not work"
+        "\n(DEBUG) (Hints: Is pyprctl installed? Is this a Linux system?)"
+        f"\n(DEBUG) [{type(_e).__name__}] {_e}",
+        file=sys.stderr,
     )
-
-    _import_pyprctl()
-    _import_pam()
-except ImportError as _e:
-    _has_multi_user = False
-    if "--debug" in sys.argv and sys.stderr.isatty():
-        # We haven't set up logging yet so manually print for now
-        print(f"(DEBUG) Failed to import from file: {__file__}", file=sys.stderr)
-        print(f"(DEBUG) [{type(_e).__name__}] {_e}", file=sys.stderr)
-else:
-    _has_multi_user = True
 
 log = logging.getLogger(__name__)
 

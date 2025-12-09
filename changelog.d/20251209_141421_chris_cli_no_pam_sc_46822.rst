@@ -1,0 +1,5 @@
+Bug Fixes
+^^^^^^^^^
+
+- Fixed an issue where endpoints could not be started or configured on systems without
+  PAM installed.
