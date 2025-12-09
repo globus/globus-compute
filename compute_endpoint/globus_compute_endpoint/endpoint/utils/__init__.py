@@ -8,12 +8,17 @@ import sys
 import typing as t
 import urllib.parse
 
+has_pyprctl: bool
+pyprctl_import_error: Exception | None
+
 try:
     import pyprctl as _pyprctl
-
-    has_pyprctl = True
-except AttributeError:
+except Exception as e:
     has_pyprctl = False
+    pyprctl_import_error = e
+else:
+    has_pyprctl = True
+    pyprctl_import_error = None
 
 
 _url_user_pass_pattern = r"://([^:]+):[^@]+@"
