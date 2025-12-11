@@ -28,6 +28,22 @@ from .utils import create_task_packer
 DEF_CONFIG_DIR = pathlib.Path(config.__file__).parent
 
 
+@pytest.hookimpl(hookwrapper=True)
+def pytest_collection_modifyitems(items: list[pytest.Item]):
+    yield
+
+    # Attempt to run the unit tests first: we have generally designed those to run
+    # much faster than the integration tests, so hopefully bugs are routed out before
+    # paying the cost of the slower tests.
+    i = len(items)
+    non_units = []
+    while i > 0:
+        i -= 1
+        if not items[i].location[0].startswith("tests/unit/"):
+            non_units.append(items.pop(i))
+    items.extend(non_units)  # don't change any other order; just prioritize units
+
+
 @pytest.fixture(autouse=True)
 def verify_all_tests_reset_signals():
     orig_sig_handlers = [
