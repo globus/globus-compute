@@ -2,7 +2,7 @@
 
 # Work with the (apparently) different setup in OpenSUSE, where `make` doesn't
 # invoke /bin/sh in the same manner as other platforms.
-PYTHON3 := $$("$(SHELL)" -c "command -v /opt/globus-python/bin/python3")
+PYTHON3 := $$("$(SHELL)" -c "command -v /opt/globus-python313/bin/python3")
 
 PY_FULL_VERSION := $$("$(PYTHON3)" -c "import platform; print(platform.python_version())")
 PY_MAJOR_VERSION := $(shell echo -n $(PY_FULL_VERSION) | cut -d . -f1 )

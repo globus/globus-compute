@@ -2,13 +2,13 @@ Source: @PACKAGE_NAME@
 Priority: optional
 Section: contrib/science
 Maintainer: Globus Toolkit <support@globus.org>
-Build-Depends: debhelper (>= 12), globus-python (>= 3.13), globus-python (<< 3.14), dh-exec, dh-python
+Build-Depends: debhelper (>= 12), globus-python313, dh-exec, dh-python
 Standards-Version: 4.6.0
 Homepage: https://globus-compute.readthedocs.io/
 
 Package: @PACKAGE_NAME@
 Architecture: amd64
-Depends: ${misc:Depends}, globus-python (>= 3.13), globus-python (<< 3.14)
+Depends: ${misc:Depends}, globus-python313
 Provides: @PACKAGE_NAME@
 Description: agent to receive tasks as sent from the Globus Compute SDK
  This module is intended for system administrators; end-users will most-likely
