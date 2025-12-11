@@ -7,8 +7,7 @@ Name:           @PACKAGE_NAME@
 %global         src_dir                      %{_sourcedir}/%{name}
 %global         package_executable           @PIP_NAME@
 %global         globus_python3_version       3.13
-%global         globus_python3_version_next  3.14
-%global         __python                     /opt/globus-python/bin/python3
+%global         __python                     /opt/globus-python313/bin/python3
 
 # We don't put our bits in the standard locations, so python_provides generation
 # is not useful (and super slow anyway!)
@@ -28,7 +27,7 @@ Vendor:         %{?vendor}%{!?vendor:Unknown}
 Summary:        Globus Compute Endpoint agent for system-level installs
 
 Conflicts:      %{name} < %{version}
-Requires:       globus-python >= %{globus_python3_version}, globus-python < %{globus_python3_version_next}
+Requires:       globus-python313
 Requires(pre):  /usr/sbin/useradd, /usr/bin/getent
 Requires(postun): /usr/sbin/userdel
 
@@ -39,7 +38,7 @@ Source1:        @PREREQS_TARBALL_NAME@
 License:        Apache 2.0
 BuildRoot:      %{_tmppath}/%{name}-%{version}-%{release}
 
-BuildRequires:  globus-python >= %{globus_python3_version}
+BuildRequires:  globus-python313
 BuildRequires:  file
 
 %description

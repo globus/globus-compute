@@ -21,7 +21,7 @@ TMP_BUILD_DIR := debian/$(name)-tmp
 TMP_VIRTUAL_ENV := $(TMP_BUILD_DIR)$(VIRTUAL_ENV)
 DEST_ROOT := debian/$(name)
 DEST_VIRTUAL_ENV := $(DEST_ROOT)$(VIRTUAL_ENV)
-PYTHON3 := /opt/globus-python/bin/python3
+PYTHON3 := /opt/globus-python313/bin/python3
 
 _sysconfdir=/etc
 _sbindir=/usr/sbin

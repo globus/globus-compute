@@ -17,7 +17,7 @@ pipeline {
     }
     stages {
         stage ("Prep source") {
-            agent {label "package_creator_py313"}
+            agent {label "package_creator"}
             steps {
                 script {
 
