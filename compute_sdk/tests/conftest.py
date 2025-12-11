@@ -10,6 +10,22 @@ config = {
 }
 
 
+@pytest.hookimpl(hookwrapper=True)
+def pytest_collection_modifyitems(items: list[pytest.Item]):
+    yield
+
+    # Attempt to run the unit tests first: we have generally designed those to run
+    # much faster than the integration tests, so hopefully bugs are routed out before
+    # paying the cost of the slower tests.
+    i = len(items)
+    non_units = []
+    while i > 0:
+        i -= 1
+        if not items[i].location[0].startswith("tests/unit/"):
+            non_units.append(items.pop(i))
+    items.extend(non_units)  # don't change any other order; just prioritize units
+
+
 def pytest_addoption(parser):
     """Add funcx-specific command-line options to pytest."""
     parser.addoption(
