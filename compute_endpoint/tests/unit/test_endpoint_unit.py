@@ -184,7 +184,7 @@ def test_double_configure_exists(mock_print, conf_dir):
 @pytest.mark.parametrize("ha", (None, True, False))
 def test_configure_ha_existing_config(mock_print, conf_dir, ha):
     config_file = Endpoint._config_file_path(conf_dir)
-    config_copy = str(conf_dir.parent / "config2.yaml")
+    config_copy = conf_dir.parent / "config2.yaml"
 
     # First, make an entry with no ha
     Endpoint.configure_endpoint(conf_dir, None, high_assurance=False)
@@ -213,6 +213,34 @@ def test_configure_ha_audit_default(mock_print, conf_dir, ha):
     else:
         assert conf.get("high_assurance"), conf
         assert conf.get("audit_log_path") == str(audit_path), conf
+
+
+@pytest.mark.parametrize("manager_config", ("some-config.yaml", None))
+@pytest.mark.parametrize("template_config", ("some-template.yaml.j2", None))
+def test_configure_config_arguments(
+    fs, mock_print, conf_dir, manager_config, template_config
+):
+    # convert to Path here instead of in the parametrize so pyfakefs can patch properly
+    if manager_config:
+        manager_config = pathlib.Path(manager_config)
+        manager_config.write_text("key: value\n")
+    if template_config:
+        template_config = pathlib.Path(template_config)
+        template_config.write_text("key: {{ value }}\n")
+
+    Endpoint.configure_endpoint(
+        conf_dir,
+        endpoint_config=manager_config,
+        user_config_template=template_config,
+    )
+
+    dest_config = Endpoint._config_file_path(conf_dir)
+    assert dest_config.exists()
+    assert ("key: value" in dest_config.read_text()) is bool(manager_config)
+
+    dest_template = Endpoint.user_config_template_path(conf_dir)
+    assert dest_template.exists()
+    assert ("key: {{ value }}" in dest_template.read_text()) is bool(template_config)
 
 
 def test_start_without_engine(caplog, conf_dir, conf):

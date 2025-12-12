@@ -140,6 +140,7 @@ class Endpoint:
     def init_endpoint_dir(
         endpoint_dir: pathlib.Path,
         endpoint_config: pathlib.Path | None = None,
+        user_config_template: pathlib.Path | None = None,
         id_mapping: bool = False,
         high_assurance: bool = False,
         display_name: str | None = None,
@@ -197,6 +198,9 @@ class Endpoint:
             src_user_env_path = _src_conf_dir / dst_user_env_path.name
             src_example_idmap_path = _src_conf_dir / dst_idmap_conf_path.name
 
+            if user_config_template is not None:
+                src_user_tmpl_path = user_config_template
+
             shutil.copyfile(src_user_tmpl_path, dst_user_tmpl_path)
             shutil.copyfile(src_user_schema_path, dst_user_schema_path)
             shutil.copyfile(src_user_env_path, dst_user_env_path)
@@ -211,7 +215,8 @@ class Endpoint:
     @staticmethod
     def configure_endpoint(
         conf_dir: pathlib.Path,
-        endpoint_config: str | None,
+        endpoint_config: pathlib.Path | None = None,
+        user_config_template: pathlib.Path | None = None,
         id_mapping: bool = False,
         high_assurance: bool = False,
         display_name: str | None = None,
@@ -224,10 +229,10 @@ class Endpoint:
             print(f"config dir <{ep_name}> already exists")
             raise Exception("ConfigExists")
 
-        templ_conf_path = pathlib.Path(endpoint_config) if endpoint_config else None
         Endpoint.init_endpoint_dir(
             conf_dir,
-            templ_conf_path,
+            endpoint_config,
+            user_config_template,
             id_mapping,
             high_assurance,
             display_name,
