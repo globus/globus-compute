@@ -581,6 +581,66 @@ def test_configure_ep_subscription_id_in_config(
     assert conf_dict["subscription_id"] == subscription_id
 
 
+def test_configure_ep_endpoint_config_deprecated(run_line, randomstring, mock_ep):
+    ep_config_arg = randomstring()
+
+    with pytest.warns(DeprecationWarning, match="--endpoint-config is deprecated"):
+        run_line(
+            f"configure {randomstring()} --endpoint-config {ep_config_arg}",
+            assert_exit_code=0,
+        )
+
+    assert (
+        mock_ep.configure_endpoint.call_args.kwargs["endpoint_config"].name
+        == ep_config_arg
+    )
+
+
+def test_configure_ep_manager_config_precedence(
+    run_line, randomstring, mock_ep, gc_dir
+):
+    ep_config_arg = randomstring(5)
+    gc_dir.mkdir(parents=True, exist_ok=True)
+    manager_config_arg = gc_dir / randomstring(4)
+    manager_config_arg.touch()
+
+    with pytest.warns(UserWarning, match="--endpoint-config will be ignored"):
+        run_line(
+            f"configure {randomstring()} --manager-config {manager_config_arg}"
+            f" --endpoint-config {ep_config_arg}",
+            assert_exit_code=0,
+        )
+
+    assert (
+        mock_ep.configure_endpoint.call_args.kwargs["endpoint_config"]
+        == manager_config_arg
+    )
+
+
+@pytest.mark.parametrize("manager_config", ("some-config.yaml", None))
+@pytest.mark.parametrize("template_config", ("some-template.yaml.j2", None))
+def test_configure_ep_config_options(
+    run_line, randomstring, gc_dir, mock_ep, manager_config, template_config
+):
+    gc_dir.mkdir(parents=True, exist_ok=True)
+
+    cmd = f"configure {randomstring()}"
+    if manager_config:
+        manager_config = gc_dir / manager_config
+        manager_config.touch()
+        cmd += f" --manager-config {manager_config}"
+    if template_config:
+        template_config = gc_dir / template_config
+        template_config.touch()
+        cmd += f" --template-config {template_config}"
+
+    run_line(cmd, assert_exit_code=0)
+
+    call_kwargs = mock_ep.configure_endpoint.call_args.kwargs
+    assert call_kwargs["endpoint_config"] == manager_config
+    assert call_kwargs["user_config_template"] == template_config
+
+
 @pytest.mark.parametrize("display_name", [None, "None"])
 def test_config_yaml_display_none(run_line, mock_command_ensure, display_name):
     ep_name = "test_display_none"

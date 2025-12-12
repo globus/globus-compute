@@ -14,6 +14,7 @@ import threading
 import time
 import typing as t
 import uuid
+import warnings
 from dataclasses import asdict
 
 import click
@@ -315,7 +316,29 @@ def version_command():
 
 
 @app.command(name="configure", help="Configure an endpoint")
-@click.option("--endpoint-config", default=None, help="a template config to use")
+@click.option(
+    "--endpoint-config",
+    default=None,
+    help="DEPRECATED: use --manager-config or --template-config",
+)
+@click.option(
+    "--manager-config",
+    type=click.Path(exists=True, dir_okay=False, path_type=pathlib.Path),
+    default=None,
+    help=(
+        "An override to the default config.yaml,"
+        " which is copied into the new endpoint directory"
+    ),
+)
+@click.option(
+    "--template-config",
+    type=click.Path(exists=True, dir_okay=False, path_type=pathlib.Path),
+    default=None,
+    help=(
+        "An override to the default user_config_template.yaml.j2,"
+        " which is copied into the new endpoint directory"
+    ),
+)
 @click.option(
     "--multi-user",
     type=click.BOOL,
@@ -401,6 +424,8 @@ def configure_endpoint(
     *,
     name: str,
     endpoint_config: str | None,
+    manager_config: pathlib.Path | None,
+    template_config: pathlib.Path | None,
     multi_user: bool | None,
     high_assurance: bool,
     display_name: str | None,
@@ -424,6 +449,22 @@ def configure_endpoint(
             "Unable to configure new endpoints; Manager Endpoint Processes are not"
             " supported on this system"
         )
+
+    if endpoint_config is not None:
+        warnings.warn(
+            "--endpoint-config is deprecated; use --manager-config instead."
+            " If you want to configure user endpoint processes, use --template-config.",
+            DeprecationWarning,
+        )
+
+        if manager_config is None:
+            manager_config = pathlib.Path(endpoint_config)
+        else:
+            warnings.warn(
+                "Both --endpoint-config and --manager-config were provided;"
+                " --endpoint-config will be ignored.",
+                UserWarning,
+            )
 
     try:
         Endpoint.validate_endpoint_name(name)
@@ -487,13 +528,14 @@ def configure_endpoint(
     compute_dir = get_config_dir()
     ep_dir = compute_dir / name
     Endpoint.configure_endpoint(
-        ep_dir,
-        endpoint_config,
-        id_mapping,
-        high_assurance,
-        display_name,
-        auth_policy,
-        subscription_id,
+        conf_dir=ep_dir,
+        endpoint_config=manager_config,
+        user_config_template=template_config,
+        id_mapping=id_mapping,
+        high_assurance=high_assurance,
+        display_name=display_name,
+        auth_policy=auth_policy,
+        subscription_id=subscription_id,
     )
 
 
