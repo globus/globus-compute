@@ -8,4 +8,5 @@ Tutorials
    compute_for_lambda
    dynamic_python_environments
    dynamic_containers
+   mpi
 
