@@ -3,6 +3,46 @@ Changelog
 
 .. scriv-insert-here
 
+.. _changelog-4.3.0:
+
+globus-compute-sdk & globus-compute-endpoint v4.3.0
+---------------------------------------------------
+
+New Functionality
+^^^^^^^^^^^^^^^^^
+
+- Added the ``render-user-config`` command to the endpoint CLI, which renders a given
+    endpoint's user config template to stdout. This allows admins to validate
+    configuration templates without needing to restart or interact with running
+    endpoint processes.
+
+- Add ``-l/--endpoint-log-dirs`` and ``-r/--recent-endpoints`` options to ``globus-compute-diagnostic``
+  such that only the specified endpoint(s) or the most recent N endpoint config/log snippets
+  are included in the diagnostic output.  See ``globus-compute-diagnostic --help`` for details.
+
+Bug Fixes
+^^^^^^^^^
+
+- Fixed an issue where endpoints could not be started or configured on systems without
+  PAM installed.
+
+Removed
+^^^^^^^
+
+- Drop support for `Python 3.9 <https://peps.python.org/pep-0596/>`_, which
+  reached `end of life on 31 Oct 2025
+  <https://devguide.python.org/versions/>`_.
+
+Changed
+^^^^^^^
+
+- Bumped ``parsl`` dependency version from `2025.9.15
+  <https://pypi.org/project/parsl/2025.9.15/>`_ to `2025.12.01
+  <https://pypi.org/project/parsl/2025.12.01/>`_
+
+- Update binary packages (DEB/RPM) to build against Python 3.13.  This will
+  create a new virtual environment directory in ``/opt/globus-compute-agent/``.
+
 .. _changelog-4.2.0:
 
 globus-compute-sdk & globus-compute-endpoint v4.2.0
