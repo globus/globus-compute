@@ -75,7 +75,7 @@ class ClickExceptionWithContext(ClickException):
     def format_message(self) -> str:
         msg = super().format_message()
         if (e := self.__cause__) is not None:
-            msg += f"\n\t({type(e).__name__}) {e}"
+            msg += f"\n\t({e.__class__.__module__}.{e.__class__.__name__}) {e}"
         return msg
 
     def __str__(self) -> str:
@@ -1296,15 +1296,20 @@ def _do_render_user_config(
             globus_identity_candidates=[],  # not used for rendering
         )
 
-    rendered_config = render_config_user_template(
-        parent_config=parent_config,
-        user_config_template=user_config_template,
-        user_config_template_path=user_config_template_path,
-        mapped_identity=mapped_identity,
-        user_config_schema=user_config_schema,
-        user_opts=user_opts,
-        user_runtime=user_runtime,
-    )
+    try:
+        rendered_config = render_config_user_template(
+            parent_config=parent_config,
+            user_config_template=user_config_template,
+            user_config_template_path=user_config_template_path,
+            mapped_identity=mapped_identity,
+            user_config_schema=user_config_schema,
+            user_opts=user_opts,
+            user_runtime=user_runtime,
+        )
+    except Exception as e:
+        raise ClickExceptionWithContext(
+            "Failed to render user configuration template."
+        ) from e
 
     log.info("Rendered user config:")
     print(rendered_config)

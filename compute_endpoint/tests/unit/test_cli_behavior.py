@@ -1609,3 +1609,28 @@ def test__do_render_user_config_parent_ep_overrides(
     assert mock_render_kwargs["user_config_schema"] == (
         schema_param if schema_from == "param" else schema_config
     )
+
+
+def test__do_render_user_config_generic_catch_all_exception(
+    mocker,
+    make_manager_endpoint_dir,
+):
+    ep_dir: pathlib.Path = make_manager_endpoint_dir()
+
+    mock_render = mocker.patch(f"{_MOCK_BASE}render_config_user_template")
+    mock_render.side_effect = RuntimeError("Something bad happened")
+
+    with pytest.raises(ClickException) as pyt_exc:
+        _do_render_user_config(
+            parent_ep_dir=ep_dir,
+            template_file=(ep_dir / "user_config_template.yaml.j2").open("r"),
+            user_options_file=None,
+            user_schema_file=None,
+            parent_config_file=None,
+            user_runtime_file=None,
+            mapped_identity_file=None,
+        )
+
+    assert "Failed to render user configuration template." in str(pyt_exc.value)
+    assert "Something bad happened" in str(pyt_exc.value)
+    assert isinstance(pyt_exc.value.__cause__, RuntimeError)
