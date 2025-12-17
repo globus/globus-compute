@@ -449,8 +449,11 @@ Executing the above prints:
 
     124
 
-MPI Functions
--------------
+
+.. _submitting-mpi:
+
+Submitting MPI Tasks
+--------------------
 
 |MPIFunction| is the solution for executing MPI applications remotely using Globus Compute.
 As an extension to |ShellFunction|, the |MPIFunction| supports the same interface
@@ -492,94 +495,22 @@ Here's an example:
     $PARSL_MPI_PREFIX <command_2>
     """)
 
-
-Here is an example configuration for an HPC system that uses PBSPro scheduler:
-
-.. code-block:: yaml
-
-    # Example configuration for a PBSPro based HPC system
-    display_name: PBSProHPC
-    engine:
-      type: GlobusMPIEngine
-      mpi_launcher: mpiexec
-
-      provider:
-        type: PBSProProvider
-
-        # Specify # of nodes per batch job that will be
-        # shared by multiple MPIFunctions
-        nodes_per_block: 4
-
-        launcher:
-          type: SimpleLauncher
-
-
-Here's another trimmed example for an HPC system that uses Slurm as the scheduler:
-
-.. code-block:: yaml
-
-    # Example configuration for a Slurm based HPC system
-    display_name: SlurmHPC
-    engine:
-      type: GlobusMPIEngine
-      mpi_launcher: srun
-
-      provider:
-        type: SlurmProvider
-
-        launcher:
-          type: SimpleLauncher
-
-        # Specify # of nodes per batch job that will be
-        # shared by multiple MPIFunctions
-        nodes_per_block: 4
-
-
-.. code-block:: python
-    :caption: globus_compute_mpi_function_example.py
-
-    from globus_compute_sdk import Executor, MPIFunction
-
-    ep_id = "<SPECIFY_ENDPOINT_ID>"
-    func = MPIFunction("hostname")
-    with Executor(endpoint_id=ep_id) as ex:
-        for nodes in range(1, 4):  # reminder: 1, 2, 3; 4 not included
-            ex.resource_specification = {
-                "num_nodes": 2,
-                "ranks_per_node": nodes
-            }
-            fu = ex.submit(func)
-            mpi_result = fu.result()
-            print(mpi_result.stdout)
-
-Expect output similar to:
-
-.. code-block:: text
-
-    exp-14-08
-    exp-14-20
-
-    exp-14-08
-    exp-14-20
-    exp-14-08
-    exp-14-20
-
-    exp-14-08
-    exp-14-20
-    exp-14-08
-    exp-14-08
-    exp-14-20
-    exp-14-20
-
-The |ShellResult| object captures outputs relevant to simplify debugging when execution
-failures. By default, |MPIFunction| captures 1,000 lines of stdout and stderr, but this
-can be changed via the ``MPIFunction(snippet_lines:int = <NUM_LINES>)`` kwarg.
-
 Results
 ^^^^^^^
 
-|MPIFunction| encapsulates its output in a |ShellResult|. Please refer to
-our `documentation section on shell results <#shell-results>`_ for more information.
+|MPIFunction| encapsulates its output in a |ShellResult|, which captures relevant
+outputs to simplify debugging. By default, |MPIFunction| captures 1,000 lines of
+``stdout`` and ``stderr``, but this can be changed via the ``snippet_lines`` kwarg:
+
+.. code-block:: python
+    :emphasize-lines: 3
+
+    MPIFunction(
+        "my_mpi_application --arg1 val1",
+        snippet_lines=2048
+    )
+
+`See the section on shell results <#shell-results>`_ for more information.
 
 .. _specifying-serde-strategy:
 

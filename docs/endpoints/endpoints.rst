@@ -489,6 +489,66 @@ The Docker YAML example from above could be approached via ``custom`` and the
 .. _Provider: https://parsl.readthedocs.io/en/stable/stubs/parsl.providers.base.ExecutionProvider.html
 
 
+.. _configuring-mpi:
+
+Configuring for MPI
+===================
+
+Support for `MPI`__ on Compute endpoints relies on |GlobusMPIEngine|, which handles
+dynamic partitioning of jobs according to the resource specification submitted by
+the user. |GlobusMPIEngine| is a shim over Parsl's |MPIExecutor|_, which itself is a
+subclass of Parsl's |HighThroughputExecutor|_. As a result, |GlobusMPIEngine| shares
+most of its available configuration options with |GlobusComputeEngine|_, since the
+latter shims |HighThroughputExecutor|_.
+
+__ https://en.wikipedia.org/wiki/Message_Passing_Interface
+
+The distinct configuration options are:
+
+ * ``mpi_launcher``, which sets the executable used to launch multi-node tasks (e.g., ``mpiexec``, ``srun``, ``aprun``), and
+ * ``max_workers_per_block``, which limits the number of MPI tasks that can run on a single block.
+
+Furthermore, |GlobusMPIEngine| requires that the provider's launcher is set to |SimpleLauncher|_.
+
+Two stub configs follow, for the PBS and Slurm schedulers respectively. See
+:doc:`/endpoints/endpoint_examples` for complete configs tested on specific machines.
+
+.. code-block:: yaml
+    :caption: MPI on a PBSPro system
+    :emphasize-lines: 3, 6
+
+    engine:
+      type: GlobusMPIEngine
+      mpi_launcher: mpiexec
+
+      provider:
+        type: PBSProProvider
+
+        max_workers_per_block: 3
+        nodes_per_block: 6
+
+        launcher:
+          type: SimpleLauncher
+
+
+.. code-block:: yaml
+    :caption: MPI on a Slurm system
+    :emphasize-lines: 3, 6
+
+    engine:
+      type: GlobusMPIEngine
+      mpi_launcher: srun
+
+      provider:
+        type: SlurmProvider
+
+        max_workers_per_block: 3
+        nodes_per_block: 6
+
+        launcher:
+          type: SimpleLauncher
+
+
 Advanced Environment Customization
 ==================================
 
@@ -1315,8 +1375,13 @@ reach out to our Team directly by submitting a
 .. _LocalProvider: https://parsl.readthedocs.io/en/stable/stubs/parsl.providers.LocalProvider.html
 .. |GlobusComputeEngine| replace:: ``GlobusComputeEngine``
 .. _GlobusComputeEngine: ../reference/engine.html#globus_compute_endpoint.engines.GlobusComputeEngine
+.. |GlobusMPIEngine| replace:: :class:`~globus_compute_endpoint.engines.GlobusMPIEngine`
 .. |HighThroughputExecutor| replace:: ``HighThroughputExecutor``
 .. _HighThroughputExecutor: https://parsl.readthedocs.io/en/latest/stubs/parsl.executors.HighThroughputExecutor.html
+.. |MPIExecutor| replace:: ``MPIExecutor``
+.. _MPIExecutor: https://parsl.readthedocs.io/en/stable/stubs/parsl.executors.MPIExecutor.html
+.. |SimpleLauncher| replace:: ``SimpleLauncher``
+.. _SimpleLauncher: https://parsl.readthedocs.io/en/stable/stubs/parsl.launchers.SimpleLauncher.html
 .. |ManagerEndpointConfig| replace:: :class:`ManagerEndpointConfig <globus_compute_endpoint.endpoint.config.config.ManagerEndpointConfig>`
 .. _Web UI: https://app.globus.org/compute
 .. _Jinja template: https://jinja.palletsprojects.com/en/stable/
