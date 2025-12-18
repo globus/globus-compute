@@ -77,6 +77,11 @@ via the ``configure`` subcommand:
    generate an additional :ref:`example-idmap-config` file.  See
    :ref:`multi-user-configuration` for more information.
 
+.. note::
+   ``$HOME/.globus_compute`` is the default directory used to store endpoint configurations
+   and logs but can be customized, see :ref:`Directories <config-dir>`
+
+
 
 ``config.yaml``
 ---------------
