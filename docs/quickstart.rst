@@ -167,3 +167,12 @@ refer to the :doc:`endpoints/index` documentation.
   $ globus-compute-endpoint configure
 
   $ globus-compute-endpoint start <ENDPOINT_NAME>
+
+
+Configuration
+-------------
+
+Directories
+===========
+
+``GLOBUS_COMPUTE_USER_DIR`` is...
