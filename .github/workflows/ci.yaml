@@ -27,14 +27,16 @@ jobs:
         run: |
           cd compute_sdk
           tox -e mypy
-          # Temporary ignore see https://github.com/pypa/pip/issues/13607
-          tox -e pip-audit -- --ignore GHSA-4xh5-x5gv-qwph
+          # GHSA-4xh5-x5gv-qwph background: https://github.com/pypa/pip/issues/13607#issuecomment-3356778034
+          # CVE-2025-68480 is waiting on https://github.com/globusonline/globus-identity-mapping/pull/34
+          tox -e pip-audit -- --ignore-vuln GHSA-4xh5-x5gv-qwph --ignore-vuln CVE-2025-68480 --ignore-vuln CVE-2025-68480
       - name: mypy and pip-audit (endpoint)
         run: |
           cd compute_endpoint
           tox -e mypy
-          # Temporary ignore see https://github.com/pypa/pip/issues/13607
-          tox -e pip-audit -- --ignore GHSA-4xh5-x5gv-qwph
+          # GHSA-4xh5-x5gv-qwph background: https://github.com/pypa/pip/issues/13607#issuecomment-3356778034
+          # CVE-2025-68480 is waiting on https://github.com/globusonline/globus-identity-mapping/pull/34
+          tox -e pip-audit -- --ignore-vuln GHSA-4xh5-x5gv-qwph --ignore-vuln CVE-2025-68480 --ignore-vuln CVE-2025-68480
 
   # ensure docs can build, imitating the RTD build as best we can
   check-docs:
