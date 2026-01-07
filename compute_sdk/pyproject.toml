@@ -1,0 +1,72 @@
+[project]
+name = "globus-compute-sdk"
+version = "4.3.0"
+description = "Globus Compute: High Performance Function Serving for Science"
+authors = [
+    {name = "Globus Compute Team", email = "support@globus.org"},
+]
+dependencies = [
+    "setuptools>=80.9.0",
+    "colorama>=0.4.6,<1",
+    "dill==0.3.9",
+    "exceptiongroup>=1.2.2",
+    "globus-compute-common==0.7.1",
+    "globus-sdk>=3.59.0,<4",
+    "packaging>=21.1",
+    "pika>=1.2",
+    "psutil<6",
+    "requests>=2.31.0,<3",
+    "rich>=13.7.1,<15",
+    "tblib==1.7.0",
+    "texttable>=1.6.7",
+    "typing_extensions>=4.0;python_version<\"3.8\"",
+]
+requires-python = ">=3.10"
+readme = "README.md"
+license = {text = "Apache-2.0"}
+keywords = ["Globus Compute", "FaaS", "Function Serving"]
+classifiers = [
+    "Development Status :: 3 - Alpha",
+    "Intended Audience :: Science/Research",
+    "Natural Language :: English",
+    "Operating System :: OS Independent",
+    "Programming Language :: Python :: 3",
+    "Topic :: Scientific/Engineering",
+]
+
+[project.urls]
+Homepage = "https://github.com/globus/globus-compute"
+Changelog = "https://globus-compute.readthedocs.io/en/latest/changelog.html"
+"Upgrade to Globus Compute" = "https://globus-compute.readthedocs.io/en/latest/funcx_upgrade.html"
+
+[project.optional-dependencies]
+dev = [
+    "coverage",
+    "flake8==3.8.0",
+    "pre-commit",
+    "pyfakefs",
+    "pytest-mock",
+    "pytest>=7.2",
+    "responses",
+]
+test = [
+    "coverage",
+    "flake8==3.8.0",
+    "pyfakefs",
+    "pytest-mock",
+    "pytest>=7.2",
+    "responses",
+]
+docs = [
+    "furo==2023.9.10",
+    "sphinx>=7.3.2",
+]
+
+[project.scripts]
+globus-compute-diagnostic = "globus_compute_sdk.sdk.diagnostic:do_diagnostic"
+[build-system]
+requires = ["setuptools>=61"]
+build-backend = "setuptools.build_meta"
+
+[tool.pdm]
+distribution = true
