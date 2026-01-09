@@ -53,7 +53,10 @@ else:
 
 
 _MOCK_BASE = "globus_compute_endpoint.endpoint.endpoint_manager."
-_GOOD_EC = 88  # SPoA for "good/happy-path" exit code
+
+# SPoA for "good/happy-path" exit codes
+_GOOD_EC = 88
+_GOOD_UNPRIVILEGED_EC = 84
 
 _mock_rootuser_rec = pwd.struct_passwd(
     ("root", "", 0, 0, "Mock Root User", "/mock_root", "/bin/false")
@@ -328,7 +331,7 @@ def command_payload(ident):
     return {
         "globus_username": "a@example.com",
         "globus_effective_identity": 1,
-        "globus_identity_set": [ident],
+        "globus_identity_set": [{"sub": ident}],
         "command": "cmd_start_endpoint",
         "kwargs": {
             "name": "some_ep_name",
@@ -357,6 +360,28 @@ def successful_exec_from_mocked_root(
     em.identity_mapper.map_identities.return_value = [
         [{ident: ["typicalglobusname@somehost.org"]}]
     ]
+    em._command_queue = mock.Mock()
+    em._command_stop_event.set()
+    em._command_queue.get.side_effect = [queue_item, queue.Empty()]
+
+    yield mock_os, conf_dir, mock_conf, mock_client, mock_pwd, em
+
+
+@pytest.fixture
+def successful_exec_from_mocked_user(
+    epmanager_as_user,
+    mock_auth_client,
+    user_conf_template,
+    mock_props,
+    ident,
+    command_payload,
+):
+    conf_dir, mock_conf, mock_client, mock_os, mock_pwd, em = epmanager_as_user
+
+    mock_auth_client.userinfo.return_value = {"identity_set": [{"sub": ident}]}
+
+    queue_item = (1, mock_props, json.dumps(command_payload).encode())
+
     em._command_queue = mock.Mock()
     em._command_stop_event.set()
     em._command_queue.get.side_effect = [queue_item, queue.Empty()]
@@ -1705,7 +1730,7 @@ def test_handles_shutdown_signal(successful_exec_from_mocked_root, sig, reset_si
     assert not em._command_queue.get.called, " ... that we've now confirmed works"
 
 
-def test_clears_environment_immediately_after_fork(
+def test_root_clears_environment_immediately_after_fork(
     successful_exec_from_mocked_root, mock_close_fds, randomstring
 ):
     mock_os, conf_dir, *_, em = successful_exec_from_mocked_root
@@ -1726,6 +1751,27 @@ def test_clears_environment_immediately_after_fork(
     for fd in (0, 1, 2):
         assert fd in k["preserve_fds"], "Expect std streams preserved, for now"
     assert len(k["preserve_fds"]) == 4, "Expect audit path kept"
+
+
+def test_non_root_keeps_original_environment(
+    successful_exec_from_mocked_user, randomstring
+):
+    mock_os, *_, em = successful_exec_from_mocked_user
+
+    sentinel_key = randomstring()
+    mock_os.environ = {sentinel_key: randomstring()}
+    expected_env = dict(mock_os.environ)
+
+    with pytest.raises(SystemExit) as pyexc:
+        em._event_loop()
+
+    assert (
+        pyexc.value.code == _GOOD_UNPRIVILEGED_EC
+    ), "Q&D: verify we exec'ed, based on '+= 1'"
+    _a, k = mock_os.execvpe.call_args
+    env = k["env"]
+    assert sentinel_key in env
+    assert env[sentinel_key] == expected_env[sentinel_key]
 
 
 def test_environment_default_path(successful_exec_from_mocked_root):
@@ -2085,7 +2131,9 @@ def test_run_as_same_user_does_not_change_uid(successful_exec_from_mocked_root):
     with pytest.raises(SystemExit) as pyexc:
         em._event_loop()
 
-    assert pyexc.value.code == 84, "Q&D: verify we exec'ed, but no privilege drop"
+    assert (
+        pyexc.value.code == _GOOD_UNPRIVILEGED_EC
+    ), "Q&D: verify we exec'ed, but no privilege drop"
 
     assert not mock_os.initgroups.called
     assert not mock_os.setresuid.called

@@ -1068,8 +1068,9 @@ class EndpointManager:
         # Reminder: from this point on, we are now the *child* process.
         pid = os.getpid()
 
-        os.environ.clear()
         env = os.environ  # shorthand going forward
+        if is_privileged():
+            env.clear()
 
         exit_code = 70
         try:
