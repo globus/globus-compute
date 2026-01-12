@@ -893,6 +893,7 @@ following ``configure`` subcommand options:
      minute, even though it is possible to set required authorizations for high
      assurance policies to smaller time intervals.
 
+.. _apply-existing-auth-policy:
 
 Apply an Existing Authentication Policy
 ---------------------------------------
