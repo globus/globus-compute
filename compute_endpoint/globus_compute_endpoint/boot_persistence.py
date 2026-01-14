@@ -68,11 +68,11 @@ def enable_on_boot(ep_dir: pathlib.Path, app: GlobusApp):
                 )
             raise ClickException(msg)
 
-        if Endpoint.check_pidfile(ep_dir)["active"]:
-            raise ClickException(
-                "Cannot enable on-boot persistence for an endpoint that is currently"
-                f" running. Stop endpoint {ep_name} and try again."
-            )
+    if Endpoint.check_pidfile(ep_dir)["active"]:
+        raise ClickException(
+            "Cannot enable on-boot persistence for an endpoint that is currently"
+            f" running. Stop endpoint {ep_name} and try again."
+        )
 
     # ensure that credentials exist when systemd tries to start endpoint, so that
     # auth login flow doesn't run under systemd
