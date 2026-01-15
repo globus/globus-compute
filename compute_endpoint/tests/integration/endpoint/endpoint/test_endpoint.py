@@ -167,7 +167,6 @@ def test_endpoint_setup_execution(mocker, tmp_path, randomstring):
     endpoint_config = UserEndpointConfig(
         endpoint_setup=command,
         engine=mock.Mock(),
-        detach_endpoint=False,
     )
     log_to_console = False
     no_color = True

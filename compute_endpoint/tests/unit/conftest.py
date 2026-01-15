@@ -33,7 +33,6 @@ known_user_config_opts = {
     "heartbeat_threshold": int,
     "idle_heartbeats_soft": int,
     "idle_heartbeats_hard": int,
-    "detach_endpoint": False,
     "endpoint_setup": str,
     "endpoint_teardown": str,
     "log_dir": str,

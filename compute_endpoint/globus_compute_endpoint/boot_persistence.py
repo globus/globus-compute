@@ -4,8 +4,6 @@ import shutil
 import textwrap
 
 from click import ClickException
-from globus_compute_endpoint.endpoint.config.config import UserEndpointConfig
-from globus_compute_endpoint.endpoint.config.utils import get_config
 from globus_compute_endpoint.endpoint.endpoint import Endpoint
 from globus_sdk import GlobusApp
 
@@ -48,25 +46,6 @@ def enable_on_boot(ep_dir: pathlib.Path, app: GlobusApp):
         )
 
     ep_name = ep_dir.name
-
-    config = get_config(ep_dir)
-    if isinstance(config, UserEndpointConfig):  # aka: not a manager endpoint
-        if config.detach_endpoint:
-            # config.py takes priority if it exists
-            if (ep_dir / "config.py").is_file():
-                # can't give users a nice packaged command to run here; just tell them
-                msg = (
-                    "Persistent endpoints cannot run in detached mode.  Update"
-                    f" {ep_name} config to set `detach_endpoint=False` and try again."
-                )
-            else:
-                # _can_ give a nice packaged command if they use yaml, though
-                msg = (
-                    "Persistent endpoints cannot run in detached mode.  Run the"
-                    f" following command to update {ep_name}'s config:"
-                    f"\n\techo 'detach_endpoint: false' >> {ep_dir / 'config.yaml'}"
-                )
-            raise ClickException(msg)
 
     if Endpoint.check_pidfile(ep_dir)["active"]:
         raise ClickException(

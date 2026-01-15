@@ -54,12 +54,6 @@ def mock_log():
 
 
 @pytest.fixture
-def mock_daemon():
-    with mock.patch(f"{_mock_base}daemon") as m:
-        yield m
-
-
-@pytest.fixture
 def mock_gcc(mock_reg_info):
     _gcc = mock.Mock(spec=Client)
     _gcc.register_endpoint.return_value = mock_reg_info
@@ -75,7 +69,7 @@ def mock_get_client(mock_gcc):
 
 @pytest.fixture
 def mock_launch():
-    with mock.patch(f"{_mock_base}Endpoint.daemon_launch") as m:
+    with mock.patch(f"{_mock_base}Endpoint.launch") as m:
         yield m
 
 
@@ -87,7 +81,7 @@ def mock_get_config():
 
 @pytest.fixture
 def conf():
-    _conf = UserEndpointConfig(engine=ThreadPoolEngine(), detach_endpoint=False)
+    _conf = UserEndpointConfig(engine=ThreadPoolEngine())
     _conf.source_content = "# test source content"
     _conf.source_content += "\nengine:\n  type: ThreadPoolEngine"
     yield _conf
@@ -289,7 +283,6 @@ def test_start_ha_non_compliant(caplog, randomstring, mock_print, conf_dir, conf
 
 def test_start_endpoint_no_reg_provided_registers(
     mock_print,
-    mock_daemon,
     mock_launch,
     mock_log,
     mock_get_client,
@@ -310,7 +303,7 @@ def test_start_endpoint_no_reg_provided_registers(
 
 
 def test_endpoint_needs_no_client_if_reg_info(
-    mock_get_client, mock_daemon, mock_launch, mock_ep_data, mock_reg_info, ep_uuid
+    mock_get_client, mock_launch, mock_ep_data, mock_reg_info, ep_uuid
 ):
     ep, ep_dir, log_to_console, no_color, ep_conf = mock_ep_data
     ep_args = (ep_dir, ep_uuid, ep_conf, log_to_console, no_color)
@@ -327,7 +320,6 @@ def test_endpoint_needs_no_client_if_reg_info(
 
 def test_start_endpoint_redacts_url_creds_from_logs(
     mock_print,
-    mock_daemon,
     mock_launch,
     mock_log,
     mock_ep_data,
@@ -348,13 +340,13 @@ def test_start_endpoint_redacts_url_creds_from_logs(
 
 
 def test_start_endpoint_populates_ep_static_info(
-    mock_print, mock_daemon, mock_ep_data, mock_reg_info, ep_uuid, randomstring
+    mock_print, mock_ep_data, mock_reg_info, ep_uuid, randomstring
 ):
     ep, ep_dir, log_to_console, no_color, ep_conf = mock_ep_data
     ep_args = (ep_dir, ep_uuid, ep_conf, log_to_console, no_color)
     canary_value = randomstring()
     ep_info = {"canary": canary_value}
-    with mock.patch(f"{_mock_base}Endpoint.daemon_launch") as mock_launch:
+    with mock.patch(f"{_mock_base}Endpoint.launch") as mock_launch:
         ep.start_endpoint(*ep_args, reg_info=mock_reg_info, ep_info=ep_info)
     assert mock_launch.called, "Should launch successfully"
 
@@ -571,29 +563,6 @@ def test_pid_file_check(fs, is_running, is_active):
     assert pid_status["active"] is is_active
 
 
-def test_daemon_creates_pid(
-    randomstring, mock_print, mock_ep_data, mock_reg_info, ep_uuid
-):
-    ep, ep_dir, log_to_console, no_color, ep_conf = mock_ep_data
-    ep_conf.detach_endpoint = True
-
-    mock_stk = mock.MagicMock()
-    mock_stk.__enter__.return_value = mock_stk
-    mock_stk.enter_context.side_effect = (None, MemoryError)
-    ep_args = (ep_dir, ep_uuid, ep_conf, log_to_console, no_color)
-
-    assert ep_conf.detach_endpoint, "Verify test setup and raison d'etre"
-    with mock.patch(f"{_mock_base}contextlib.ExitStack", return_value=mock_stk):
-        with pytest.raises(MemoryError):
-            ep.start_endpoint(*ep_args, reg_info=mock_reg_info, ep_info={})
-
-    a, k = mock_stk.enter_context.call_args
-    contextmanager_generator = a[0]
-
-    # awful test, but a temporary measure until v4, when we remove daemon context
-    assert contextmanager_generator.func.__name__ == "_pidfile"
-
-
 @pytest.mark.parametrize(
     "engine_cls", (GlobusComputeEngine, ThreadPoolEngine, ProcessPoolEngine)
 )
@@ -699,7 +668,7 @@ def test_endpoint_sets_owner_only_access(tmp_path, umask, mask, idmap):
 
 
 def test_always_prints_endpoint_id_to_terminal(
-    mock_daemon, mock_launch, mocker, mock_ep_data, mock_reg_info
+    mock_launch, mocker, mock_ep_data, mock_reg_info
 ):
     ep, ep_dir, log_to_console, no_color, ep_conf = mock_ep_data
     ep_id = str(uuid.uuid4())
@@ -776,7 +745,6 @@ def test_serialize_config_field_types():
     assert len(result["allowed_functions"]) == len(fns)
     assert result["allowed_functions"] == fns
     assert isinstance(result["heartbeat_period"], int)
-    assert isinstance(result["detach_endpoint"], bool)
     assert result["environment"]["foo"] == "bar"
 
     # Others should not
@@ -861,7 +829,6 @@ def test_get_endpoint_id(tmp_path: pathlib.Path, json_exists: bool, ep_uuid):
 
 def test_handles_provided_endpoint_id_no_json(
     mock_print,
-    mock_daemon,
     mock_launch,
     mock_gcc,
     mock_get_client,
@@ -881,7 +848,6 @@ def test_handles_provided_endpoint_id_no_json(
 
 def test_handles_provided_endpoint_id_with_json(
     mock_print,
-    mock_daemon,
     mock_launch,
     mock_gcc,
     mock_get_client,

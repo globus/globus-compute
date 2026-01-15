@@ -29,9 +29,7 @@ class ProcessPoolEngine(GlobusComputeEngineBase):
         **kwargs,
     ):
         self.label = label
-        self.executor: t.Optional[NativeExecutor] = None
-        self._executor_args = args
-        self._executor_kwargs = kwargs
+        self.executor = NativeExecutor(*args, **kwargs)
         self._task_counter: int = 0
         super().__init__(
             *args,
@@ -58,15 +56,6 @@ class ProcessPoolEngine(GlobusComputeEngineBase):
         Returns
         -------
         """
-        if self.executor is None:
-            # We are instantiating the executor here, rather than in the constructor,
-            # to ensure the executor starts within the daemon context. Doing so avoids
-            # having the daemon close existing pipe file descriptors required for
-            # inter-process communication.
-            self.executor = NativeExecutor(
-                *self._executor_args, **self._executor_kwargs
-            )
-
         assert endpoint_id, "ProcessPoolEngine requires kwarg:endpoint_id at start"
         self.endpoint_id = endpoint_id
         self.set_working_dir(run_dir=run_dir)
@@ -119,5 +108,4 @@ class ProcessPoolEngine(GlobusComputeEngineBase):
         return f
 
     def shutdown(self, /, block=False, **kwargs) -> None:
-        if self.executor:
-            self.executor.shutdown(wait=block)
+        self.executor.shutdown(wait=block)

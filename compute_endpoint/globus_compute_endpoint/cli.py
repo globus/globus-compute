@@ -112,18 +112,6 @@ def get_config_dir() -> pathlib.Path:
     return state.endpoint_config_dir
 
 
-def get_cli_endpoint(conf: UserEndpointConfig) -> Endpoint:
-    # this getter creates an Endpoint object from the CommandState
-    # it takes its various configurable values from the current CommandState
-    # as a result, any number of CLI options may be used to tweak the CommandState
-    # via callbacks, and the Endpoint will only be constructed within commands which
-    # access the Endpoint via this getter
-    state = CommandState.ensure()
-    endpoint = Endpoint(debug=state.debug or conf.debug)
-
-    return endpoint
-
-
 def set_param_to_config(ctx, param, value):
     state = CommandState.ensure()
     setattr(state, param.name, value)
@@ -818,11 +806,7 @@ def _do_start_endpoint(
         else:
             assert isinstance(ep_config, UserEndpointConfig)
 
-            if die_with_parent:
-                # The endpoint cannot die with its parent if it doesn't have one :)
-                ep_config.detach_endpoint = False
-                log.debug("The --die-with-parent flag has set detach_endpoint to False")
-            else:
+            if not die_with_parent:
                 bname = os.path.basename(sys.argv[0])
                 print(
                     "\nThis endpoint is not template capable.  To add that capability,"
@@ -831,7 +815,8 @@ def _do_start_endpoint(
                     flush=True,
                 )
 
-            get_cli_endpoint(ep_config).start_endpoint(
+            ep = Endpoint()
+            ep.start_endpoint(
                 ep_dir,
                 endpoint_uuid,
                 ep_config,

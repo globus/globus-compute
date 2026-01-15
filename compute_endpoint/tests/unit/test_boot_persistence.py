@@ -3,7 +3,6 @@ import pathlib
 from unittest import mock
 
 import pytest
-import yaml
 from click import ClickException
 from globus_compute_endpoint.boot_persistence import (
     _systemd_service_name,
@@ -29,7 +28,6 @@ def fake_ep_dir(fs: fakefs.FakeFilesystem, ep_name) -> pathlib.Path:
     ep_config = Endpoint._config_file_path(ep_dir)
     ep_config.write_text(
         """
-detach_endpoint: false
 display_name: null
 engine:
     type: ThreadPoolEngine
@@ -70,19 +68,6 @@ def test_enable_on_boot_no_systemd(fake_ep_dir, mocker):
         enable_on_boot(fake_ep_dir, mock_app)
 
     assert "Systemd not found" in str(e)
-
-
-def test_enable_on_boot_detach_endpoint(fake_ep_dir, systemd_unit_dir):
-    mock_app = mock.Mock(spec=UserApp)
-    cfg_path = fake_ep_dir / "config.yaml"
-    cfg = yaml.safe_load(cfg_path.read_text())
-    del cfg["detach_endpoint"]
-    cfg_path.write_text(yaml.dump(cfg))
-
-    with pytest.raises(ClickException) as e:
-        enable_on_boot(fake_ep_dir, mock_app)
-
-    assert "cannot run in detached mode" in str(e)
 
 
 @pytest.mark.parametrize("exists", [True, False])

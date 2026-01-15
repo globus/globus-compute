@@ -750,24 +750,6 @@ def test_delete_endpoint_with_malformed_config_sc28515(
     assert not conf_dir.exists()
 
 
-@pytest.mark.parametrize("die_with_parent", [True, False])
-def test_die_with_parent_detached(
-    mock_get_config,
-    run_line,
-    mock_ep,
-    die_with_parent,
-    ep_name,
-    make_endpoint_dir,
-):
-    make_endpoint_dir()
-
-    if die_with_parent:
-        run_line(f"start {ep_name} --die-with-parent")
-    else:
-        run_line(f"start {ep_name}")
-    assert mock_get_config.return_value.detach_endpoint is (not die_with_parent)
-
-
 def test_python_exec(mocker: MockFixture, run_line: t.Callable):
     mock_execvpe = mocker.patch("os.execvpe")
     run_line("python-exec path.to.module arg --option val")

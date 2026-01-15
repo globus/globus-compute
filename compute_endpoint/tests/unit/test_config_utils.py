@@ -74,6 +74,7 @@ def _get_cls_kwds(cls) -> set[str]:
 def test_config_opts_accounted_for_in_tests():
     kwds = _get_cls_kwds(UserEndpointConfig)
     kwds.remove("multi_user")  # special case deprecated argument
+    kwds.remove("detach_endpoint")  # special case deprecated argument
     assert set(known_user_config_opts) == kwds
     kwds = _get_cls_kwds(ManagerEndpointConfig)
     kwds.remove("multi_user")  # special case deprecated argument

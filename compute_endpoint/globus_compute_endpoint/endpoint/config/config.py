@@ -116,6 +116,8 @@ class BaseConfig:
             "multi_user",
             # remove after Apr 2026
             "force_mu_allow_same_user",
+            # remove after Jun 2026
+            "detach_endpoint",
         }
 
         kwds: dict[str, t.Any] = {}
@@ -240,8 +242,9 @@ class UserEndpointConfig(BaseConfig):
         equivalent to two days.  For example, if ``heartbeat_period`` is 30s, then
         suggest 5760.
 
-    :param detach_endpoint: Whether the endpoint daemon be run as a detached process.
-        This is good for a real edge node, but an anti-pattern for kubernetes pods
+    :param detach_endpoint: DEPRECATED - Previously, this setting would cause the
+        endpoint to detach from its parent process and run as a daemon. This
+        functionality has been removed.
 
     :param endpoint_setup: Command(s) to be run during the endpoint initialization
         process
@@ -266,7 +269,7 @@ class UserEndpointConfig(BaseConfig):
         heartbeat_threshold: int = 120,
         idle_heartbeats_soft: int = 0,
         idle_heartbeats_hard: int = 5760,  # Two days, divided by `heartbeat_period`
-        detach_endpoint: bool = True,
+        detach_endpoint: bool | None = None,
         endpoint_setup: str | None = None,
         endpoint_teardown: str | None = None,
         # Logging info
@@ -286,11 +289,18 @@ class UserEndpointConfig(BaseConfig):
         else:
             self.engine = engine
 
+        if detach_endpoint is not None:
+            warnings.warn(
+                "`detach_endpoint` is deprecated and will be removed in a future"
+                " release.",
+                DeprecationWarning,
+                stacklevel=2,
+            )
+
         # Single-user tuning
         self.heartbeat_threshold = heartbeat_threshold
         self.idle_heartbeats_soft = int(max(0, idle_heartbeats_soft))
         self.idle_heartbeats_hard = int(max(0, idle_heartbeats_hard))
-        self.detach_endpoint = detach_endpoint
 
         self.endpoint_setup = endpoint_setup
         self.endpoint_teardown = endpoint_teardown
