@@ -3,6 +3,31 @@ Changelog
 
 .. scriv-insert-here
 
+.. _changelog-4.4.0:
+
+globus-compute-sdk & globus-compute-endpoint v4.4.0
+-----------------------------------------------------
+
+New Functionality
+^^^^^^^^^^^^^^^^^
+
+- Added two options to ``globus-compute-endpoint configure``, ``--manager-config``
+  and ``--template-config``, which allow specifying alternate configuration files
+  to be copied into the new endpoint directory during configuration.
+
+Deprecated
+^^^^^^^^^^
+
+- Deprecated the ``--endpoint-config`` option of ``globus-compute-endpoint configure``,
+  in favor of the new ``--manager-config`` and ``--template-config`` options.
+
+Changed
+^^^^^^^
+
+- Bumped ``parsl`` dependency version from `2025.12.01
+  <https://pypi.org/project/parsl/2025.12.01/>`_ to `2026.1.5
+  <https://pypi.org/project/parsl/2026.1.5/>`_.
+
 .. _changelog-4.3.0:
 
 globus-compute-sdk & globus-compute-endpoint v4.3.0
