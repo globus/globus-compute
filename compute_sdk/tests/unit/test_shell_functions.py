@@ -317,7 +317,7 @@ def test_stdout_naming(run_in_tmp_dir, monkeypatch):
 
 
 def test_bad_walltime(run_in_tmp_dir, monkeypatch):
-    """BashFunction should raise an error on negative walltime"""
+    """ShellFunction should raise an error on negative walltime"""
     task_id = str(uuid.uuid4())
     monkeypatch.setenv("GC_TASK_UUID", task_id)
     with pytest.raises(AssertionError):
@@ -326,14 +326,14 @@ def test_bad_walltime(run_in_tmp_dir, monkeypatch):
 
 @pytest.mark.parametrize("fn_name", ["for", "with", "break", " abc", "2be"])
 def test_bad_shell_function_name(fn_name):
-    """BashFunction should raise a ValueError on invalid function names"""
+    """ShellFunction should raise a ValueError on invalid function names"""
     with pytest.raises(ValueError):
         ShellFunction("pwd", name=fn_name)
 
 
 @pytest.mark.parametrize("fn_name", ["Hello", "World", "My_Shell_Function", "École"])
 def test_shell_function_name(fn_name):
-    """BashFunction should have name set at init"""
+    """ShellFunction should have name set at init"""
     sf = ShellFunction("pwd", name=fn_name)
     assert sf.__name__ == fn_name
 
