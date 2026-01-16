@@ -5,7 +5,7 @@ from .shell_function import ShellFunction, ShellResult
 
 class MPIFunction(ShellFunction):
     """MPIFunction extends ShellFunction, as a thin wrapper that adds an
-    MPI launcher prefix to the BashFunction command.
+    MPI launcher prefix to the ShellFunction command.
     """
 
     def __call__(
