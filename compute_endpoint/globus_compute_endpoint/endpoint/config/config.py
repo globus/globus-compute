@@ -116,6 +116,8 @@ class BaseConfig:
             "multi_user",
             # remove after Apr 2026
             "force_mu_allow_same_user",
+            # remove after Jun 2026
+            "detach_endpoint",
         }
 
         kwds: dict[str, t.Any] = {}

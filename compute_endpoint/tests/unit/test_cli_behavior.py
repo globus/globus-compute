@@ -87,6 +87,7 @@ def mock_command_ensure(gc_dir):
     with mock.patch(f"{_MOCK_BASE}CommandState.ensure") as m:
         m.return_value = m
         m.endpoint_config_dir = gc_dir
+        m.detach = False  # since a Mock would be truthy
 
         yield m
 

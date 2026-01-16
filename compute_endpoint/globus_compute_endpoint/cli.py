@@ -18,6 +18,7 @@ import warnings
 from dataclasses import asdict
 
 import click
+import daemon
 import lockfile
 from click import ClickException
 from click_option_group import optgroup
@@ -90,6 +91,7 @@ class CommandState:
     def __init__(self):
         self.endpoint_config_dir: pathlib.Path = init_config_dir()
         self.debug = False
+        self.detach = False
         self.no_color = False
         self.log_to_console = False
         self.endpoint_uuid = None
@@ -181,6 +183,12 @@ def start_options(f):
         hidden=True,
         callback=set_param_to_config,
         help="Shutdown if parent process goes away",
+    )(f)
+    f = click.option(
+        "--detach",
+        is_flag=True,
+        callback=set_param_to_config,
+        help="Detach from the controlling terminal and run in the background",
     )(f)
     return f
 
@@ -782,15 +790,6 @@ def _do_start_endpoint(
 
             if fn_allow_list != _no_fn_list_canary:
                 ep_config.allowed_functions = fn_allow_list
-
-            if not state.debug and ep_config.debug:
-                setup_logging(
-                    logfile=ep_dir / "endpoint.log",
-                    debug=ep_config.debug,
-                    console_enabled=state.log_to_console,
-                    no_color=state.no_color,
-                )
-
         except Exception as e:
             if isinstance(e, ClickException):
                 raise
@@ -804,6 +803,26 @@ def _do_start_endpoint(
             )
             log.critical(msg)
             raise
+
+        if state.detach:
+            # enter daemon context as early as possible to ensure files are opened
+            # after the double fork, but after config loading to ensure any error
+            # messages from that reach the console
+            stk.enter_context(
+                daemon.DaemonContext(
+                    working_directory=str(ep_dir),
+                    umask=0o002,
+                    detach_process=True,
+                )
+            )
+
+        # reset logging after daemonization
+        setup_logging(
+            logfile=ep_dir / "endpoint.log",
+            debug=state.debug or ep_config.debug,
+            console_enabled=state.log_to_console,
+            no_color=state.no_color,
+        )
 
         pid_path = Endpoint.pid_path(ep_dir)
         stk.enter_context(_pidfile(pid_path, ep_config.heartbeat_period * 3))
