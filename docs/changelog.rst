@@ -3,6 +3,18 @@ Changelog
 
 .. scriv-insert-here
 
+.. _changelog-4.5.0:
+
+globus-compute-sdk & globus-compute-endpoint v4.5.0
+---------------------------------------------------
+
+New Functionality
+^^^^^^^^^^^^^^^^^
+
+- When running an endpoint under a non-root user, environment variables from the parent
+  process are now passed to the user endpoint process. (Endpoints run as root still
+  start with a clean environment.)
+
 .. _changelog-4.4.0:
 
 globus-compute-sdk & globus-compute-endpoint v4.4.0
