@@ -1,5 +1,9 @@
 #!/usr/bin/env bash
 
+# This script builds the docs so changes can be tested locally, via a docs .venv.
+# The output are in ./_build/html/.. and they are also viewable via a simple
+# http.server at http://127.0.0.1:12345/
+#
 # Take advantage of FS-events to avoid an up-enter cycle.  Just save any file within
 # the documentation directory and then go reload the page.
 #
@@ -17,6 +21,7 @@ elif command -v fswatch &> /dev/null; then
     WATCH_FS_COMMAND="fswatch -1"
 else
     echo "No known command to watch filesystem; bailing so as not waste CPU cycles"
+    echo -e "(ensure \033[92;1minotifywait\033[0m or \033[92;1mfswatch\033[0m is installed)"
     exit 2
 fi
 
