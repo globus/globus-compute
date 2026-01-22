@@ -186,38 +186,23 @@ Please refer to :ref:`endpoint-manager-config` for details on each field.
 This is a valid-syntax-but-will-never-successfully-map example identity mapping
 configuration file.  It is a JSON list of identity mapping configurations that
 will be tried in order.  By implementation within the endpoint code base, the
-first configuration to return a match "wins."  In this example, the first
-configuration is a call out to an external tool, as specified by the
-|idmap_external|_ DATA_TYPE.  The command is a list of arguments, with the first
-element as the actual executable.  In this case, the flags are strictly
-illustrative, as ``/bin/false`` always returns with a non-zero exit code and so
-will be ignored by the |globus-identity-mapping|_ logic.  However, if the site
-requires custom or special logic to acquire the correct local username, this
-executable must accept a |idmap_input|_ JSON document via ``stdin`` and output a
-|idmap_output|_ JSON document to ``stdout``.
-
-The second configuration in this example is an |idmap_expression|_, which means
-it uses a subset of regular expression syntax to search for a suitable POSIX
-username.  This configuration searches the ``username`` field from the passed
-identity set for a value that ends in ``@example.com``.  The library appends the
-``^`` and ``$`` anchors to the regex before searching, so the actual regular
-expression used would be ``^(.*)@example.com$``.  Finally, if a match is found,
-the first saved group is the output (i.e., ``{0}``).  If the ``username`` field
-contained ``mickey97@example.com``, then this configuration would return
-``mickey97``, and the MEP would then use |getpwnam(3)|_ to look up ``mickey97``.
-But if the username field(s) did not end with ``@example.com``, then it would
-not match and the start request would fail.
+first configuration to return a match "wins."  In this example, there is only
+one configuration, an |idmap_expression|_.  This means that the ``match`` field
+uses a subset of regular expression syntax\ [1]_ to scan the ``username`` field
+from the passed identity set.  The library appends the ``^`` and ``$`` anchors
+to the regex before searching, so the actual regular expression used would be
+``^(.*)@example.com$``.  Finally, if a match is found, the first saved group is
+the output (i.e., ``{0}``).  As an example, if a ``username`` field contained
+``mickey97@example.com``, then this configuration would return ``mickey97``, and
+the MEP would then use |getpwnam(3)|_ to look up ``mickey97``.  But if no
+username field in any of the identities in the set ended with ``@example.com``,
+then it would not match and the start request would fail.
 
 .. code-block:: json
-   :caption: The default example identity mapping configuration; technically functional
-       but pragmatically useless
+   :caption: The default example identity mapping configuration; technically
+      functional but pragmatically useless
 
    [
-     {
-       "comment": "For more examples, see: https://docs.globus.org/globus-connect-server/v5.4/identity-mapping-guide/",
-       "DATA_TYPE": "external_identity_mapping#1.0.0",
-       "command": ["/bin/false", "--some", "flag", "-a", "-b", "-c"]
-     },
      {
        "comment": "For more examples, see: https://docs.globus.org/globus-connect-server/v5.4/identity-mapping-guide/",
        "DATA_TYPE": "expression_identity_mapping#1.0.0",
@@ -231,10 +216,29 @@ not match and the start request would fail.
      }
    ]
 
+Some setups may require an external script or admin-supplied executable to
+properly map an identity, so this second example showcases the |idmap_external|_
+DATA_TYPE.  The command is a list of arguments, with the first element as the
+actual executable.  The flags specified here are for illustrative purposes to
+match the ``custom_script`` example.  This executable must accept a
+|idmap_input|_ JSON document via ``stdin``, output a |idmap_output|_ JSON
+document to ``stdout``, and return a 0 exit code.  (A result with a non-zero
+exit code will be ignored.)
+
+.. code-block:: json
+   :caption: An external program identity mapping configuration example
+
+   [
+     {
+       "DATA_TYPE": "external_identity_mapping#1.0.0",
+       "command": ["/root/custom_script", "--some", "flag", "-a", "-b", "-c"]
+     },
+   ]
+
 The syntax of this document is defined in the `Globus Connect Server Identity Mapping
 <https://docs.globus.org/globus-connect-server/v5.4/identity-mapping-guide/>`_
 documentation.  It is a JSON-list of mapping configurations, and there are two
-implemented strategies to determine a mapping:
+provided strategies to determine a mapping:
 
 * ``expression_identity_mapping#1.0.0`` |nbsp| --- |nbsp| Regular Expression
   based mapping applies an administrator-defined regular expression against any
@@ -245,6 +249,11 @@ implemented strategies to determine a mapping:
   administrator-defined external process, passing the input identity documents
   via ``stdin``, and reading the response from ``stdout``.
 
+Observe that as a *list*, administrators may implement more than one strategy
+for mapping identities.  While the default mapping configuration illustrates the
+most common approach (regular expression mapping), some setups may require
+trying multiple avenues to ascertain a proper mapping.
+
 .. tip::
 
    While developing this file, administrators may appreciate using the
@@ -254,7 +263,7 @@ implemented strategies to determine a mapping:
 The manager endpoint process watches this file for changes.  If an administrator
 needs to make a live change, simply update the content of the identity mapping
 file specified by the ``config.yaml`` configuration.  The manager endpoint
-process will note the change, and atomically apply it: if the new identity
+process will note the change and atomically apply it: if the new identity
 mapping configuration is invalid, the previously loaded configuration will
 remain in place.  In both cases (valid or invalid), the endpoint will emit a
 message to the log.
@@ -313,7 +322,7 @@ This user has linked both identities, so both identities are in the identity
 set.  Per the configuration, the first identity will not match either regex, but
 the second (``roberto@your_institution.com``) will, and the returned username
 would be ``roberto``.  Note that any field could be tested, but this example
-used``email``.
+used ``email``.
 
 ``external_identity_mapping#1.0.0``
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
@@ -696,6 +705,9 @@ Administrator Quickstart
    .. code-block:: console
 
       # systemctl enable globus-compute-endpoint-prod_gpu_large --now
+
+.. [1] Specifically, a subset of what `Python's re module
+   <https://docs.python.org/3/library/re.html>`_ implements.
 
 .. |nbsp| unicode:: 0xA0
    :trim:
