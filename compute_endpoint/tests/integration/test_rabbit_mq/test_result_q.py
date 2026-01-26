@@ -77,7 +77,7 @@ def test_publish_multiple_then_subscribe(
 
     all_results = {}
     for _i in range(total_messages):
-        (routing_key, b_message) = results_q.get(timeout=2)
+        routing_key, b_message = results_q.get(timeout=2)
         all_results[routing_key] = all_results.get(routing_key, 0) + 1
 
     routing_keys_stripped = [key.split(".")[0] for key in all_results]

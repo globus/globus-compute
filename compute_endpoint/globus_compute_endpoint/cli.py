@@ -224,16 +224,14 @@ def get_ep_dir_by_name_or_uuid(ctx, param, value, require_local: bool = True):
             ep_info = f"at {path}"
             ep_name = value
 
-        msg = textwrap.dedent(
-            f"""
+        msg = textwrap.dedent(f"""
             There is no endpoint configuration on this machine {ep_info}
 
             1. Please create a configuration template with:
                 globus-compute-endpoint configure {ep_name}
             2. Update the configuration
             3. Start the endpoint
-            """
-        )
+            """)
         raise ClickException(msg)
 
     ctx.params["ep_dir"] = path

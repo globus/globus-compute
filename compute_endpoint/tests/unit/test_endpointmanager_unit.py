@@ -128,8 +128,7 @@ def mock_conf_root(identity_map_path):
 @pytest.fixture(autouse=True)
 def user_conf_template(conf_dir) -> pathlib.Path:
     template = Endpoint.user_config_template_path(conf_dir)
-    template.write_text(
-        """
+    template.write_text("""
 heartbeat_period: {{ heartbeat }}
 engine:
     type: GlobusComputeEngine
@@ -138,8 +137,7 @@ engine:
         init_blocks: 1
         min_blocks: 0
         max_blocks: 1
-        """
-    )
+        """)
     return template
 
 
