@@ -1,11 +1,11 @@
 Executor User Guide
 ===================
 
-The |Executor|_ class, a subclass of Python's |ConcurrentFuturesExecutor|_, is the
+The |Executor| class, a subclass of Python's |ConcurrentFuturesExecutor|_, is the
 preferred approach to collecting results from the Globus Compute web services.  Over
 polling (the historical approach) where the web service must be repeatedly
 queried for the status of tasks and results eventually collected in bulk, the
-|Executor|_ class instantiates an AMQPS connection that streams results
+|Executor| class instantiates an AMQPS connection that streams results
 directly -- and immediately -- as they arrive at the server.  This is a far
 more efficient paradigm, simultaneously in terms of bytes over the wire, time
 spent waiting for results, and boilerplate code to check for results.
@@ -29,8 +29,8 @@ example interaction:
         print(fut.result())
 
 This example is only a quick-reference, showing the basic mechanics of how to
-use the |Executor|_ class and submitting a single task.  However, there
-are a number of details to observe.  The first is that a |Executor|_
+use the |Executor| class and submitting a single task.  However, there
+are a number of details to observe.  The first is that a |Executor|
 instance is associated with a specific endpoint.  We use the "well-known"
 tutorial endpoint in this example, but that can point to any endpoint to which
 you have access.
@@ -52,10 +52,10 @@ been executed (remotely), much less a result received.  The |.result()|_ call
 blocks ("waits") until all of that has completed, and the result has been
 received from the upstream services.
 
-Third, |Executor|_ objects can be used as context managers (the ``with``
-statement).  Underneath the hood, the |Executor|_ class uses threads to
+Third, |Executor| objects can be used as context managers (the ``with``
+statement).  Underneath the hood, the |Executor| class uses threads to
 implement the asynchronous interface -- a thread to coalesce and submit tasks,
-and a thread to watch for incoming results.  The |Executor|_ logic cannot
+and a thread to watch for incoming results.  The |Executor| logic cannot
 determine when it will no longer receive tasks (i.e., no more |.submit()|_
 calls) and so cannot prematurely shutdown.  Thus, it must be told, either
 explicitly with a call to |.shutdown()|_, or implicitly when used as a context
@@ -218,10 +218,10 @@ example uses `concurrent.futures.as_completed`_:
 
 Reloading Tasks
 ---------------
-Waiting for incoming results with the |Executor|_ requires an active
+Waiting for incoming results with the |Executor| requires an active
 connection -- which is often at odds with closing a laptop clamshell (e.g.,
 heading home for the weekend).  For longer running jobs like this, the
-|Executor|_ offers the |.reload_tasks()|_ method.  This method will reach
+|Executor| offers the |.reload_tasks()|_ method.  This method will reach
 out to the Globus Compute web-services to collect all of the tasks associated with the
 |.task_group_id|_, create a list of associated futures, finish
 (call |.set_result()|_) any previously finished tasks, and watch the unfinished
@@ -290,7 +290,7 @@ futures.  Consider the following (contrived) example:
     print("Results:\n ", "\n  ".join(results))
 
 For a slightly more advanced usage, one could manually submit a batch of tasks
-with the |Client|_, and wait for the results at a future time.  Submitting
+with the |Client|, and wait for the results at a future time.  Submitting
 the results might look like:
 
 .. code-block:: python
@@ -639,10 +639,9 @@ like BinderHub:
 
 .. |rarr| unicode:: 0x2192
 
-.. |Client| replace:: ``Client``
-.. _Client: ../reference/client.html
-.. |Executor| replace:: ``Executor``
-.. _Executor: ../reference/executor.html
+.. |Client| replace:: :class:`Client <globus_compute_sdk.sdk.client.Client>`
+.. |Executor| replace:: :class:`Executor <globus_compute_sdk.sdk.executor.Executor>`
+
 .. |Future| replace:: ``Future``
 .. _Future: https://docs.python.org/3/library/concurrent.futures.html#future-objects
 .. |ConcurrentFuturesExecutor| replace:: ``concurrent.futures.Executor``
