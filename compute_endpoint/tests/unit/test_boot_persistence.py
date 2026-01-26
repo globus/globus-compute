@@ -27,14 +27,12 @@ def fake_ep_dir(fs: fakefs.FakeFilesystem, ep_name) -> pathlib.Path:
     ep_dir = pathlib.Path.home() / ".globus_compute" / ep_name
     fs.create_dir(ep_dir)
     ep_config = Endpoint._config_file_path(ep_dir)
-    ep_config.write_text(
-        """
+    ep_config.write_text("""
 detach_endpoint: false
 display_name: null
 engine:
     type: ThreadPoolEngine
-        """.strip()
-    )
+        """.strip())
     return ep_dir
 
 

@@ -35,8 +35,7 @@ def test_resultwatcher_graceful_shutdown():
 
 def test_executor_atexit_handler_catches_all_instances(tmp_path):
     test_script = tmp_path / "test.py"
-    script_content = textwrap.dedent(
-        """
+    script_content = textwrap.dedent("""
         import random
         from globus_compute_sdk import Executor
         from globus_compute_sdk.sdk.executor import _REGISTERED_EXECUTORS
@@ -53,8 +52,7 @@ def test_executor_atexit_handler_catches_all_instances(tmp_path):
             f"Verify test setup: {len(_REGISTERED_EXECUTORS)} != {num_executors}"
         )
         gce.shutdown()  # only shutting down _last_ instance.  Should still exit cleanly
-        """
-    )
+        """)
     test_script.write_text(script_content)
     res = subprocess.run([sys.executable, str(test_script)], timeout=5)
     assert res.returncode == 0

@@ -79,14 +79,12 @@ def handle_auth_errors(f: t.Callable) -> t.Callable:
         try:
             return f(*args, **kwargs)
         except globus_sdk.AuthAPIError as e:
-            msg = textwrap.dedent(
-                f"""
+            msg = textwrap.dedent(f"""
                 Compute CLI Error: An Auth API error occurred.
                 HTTP status:       {e.http_status}
                 code:              {e.code}
                 message:           {e.text}
-                """
-            )
+                """)
 
             # This specific Auth error has a common cause
             if e.http_status == 400 and e.code == "Error":

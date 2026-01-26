@@ -132,13 +132,11 @@ def make_endpoint_dir(mock_command_ensure, ep_name):
             ep_json = ep_dir / "endpoint.json"
             ep_json.write_text(json.dumps({"endpoint_id": ep_uuid}))
         ep_config = Endpoint._config_file_path(ep_dir)
-        ep_config.write_text(
-            """
+        ep_config.write_text("""
 display_name: null
 engine:
     type: ThreadPoolEngine
-            """.strip()
-        )
+            """.strip())
         return ep_dir
 
     return func
@@ -155,20 +153,15 @@ def make_manager_endpoint_dir(mock_command_ensure, ep_name):
         ep_config = Endpoint._config_file_path(ep_dir)
         ep_template = Endpoint.user_config_template_path(ep_dir)
         ep_schema = Endpoint.user_config_schema_path(ep_dir)
-        ep_config.write_text(
-            """
+        ep_config.write_text("""
 display_name: null
-            """.strip()
-        )
-        ep_template.write_text(
-            """
+            """.strip())
+        ep_template.write_text("""
 heartbeat_period: {{ heartbeat }}
 engine:
     type: ThreadPoolEngine
-            """.strip()
-        )
-        ep_schema.write_text(
-            """
+            """.strip())
+        ep_schema.write_text("""
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "type": "object",
@@ -176,8 +169,7 @@ engine:
     "heartbeat": { "type": "number" }
   }
 }
-            """.strip()
-        )
+            """.strip())
         return ep_dir
 
     return func

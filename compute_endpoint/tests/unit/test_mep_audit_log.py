@@ -51,16 +51,14 @@ def mock_close_fds():
 
 
 def conf_tmpl():
-    return textwrap.dedent(
-        """
+    return textwrap.dedent("""
         heartbeat_period: 1
         idle_heartbeats_soft: 1
         idle_heartbeats_hard: 2
         engine:
             type: ThreadPoolEngine
             max_workers: 1
-    """
-    ).strip()
+    """).strip()
 
 
 @pytest.fixture
