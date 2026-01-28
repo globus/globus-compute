@@ -1,17 +1,14 @@
 from __future__ import annotations
 
+import os
 from urllib.parse import urlparse
-
-from .utils import get_env_var_with_deprecation
 
 # Same UUID for tutorial MEP in all environments
 TUTORIAL_EP_UUID = "4b116d3c-1703-4f8f-9f6f-39921e5864df"
 
 
 def _get_envname():
-    return get_env_var_with_deprecation(
-        "GLOBUS_SDK_ENVIRONMENT", "FUNCX_SDK_ENVIRONMENT", "production"
-    )
+    return os.getenv("GLOBUS_SDK_ENVIRONMENT", "production")
 
 
 def get_web_service_url(envname: str | None = None) -> str:
