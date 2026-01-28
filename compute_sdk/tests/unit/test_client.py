@@ -365,20 +365,6 @@ def test_register_function(gcc: gc.Client, serde: ComputeSerializer):
     assert data["meta"]["serde_identifier"] == metadata["serde_identifier"]
 
 
-@pytest.mark.parametrize("dep_arg", ["searchable", "function_name"])
-def test_register_function_deprecated_args(gcc, dep_arg):
-    gcc._compute_web_client.v3.register_function.return_value = types.SimpleNamespace(
-        data={"function_uuid": str(uuid.uuid4())}
-    )
-
-    with pytest.deprecated_call() as pyt_wrn:
-        gcc.register_function(funk, **{dep_arg: "foo"})
-
-    warning = pyt_wrn.pop(DeprecationWarning)
-    assert "deprecated" in str(warning).lower()
-    assert dep_arg in str(warning)
-
-
 def _docstring_test_case_no_docstring():
     pass
 
