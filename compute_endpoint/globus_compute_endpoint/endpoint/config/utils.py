@@ -375,8 +375,6 @@ def serialize_config(config: UserEndpointConfig | ManagerEndpointConfig) -> dict
         params = [k for sig in signatures for k in sig.parameters.keys()]
 
         for param in params:
-            if param == "executors":
-                continue
             val = getattr(obj, param, 0)
             if val == 0:
                 continue
