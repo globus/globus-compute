@@ -51,7 +51,6 @@ from globus_compute_sdk.sdk.auth.auth_client import ComputeAuthClient
 from globus_compute_sdk.sdk.auth.whoami import print_whoami_info
 from globus_compute_sdk.sdk.batch import create_user_runtime
 from globus_compute_sdk.sdk.compute_dir import ensure_compute_dir
-from globus_compute_sdk.sdk.diagnostic import do_diagnostic_base
 from globus_compute_sdk.sdk.utils.gare import gare_handler
 from globus_sdk import MISSING, AuthClient, GlobusAPIError, MissingType
 
@@ -947,20 +946,6 @@ def delete_endpoint(
             )
 
     Endpoint.delete_endpoint(ep_dir, ep_conf, force=force, ep_uuid=ep_uuid)
-
-
-@app.command("self-diagnostic")
-def self_diagnostic():
-    """
-    Note that this functionality has been migrated to the SDK, leaving only
-    a redirect here.
-    """
-    print(
-        "This endpoint self-diagnostic command has been deprecated.\n"
-        "  Please use the `globus-compute-diagnostic` command from the SDK instead.",
-        file=sys.stderr,
-    )
-    do_diagnostic_base(sys.argv[2:])
 
 
 @app.command(
