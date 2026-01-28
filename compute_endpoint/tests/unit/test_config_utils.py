@@ -60,9 +60,9 @@ def mapped_ident(mocker):
 
 
 @pytest.fixture
-def conf_no_exec():
+def conf_no_engine():
     # empty so as to avoid unnecessary network lookup
-    yield UserEndpointConfig(executors=())
+    yield UserEndpointConfig(engine=None)
 
 
 def _get_cls_kwds(cls) -> set[str]:
@@ -106,7 +106,6 @@ def test_load_user_endpoint_config_full(get_random_of_datatype):
     conf = {
         kw: get_random_of_datatype(tval) for kw, tval in known_user_config_opts.items()
     }
-    conf.pop("executors")
     conf["engine"] = {"type": "ThreadPoolEngine"}
     serde_yaml = yaml.safe_dump(conf)
     conf = load_config_yaml(serde_yaml)
@@ -131,7 +130,7 @@ def test_load_manager_endpoint_config_full(get_random_of_datatype):
 
 
 def test_render_user_config_escape_strings(
-    conf_no_exec, mapped_ident: MappedPosixIdentity
+    conf_no_engine, mapped_ident: MappedPosixIdentity
 ):
     template = """
 endpoint_setup: {{ setup }}
@@ -153,7 +152,7 @@ engine:
     }
     user_runtime = {"python": {"version": "3.13.7\n    bar: baz"}}
     rendered_str = render_config_user_template(
-        conf_no_exec,
+        conf_no_engine,
         template,
         pathlib.Path("/"),
         mapped_ident,
@@ -172,7 +171,7 @@ engine:
 
 
 def test_render_user_config_handles_null_user_values(
-    conf_no_exec, mapped_ident: MappedPosixIdentity
+    conf_no_engine, mapped_ident: MappedPosixIdentity
 ):
     template = """
 endpoint_setup: {{ some_var }}
@@ -182,7 +181,7 @@ display_name: {{ user_runtime.some_var }}
     user_opts = {"some_var": None}
     user_runtime = {"some_var": None}
     rendered_str = render_config_user_template(
-        conf_no_exec,
+        conf_no_engine,
         template,
         pathlib.Path("/"),
         mapped_ident,
@@ -213,7 +212,7 @@ display_name: {{ user_runtime.some_var }}
     ],
 )
 def test_render_user_config_option_types(
-    conf_no_exec, data, mapped_ident: MappedPosixIdentity
+    conf_no_engine, data, mapped_ident: MappedPosixIdentity
 ):
     is_valid, val = data
     template = "foo: {{ foo }}"
@@ -221,12 +220,12 @@ def test_render_user_config_option_types(
 
     if is_valid:
         render_config_user_template(
-            conf_no_exec, template, pathlib.Path("/"), mapped_ident, {}, user_opts
+            conf_no_engine, template, pathlib.Path("/"), mapped_ident, {}, user_opts
         )
     else:
         with pytest.raises(ValueError) as pyt_exc:
             render_config_user_template(
-                conf_no_exec, template, pathlib.Path("/"), mapped_ident, {}, user_opts
+                conf_no_engine, template, pathlib.Path("/"), mapped_ident, {}, user_opts
             )
         assert "not a valid user config option type" in pyt_exc.exconly()
 
@@ -240,7 +239,7 @@ def test_render_user_config_option_types(
     ],
 )
 def test_render_user_config_sandbox(
-    conf_no_exec, data: t.Tuple[str, t.Any], mapped_ident: MappedPosixIdentity
+    conf_no_engine, data: t.Tuple[str, t.Any], mapped_ident: MappedPosixIdentity
 ):
     jinja_op, val = data
     template = f"foo: {jinja_op}"
@@ -248,14 +247,14 @@ def test_render_user_config_sandbox(
     with mock.patch(f"{_MOCK_BASE}_sanitize_user_json", return_value=user_opts):
         with pytest.raises(jinja2.exceptions.SecurityError):
             render_config_user_template(
-                conf_no_exec, template, pathlib.Path("/"), mapped_ident, {}, user_opts
+                conf_no_engine, template, pathlib.Path("/"), mapped_ident, {}, user_opts
             )
 
 
 @mock.patch.object(jinja2.sandbox, "SandboxedEnvironment")
 @mock.patch.object(jinja2, "FileSystemLoader")
 def test_render_user_config_environment_loader(
-    mock_loader, mock_env, conf_no_exec, mapped_ident: MappedPosixIdentity
+    mock_loader, mock_env, conf_no_engine, mapped_ident: MappedPosixIdentity
 ):
     template_dir = pathlib.Path("templates/")
     template_dir.mkdir(parents=True, exist_ok=True)
@@ -264,7 +263,9 @@ def test_render_user_config_environment_loader(
     template_path.write_text(template_str)
 
     template_dir.chmod(0o700)
-    render_config_user_template(conf_no_exec, template_str, template_path, mapped_ident)
+    render_config_user_template(
+        conf_no_engine, template_str, template_path, mapped_ident
+    )
 
     mock_loader.assert_called_once_with(template_dir)
     mock_env.assert_called_once_with(
@@ -275,7 +276,7 @@ def test_render_user_config_environment_loader(
 @mock.patch("jinja2.sandbox.SandboxedEnvironment")
 @mock.patch("jinja2.FileSystemLoader")
 def test_render_user_config_environment_loader_no_permissions(
-    mock_loader, mock_env, conf_no_exec, mock_log, mapped_ident: MappedPosixIdentity
+    mock_loader, mock_env, conf_no_engine, mock_log, mapped_ident: MappedPosixIdentity
 ):
     template_dir = pathlib.Path("templates/")
     template_dir.mkdir(parents=True, exist_ok=True)
@@ -284,7 +285,9 @@ def test_render_user_config_environment_loader_no_permissions(
     template_path.write_text(template_str)
 
     template_dir.chmod(0o000)
-    render_config_user_template(conf_no_exec, template_str, template_path, mapped_ident)
+    render_config_user_template(
+        conf_no_engine, template_str, template_path, mapped_ident
+    )
 
     assert mock_log.debug.called
     a, *_ = mock_log.debug.call_args
@@ -314,13 +317,13 @@ def test_render_user_config_environment_loader_no_permissions(
     ],
 )
 def test_render_user_config_shell_escape(
-    conf_no_exec, data: t.Tuple[bool, t.Any], mapped_ident: MappedPosixIdentity
+    conf_no_engine, data: t.Tuple[bool, t.Any], mapped_ident: MappedPosixIdentity
 ):
     is_valid, option = data
     template = "option: {{ option|shell_escape }}"
     user_opts = {"option": option}
     rendered = render_config_user_template(
-        conf_no_exec, template, pathlib.Path("/"), mapped_ident, {}, user_opts
+        conf_no_engine, template, pathlib.Path("/"), mapped_ident, {}, user_opts
     )
     rendered_dict = yaml.safe_load(rendered)
 
@@ -335,7 +338,7 @@ def test_render_user_config_shell_escape(
 
 @pytest.mark.parametrize("schema_exists", (True, False))
 def test_render_user_config_apply_schema(
-    conf_no_exec, schema_exists: bool, mapped_ident: MappedPosixIdentity, randomstring
+    conf_no_engine, schema_exists: bool, mapped_ident: MappedPosixIdentity, randomstring
 ):
     template = "foo: {{ foo }}"
     schema = {}
@@ -351,7 +354,7 @@ def test_render_user_config_apply_schema(
     user_opts = {"foo": randomstring()}
     with mock.patch.object(jsonschema, "validate") as mock_validate:
         render_config_user_template(
-            conf_no_exec, template, pathlib.Path("/"), mapped_ident, schema, user_opts
+            conf_no_engine, template, pathlib.Path("/"), mapped_ident, schema, user_opts
         )
 
     if schema_exists:
@@ -366,28 +369,28 @@ def test_render_user_config_apply_schema(
 
 
 def test_render_config_passes_parent_config(
-    conf_no_exec, mapped_ident: MappedPosixIdentity
+    conf_no_engine, mapped_ident: MappedPosixIdentity
 ):
     template = "parent_heartbeat: {{ parent_config.heartbeat_period }}"
 
     rendered = render_config_user_template(
-        conf_no_exec, template, pathlib.Path("/"), mapped_ident
+        conf_no_engine, template, pathlib.Path("/"), mapped_ident
     )
 
     rendered_dict = yaml.safe_load(rendered)
-    assert rendered_dict["parent_heartbeat"] == conf_no_exec.heartbeat_period
+    assert rendered_dict["parent_heartbeat"] == conf_no_engine.heartbeat_period
 
 
 @pytest.mark.parametrize("user_runtime", [None, {}, {"python": {"version": "X.Y.Z"}}])
 def test_render_config_passes_user_runtime(
-    conf_no_exec, mapped_ident: MappedPosixIdentity, user_runtime
+    conf_no_engine, mapped_ident: MappedPosixIdentity, user_runtime
 ):
     template = (
         "user_python: {{ user_runtime.python.version if user_runtime else '<none>' }}"
     )
 
     rendered = render_config_user_template(
-        conf_no_exec,
+        conf_no_engine,
         template,
         pathlib.Path("/"),
         mapped_ident,
@@ -401,7 +404,7 @@ def test_render_config_passes_user_runtime(
         assert rendered_dict["user_python"] == "<none>"
 
 
-def test_render_config_passes_mapped_identity(mocker, conf_no_exec):
+def test_render_config_passes_mapped_identity(mocker, conf_no_engine):
     mock_struct_passwd = mock.Mock(
         pw_name="testuser",
         pw_uid=1000,
@@ -429,7 +432,7 @@ def test_render_config_passes_mapped_identity(mocker, conf_no_exec):
         "globus_id: {{ mapped_identity.globus.id }}"
     )
     rendered = render_config_user_template(
-        conf_no_exec, template, pathlib.Path("/"), mapped_ident
+        conf_no_engine, template, pathlib.Path("/"), mapped_ident
     )
 
     rendered_dict = yaml.safe_load(rendered)
@@ -444,7 +447,7 @@ def test_render_config_passes_mapped_identity(mocker, conf_no_exec):
 
 @pytest.mark.parametrize("reserved_word", RESERVED_USER_CONFIG_TEMPLATE_VARIABLES)
 def test_render_config_passes_all_reserved_variables(
-    conf_no_exec, mapped_ident: MappedPosixIdentity, reserved_word, randomstring
+    conf_no_engine, mapped_ident: MappedPosixIdentity, reserved_word, randomstring
 ):
     template = f"""
 {{% if {reserved_word} is defined %}}
@@ -456,7 +459,7 @@ def test_render_config_passes_all_reserved_variables(
 """
 
     rendered = render_config_user_template(
-        conf_no_exec, template, pathlib.Path("/"), mapped_ident
+        conf_no_engine, template, pathlib.Path("/"), mapped_ident
     )
 
     assert f'# "{reserved_word}" is defined' in rendered
@@ -511,11 +514,11 @@ def test_validate_user_config_options_invalid_schema(mock_log, schema):
 
 @pytest.mark.parametrize("reserved_word", RESERVED_USER_CONFIG_TEMPLATE_VARIABLES)
 def test_validate_user_opts_reserved_words(
-    conf_no_exec, reserved_word, mapped_ident: MappedPosixIdentity
+    conf_no_engine, reserved_word, mapped_ident: MappedPosixIdentity
 ):
     with pytest.raises(ValueError) as pyt_exc:
         render_config_user_template(
-            conf_no_exec,
+            conf_no_engine,
             "",
             mock.MagicMock(),
             mapped_ident,
@@ -527,7 +530,7 @@ def test_validate_user_opts_reserved_words(
 
 
 def test_render_user_config_validates_before_sanitize(
-    mocker, conf_no_exec, mapped_ident
+    mocker, conf_no_engine, mapped_ident
 ):
     user_opts = {"foo": "bar"}
     user_opts_calls = []
@@ -551,7 +554,7 @@ def test_render_user_config_validates_before_sanitize(
 
     with pytest.raises(Exception) as pyt_exc:
         render_config_user_template(
-            conf_no_exec,
+            conf_no_engine,
             "foo: {{ foo }}",
             pathlib.Path("/"),
             mapped_ident,
@@ -645,7 +648,7 @@ def test_load_user_config_template_tries_yaml_if_j2_not_found(mock_log):
     ],
 )
 def test_render_user_config(
-    mock_log, conf_no_exec, data, mapped_ident: MappedPosixIdentity
+    mock_log, conf_no_engine, data, mapped_ident: MappedPosixIdentity
 ):
     is_valid, user_opts = data
     conf_dir = pathlib.Path("/")
@@ -653,14 +656,14 @@ def test_render_user_config(
 
     if is_valid:
         rendered = render_config_user_template(
-            conf_no_exec, template, conf_dir, mapped_ident, {}, user_opts
+            conf_no_engine, template, conf_dir, mapped_ident, {}, user_opts
         )
         rendered_dict = yaml.safe_load(rendered)
         assert rendered_dict["heartbeat_period"] == user_opts["heartbeat"]
     else:
         with pytest.raises(jinja2.exceptions.UndefinedError):
             render_config_user_template(
-                conf_no_exec, template, conf_dir, mapped_ident, {}, user_opts
+                conf_no_engine, template, conf_dir, mapped_ident, {}, user_opts
             )
         a, _k = mock_log.debug.call_args
         assert "Missing required" in a[0]

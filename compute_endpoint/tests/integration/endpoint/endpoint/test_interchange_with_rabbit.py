@@ -44,8 +44,8 @@ def run_interchange_process(
         if hasattr(request, "param") and request.param:
             config = request.param
         else:
-            config = UserEndpointConfig(executors=[])
-        config.executors = [mock_exe]
+            config = UserEndpointConfig(engine=None)
+        config.engine = mock_exe
 
         ix = EndpointInterchange(
             config=config,
