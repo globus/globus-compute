@@ -1,8 +1,8 @@
 from __future__ import annotations
 
-from globus_sdk.scopes import ScopeBuilder
+import os
 
-from ..utils import get_env_var_with_deprecation
+from globus_sdk.scopes import ScopeBuilder
 
 DEFAULT_SCOPE = (
     "https://auth.globus.org/scopes/facd7ccc-c5f4-42aa-916b-a0e270e2c2a9/all"
@@ -20,9 +20,8 @@ class ComputeScopeBuilder(ScopeBuilder):
         # At some point, we ought to work out how to normalize this so that it conforms
         # to one of the known, pre-existing modes for scopes
         super().__init__(resource_server="funcx_service")
-        self.all = get_env_var_with_deprecation(
+        self.all = os.getenv(
             "GLOBUS_COMPUTE_SCOPE",
-            "FUNCX_SCOPE",
             DEFAULT_SCOPE,
         )
 
