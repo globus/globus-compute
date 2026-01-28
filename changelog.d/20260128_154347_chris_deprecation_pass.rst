@@ -11,3 +11,6 @@ Removed
       ``globus-compute-diagnostic`` instead)
     - Legacy function-level container features (configure containers on the endpoint
       instead)
+    - The ``function_name`` argument to ``Client.register_function`` (use the
+      ``__name__`` attribute of the function instead)
+    - The non-functional ``searchable`` argument to ``Client.register_function``

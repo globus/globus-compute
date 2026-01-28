@@ -733,12 +733,10 @@ class Client:
     def register_function(
         self,
         function,
-        function_name=None,
         description=None,
         metadata: dict | None = None,
         public=False,
         group=None,
-        searchable=None,
         ha_endpoint_id: UUID_LIKE_T | None = None,
     ) -> str:
         """Register a function code with the Globus Compute service.
@@ -747,9 +745,6 @@ class Client:
         ----------
         function : Python Function
             The function to be registered for remote execution
-        function_name : str
-            The entry point (function name) of the function. Default: None
-            DEPRECATED - functions' names are derived from their ``__name__`` attribute
         description : str
             Description of the function. If this is None, and the function has a
             docstring, that docstring is uploaded as the function's description instead;
@@ -761,11 +756,6 @@ class Client:
             Whether or not the function is publicly accessible. Default = False
         group : str
             A globus group uuid to share this function with
-        searchable : bool
-            If true, the function will be indexed into globus search with the
-            appropriate permissions
-
-            DEPRECATED - ingesting functions to Globus Search is not currently supported
         ha_endpoint_id : UUID | str | None
             Users will only be able to run this function on the specified HA endpoint.
             Since HA functions cannot be shared, this argument is mutually exclusive
@@ -776,15 +766,6 @@ class Client:
         function uuid : str
             UUID identifier for the registered function
         """
-        deprecated = ["searchable", "function_name"]
-        for arg in deprecated:
-            if locals()[arg] is not None:
-                warnings.warn(
-                    f"The '{arg}' argument is deprecated and no longer functional. "
-                    "It will be removed in a future release.",
-                    DeprecationWarning,
-                )
-
         data = FunctionRegistrationData(
             function=function,
             description=description,
