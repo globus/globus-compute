@@ -96,7 +96,6 @@ def ez_pack_function(serializer, func, args, kwargs):
 def create_task_packer(
     serde: ComputeSerializer | None = None,
     task_uuid: uuid.UUID | None = None,
-    container_uuid: uuid.UUID | None = None,
 ) -> t.Callable[[t.Callable, ...], bytes]:
     """
     A quick go-to for easier development while hacking on the engine submit routines.
@@ -127,9 +126,7 @@ def create_task_packer(
     def _pack_it(fn, *a, **k) -> bytes:
         task_body = ez_pack_function(serde, fn, a, k)
         return messagepack.pack(
-            messagepack.message_types.Task(
-                task_id=task_uuid, container_id=container_uuid, task_buffer=task_body
-            )
+            messagepack.message_types.Task(task_id=task_uuid, task_buffer=task_body)
         )
 
     return _pack_it

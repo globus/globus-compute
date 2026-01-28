@@ -127,7 +127,6 @@ class Executor(concurrent.futures.Executor):
     def __init__(
         self,
         endpoint_id: UUID_LIKE_T | None = None,
-        container_id: UUID_LIKE_T | None = None,
         client: Client | None = None,
         task_group_id: UUID_LIKE_T | None = None,
         resource_specification: dict[str, t.Any] | None = None,
@@ -143,8 +142,6 @@ class Executor(concurrent.futures.Executor):
     ):
         """
         :param endpoint_id: id of the endpoint to which to submit tasks
-        :param container_id: id of the container in which to execute tasks
-            DEPRECATED - Container functionality has moved to endpoint configuration.
         :param client: instance of Client to be used by the executor.  If not provided,
             the executor will instantiate one with default arguments.
         :param task_group_id: The Task Group to which to associate tasks.  If not set,
@@ -189,9 +186,6 @@ class Executor(concurrent.futures.Executor):
             self.serializer = serializer
 
         self.endpoint_id = endpoint_id
-
-        # mypy ... sometimes you just ain't too bright
-        self.container_id = container_id  # type: ignore[assignment]
 
         self._task_group_id: uuid.UUID | None
         self.task_group_id = (
@@ -240,10 +234,9 @@ class Executor(concurrent.futures.Executor):
         name = self.__class__.__name__
         label = self.label and f"{self.label}; " or ""
         ep_id = self.endpoint_id and f"ep_id:{self.endpoint_id}; " or ""
-        c_id = self.container_id and f"c_id:{self.container_id}; " or ""
         tg_id = f"tg_id:{self.task_group_id}; "
         bs = f"bs:{self.batch_size}"
-        return f"{name}<{label}{ep_id}{c_id}{tg_id}{bs}>"
+        return f"{name}<{label}{ep_id}{tg_id}{bs}>"
 
     @property
     def endpoint_id(self):
@@ -392,48 +385,6 @@ class Executor(concurrent.futures.Executor):
         self._user_endpoint_config = val
 
     @property
-    def container_id(self) -> uuid.UUID | None:
-        """
-        .. warning::
-
-            Deprecated since version 3.8.0. Container functionality has moved to
-            the endpoint configuration.
-
-        The container id with which this Executor instance is currently associated.
-        Tasks submitted after this is set will use this container.
-
-        Must be a UUID, valid uuid-like string, or None.  Set by simple assignment::
-
-            >>> import uuid
-            >>> from globus_compute_sdk import Executor
-            >>> c_id = "00000000-0000-0000-0000-000000000000"  # some known container id
-            >>> c_as_uuid = uuid.UUID(c_id)
-            >>> gce = Executor(container_id=c_id)
-
-            # May also alter after construction:
-            >>> gce.container_id = c_id
-            >>> gce.container_id = c_as_uuid  # also accepts a UUID object
-
-            # Internally, it is always stored as a UUID (or None):
-            >>> gce.container_id
-            UUID('00000000-0000-0000-0000-000000000000')
-
-        [default: ``None``]
-        """
-        return self._container_id
-
-    @container_id.setter
-    def container_id(self, c_id: UUID_LIKE_T | None):
-        if c_id:
-            warnings.warn(
-                "The 'container_id' attribute is deprecated."
-                " Container functionality has moved to the endpoint configuration.",
-                category=DeprecationWarning,
-                stacklevel=2,
-            )
-        self._container_id = as_optional_uuid(c_id)
-
-    @property
     def amqp_port(self) -> int | None:
         """
         The port to use when connecting to the result queue. Can be one of 443, 5671,
@@ -505,7 +456,7 @@ class Executor(concurrent.futures.Executor):
             self._result_serializers = val
 
     def _fn_cache_key(self, fn: t.Callable | int):
-        return fn, self.container_id
+        return fn
 
     def register_function(
         self, fn: t.Callable, function_id: str | None = None, **func_register_kwargs
@@ -566,11 +517,9 @@ class Executor(concurrent.futures.Executor):
 
         log.debug("Function not registered. Registering: %s", fn)
         func_register_kwargs.pop("function", None)  # just to be sure
-        reg_kwargs = {"container_uuid": self.container_id}
-        reg_kwargs.update(func_register_kwargs)
 
         try:
-            func_reg_id = self.client.register_function(fn, **reg_kwargs)
+            func_reg_id = self.client.register_function(fn, **func_register_kwargs)
         except Exception:
             log.error(f"Unable to register function: {fn.__name__}")
             self.shutdown(wait=False, cancel_futures=True)
