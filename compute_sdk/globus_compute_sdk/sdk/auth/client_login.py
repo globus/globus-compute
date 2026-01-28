@@ -1,13 +1,9 @@
 from __future__ import annotations
 
-from ..utils import get_env_var_with_deprecation
+import os
 
 
 def get_client_creds() -> tuple[str | None, str | None]:
-    client_id = get_env_var_with_deprecation(
-        "GLOBUS_COMPUTE_CLIENT_ID", "FUNCX_SDK_CLIENT_ID"
+    return os.getenv("GLOBUS_COMPUTE_CLIENT_ID"), os.getenv(
+        "GLOBUS_COMPUTE_CLIENT_SECRET"
     )
-    client_secret = get_env_var_with_deprecation(
-        "GLOBUS_COMPUTE_CLIENT_SECRET", "FUNCX_SDK_CLIENT_SECRET"
-    )
-    return client_id, client_secret

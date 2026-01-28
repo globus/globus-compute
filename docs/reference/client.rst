@@ -13,10 +13,6 @@ For usage examples and explanations, please see the :doc:`../sdk/client_user_gui
     :members:
     :member-order: bysource
 
-.. autoclass:: globus_compute_sdk.sdk.container_spec.ContainerSpec
-    :members:
-    :member-order: bysource
-
 .. autoclass:: globus_compute_sdk.sdk.batch.Batch
     :members:
     :member-order: bysource
