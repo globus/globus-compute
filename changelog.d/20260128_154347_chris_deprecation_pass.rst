@@ -9,3 +9,5 @@ Removed
       (use ``GLOBUS_COMPUTE_``-prefixed environment variables instead)
     - The ``globus-compute-endpoint self-diagnostic`` command (use
       ``globus-compute-diagnostic`` instead)
+    - Legacy function-level container features (configure containers on the endpoint
+      instead)
