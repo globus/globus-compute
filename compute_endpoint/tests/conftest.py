@@ -252,19 +252,14 @@ def task_uuid() -> uuid.UUID:
     return uuid.uuid4()
 
 
-@pytest.fixture
-def container_uuid() -> uuid.UUID:
-    return uuid.uuid4()
-
-
 @pytest.fixture(scope="module")
 def serde():
     return ComputeSerializer()
 
 
 @pytest.fixture
-def ez_pack_task(serde, task_uuid, container_uuid):
-    return create_task_packer(serde, task_uuid, container_uuid)
+def ez_pack_task(serde, task_uuid):
+    return create_task_packer(serde, task_uuid)
 
 
 @pytest.fixture()

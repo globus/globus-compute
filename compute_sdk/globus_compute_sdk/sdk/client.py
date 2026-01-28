@@ -663,14 +663,6 @@ class Client:
         with self._request_lock:
             return self._compute_web_client.v2.get_result_amqp_url().data
 
-    def _raise_container_deprecation_warning(self, method_name: str):
-        warnings.warn(
-            f"The '{method_name}' method is deprecated."
-            " Container functionality has moved to the endpoint configuration.",
-            category=DeprecationWarning,
-            stacklevel=2,
-        )
-
     def _raise_ha_warning(self, response_data: t.Any):
         ha_warning = response_data.get("ha_warning")
         if not ha_warning:
@@ -681,36 +673,6 @@ class Client:
         warnings.formatwarning = lambda msg, *args, **kwargs: str(msg) + "\n"
         warnings.warn(ha_warning, UserWarning)
         warnings.formatwarning = og_fmt
-
-    @_client_gares_handler
-    def get_container(self, container_uuid, container_type):
-        """
-        .. warning::
-
-            Deprecated since version 3.8.0. Container functionality has moved to
-            the endpoint configuration.
-
-        Get the details of a container for staging it locally.
-
-        Parameters
-        ----------
-        container_uuid : str
-            UUID of the container in question
-        container_type : str
-            The type of containers that will be used (Singularity, Shifter, Docker,
-            Podman)
-
-        Returns
-        -------
-        dict
-            The details of the containers to deploy
-        """
-        self._raise_container_deprecation_warning("get_container")
-        with self._request_lock:
-            r = self._compute_web_client.v2.get(
-                f"/v2/containers/{container_uuid}/{container_type}"
-            )
-        return r.data["container"]
 
     @_client_gares_handler
     def get_endpoint_status(self, endpoint_uuid):
@@ -772,7 +734,6 @@ class Client:
         self,
         function,
         function_name=None,
-        container_uuid=None,
         description=None,
         metadata: dict | None = None,
         public=False,
@@ -789,9 +750,6 @@ class Client:
         function_name : str
             The entry point (function name) of the function. Default: None
             DEPRECATED - functions' names are derived from their ``__name__`` attribute
-        container_uuid : str
-            Container UUID from registration with Globus Compute
-            DEPRECATED - Container functionality has moved to the endpoint configuration
         description : str
             Description of the function. If this is None, and the function has a
             docstring, that docstring is uploaded as the function's description instead;
@@ -829,7 +787,6 @@ class Client:
 
         data = FunctionRegistrationData(
             function=function,
-            container_uuid=container_uuid,
             description=description,
             metadata=FunctionRegistrationMetadata(**metadata) if metadata else None,
             public=public,
@@ -944,119 +901,6 @@ class Client:
         """
         with self._request_lock:
             return self._compute_web_client.v2.get_function(function_id).data
-
-    @_client_gares_handler
-    def register_container(self, location, container_type, name="", description=""):
-        """
-        .. warning::
-
-            Deprecated since version 3.8.0. Container functionality has moved to
-            the endpoint configuration.
-
-        Register a container with the Globus Compute service.
-
-        Parameters
-        ----------
-        location : str
-            The location of the container (e.g., its docker url). Required
-        container_type : str
-            The type of containers that will be used (Singularity, Shifter, Docker,
-            Podman). Required
-        name : str
-            A name for the container. Default = ''
-        description : str
-            A description to associate with the container. Default = ''
-
-        Returns
-        -------
-        str
-            The id of the container
-        """
-        self._raise_container_deprecation_warning("register_container")
-
-        payload = {
-            "name": name,
-            "location": location,
-            "description": description,
-            "type": container_type,
-        }
-
-        with self._request_lock:
-            r = self._compute_web_client.v2.post("/v2/containers", data=payload)
-        return r.data["container_id"]
-
-    @_client_gares_handler
-    def build_container(self, container_spec):
-        """
-        .. warning::
-
-            Deprecated since version 3.8.0. Container functionality has moved to
-            the endpoint configuration.
-
-        Submit a request to build a docker image based on a container spec. This
-        container build service is based on repo2docker, so the spec reflects features
-        supported by it.
-
-        Only members of a managed globus group are allowed to use this service at
-        present. This call will throw a ContainerBuildForbidden exception if you are
-        not a member of this group.
-
-        Parameters
-        ----------
-        container_spec : globus_compute_sdk.sdk.container_spec.ContainerSpec
-            Complete specification of what goes into the container
-
-        Returns
-        -------
-        str
-            UUID of the container which can be used to register your function
-
-        Raises
-        ------
-        ContainerBuildForbidden
-            User is not in the globus group that protects the build
-        """
-        self._raise_container_deprecation_warning("build_container")
-        with self._request_lock:
-            r = self._compute_web_client.v2.post(
-                "/v2/containers/build", data=container_spec.to_json()
-            )
-        return r.data["container_id"]
-
-    @_client_gares_handler
-    def get_container_build_status(self, container_id):
-        """
-        .. warning::
-
-            Deprecated since version 3.8.0. Container functionality has moved to
-            the endpoint configuration.
-
-        Get the status of a container build.
-
-        Parameters
-        ----------
-        container_id : str
-            UUID of the container in question
-
-        Returns
-        -------
-        str
-            The status of the container build
-        """
-        self._raise_container_deprecation_warning("get_container_build_status")
-        with self._request_lock:
-            r = self._compute_web_client.v2.get(f"/v2/containers/build/{container_id}")
-        if r.http_status == 200:
-            return r["status"]
-        elif r.http_status == 404:
-            raise ValueError(f"Container ID {container_id} not found")
-        else:
-            message = (
-                f"Exception in fetching build status. HTTP Error Code "
-                f"{r.http_status}, {r.http_reason}"
-            )
-            logger.error(message)
-            raise SystemError(message)
 
     @_client_gares_handler
     def get_allowed_functions(self, endpoint_id: UUID_LIKE_T):

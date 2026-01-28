@@ -46,7 +46,6 @@ class FunctionRegistrationData:
         function: t.Optional[t.Callable] = None,
         function_name: t.Optional[str] = None,
         function_code: t.Optional[str] = None,
-        container_uuid: t.Optional[UUID_LIKE_T] = None,
         description: t.Optional[str] = None,
         metadata: t.Optional[FunctionRegistrationMetadata] = None,
         public: bool = False,
@@ -81,13 +80,6 @@ class FunctionRegistrationData:
         if ha_endpoint_id and (public or group):
             raise ValueError(
                 "`ha_endpoint_id` is mutually exclusive with `public` and `group`"
-            )
-
-        if container_uuid:
-            warnings.warn(
-                "`container_uuid` is deprecated and no longer specified per function;"
-                " instead, send tasks to an endpoint within a container",
-                stacklevel=2,
             )
 
         self.function_name = function_name

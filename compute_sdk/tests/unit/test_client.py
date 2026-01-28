@@ -16,7 +16,7 @@ import globus_compute_sdk as gc
 import pytest
 import requests
 from conftest import randomstring_impl
-from globus_compute_sdk import ContainerSpec, __version__
+from globus_compute_sdk import __version__
 from globus_compute_sdk.errors import TaskExecutionFailed
 from globus_compute_sdk.sdk.auth.auth_client import ComputeAuthClient
 from globus_compute_sdk.sdk.client import _client_gares_handler, _ComputeWebClient
@@ -53,8 +53,6 @@ fnmetadata = FunctionRegistrationMetadata(
 client_api_reqs = {
     gc.Client.get_allowed_functions: ("some ep id",),
     gc.Client.get_batch_result: (["some", "task", "id", "list"],),
-    gc.Client.get_container: ("some container id", "some container type"),
-    gc.Client.get_container_build_status: ("some container id",),
     gc.Client.get_endpoint_metadata: ("some ep id",),
     gc.Client.get_endpoint_status: ("some ep id",),
     gc.Client.get_endpoints: (),
@@ -63,13 +61,11 @@ client_api_reqs = {
     gc.Client.get_task: ("some task id",),
     # non-GETs: ---
     gc.Client.batch_run: ("some ep id", mock.Mock(name="some batch")),
-    gc.Client.build_container: (ContainerSpec(),),
     gc.Client.delete_endpoint: ("some ep id",),
     gc.Client.delete_function: ("some func id",),
     gc.Client.register_endpoint: ("ep name", None),
     gc.Client.register_function: (lambda: "some function",),
     gc.Client.register_source_code: ("some source", "some func name"),
-    gc.Client.register_container: ("some loc", "some container type"),
     gc.Client.stop_endpoint: ("some ep id",),
 }
 known_gare_wrapped = set(client_api_reqs)
@@ -338,100 +334,6 @@ def test_batch_includes_user_runtime_info(gcc):
     }
 
 
-def test_get_container(gcc: gc.Client):
-    container_info = {"foo": "bar"}
-    gcc._compute_web_client.v2.get.return_value = mock.Mock(
-        data={"container": container_info}
-    )
-    with pytest.warns(DeprecationWarning) as pyt_wrn:
-        res = gcc.get_container("some-endpoint", "docker")
-    assert "'get_container' method is deprecated" in str(pyt_wrn[0].message)
-    assert res == container_info
-
-
-def test_register_container(gcc: gc.Client):
-    container_id = str(uuid.uuid4())
-    gcc._compute_web_client.v2.post.return_value = mock.Mock(
-        data={"container_id": container_id}
-    )
-    with pytest.warns(DeprecationWarning) as pyt_wrn:
-        res = gcc.register_container("some-endpoint", "docker")
-    assert "'register_container' method is deprecated" in str(pyt_wrn[0].message)
-    assert res == container_id
-
-
-def test_build_container(mocker, gcc, randomstring):
-    expected_container_id = randomstring()
-    mock_data = mocker.Mock(data={"container_id": expected_container_id})
-    gcc._compute_web_client.v2.post.return_value = mock_data
-    spec = ContainerSpec(
-        name="MyContainer",
-        pip=["matplotlib==3.5.1", "numpy==1.18.5"],
-        python_version="3.8",
-        payload_url="https://github.com/funcx-faas/funcx-container-service.git",
-    )
-
-    with pytest.warns(DeprecationWarning) as pyt_wrn:
-        container_id = gcc.build_container(spec)
-    assert "'build_container' method is deprecated" in str(pyt_wrn[0].message)
-
-    assert container_id == expected_container_id
-    assert gcc._compute_web_client.v2.post.called
-    a, k = gcc._compute_web_client.v2.post.call_args
-    assert a[0] == "/v2/containers/build"
-    assert k == {"data": spec.to_json()}
-
-
-def test_container_build_status(gcc, randomstring):
-    expected_status = randomstring()
-
-    class MockData(dict):
-        def __init__(self):
-            super().__init__()
-            self["status"] = expected_status
-            self.http_status = 200
-
-    gcc._compute_web_client.v2.get.return_value = MockData()
-
-    with pytest.warns(DeprecationWarning) as pyt_wrn:
-        status = gcc.get_container_build_status("123-434")
-    assert "'get_container_build_status' method is deprecated" in str(
-        pyt_wrn[0].message
-    )
-
-    assert status == expected_status
-
-
-def test_container_build_status_not_found(gcc, randomstring):
-    class MockData(dict):
-        def __init__(self):
-            super().__init__()
-            self.http_status = 404
-
-    gcc._compute_web_client.v2.get.return_value = MockData()
-
-    look_for = randomstring()
-    with pytest.raises(ValueError) as excinfo:
-        gcc.get_container_build_status(look_for)
-
-    assert excinfo.value.args[0] == f"Container ID {look_for} not found"
-
-
-def test_container_build_status_failure(gcc):
-    class MockData(dict):
-        def __init__(self):
-            super().__init__()
-            self.http_status = 500
-            self.http_reason = "This is a reason"
-
-    gcc._compute_web_client.v2.get.return_value = MockData()
-
-    with pytest.raises(SystemError) as excinfo:
-        gcc.get_container_build_status("123-434")
-
-    assert type(excinfo.value) is SystemError
-
-
 def test_stop_endpoint(gcc: gc.Client):
     ep_uuid_str = uuid.uuid4()
     gcc._compute_web_client = mock.MagicMock()
@@ -684,11 +586,6 @@ def test_function_registration_data_repr_recreates():
     frd = FunctionRegistrationData(function=funk)
     frd2 = eval(repr(frd))
     assert frd2.to_dict() == frd.to_dict()
-
-
-def test_function_registration_data_warns_container():
-    with pytest.warns(UserWarning, match="container_uuid"):
-        FunctionRegistrationData(function=funk, container_uuid="abc")
 
 
 def test_get_function(gcc):
