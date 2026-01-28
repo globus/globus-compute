@@ -176,7 +176,7 @@ def test_gc_engine_system_failure(serde, ez_pack_task, task_uuid, engine_runner)
 
 def test_serialized_engine_config_has_provider():
     loopback = "::1"
-    ep_config = UserEndpointConfig(executors=[GlobusComputeEngine(address=loopback)])
+    ep_config = UserEndpointConfig(engine=GlobusComputeEngine(address=loopback))
 
     res = serialize_config(ep_config)
     assert res["engine"]["executor"].get("provider")
