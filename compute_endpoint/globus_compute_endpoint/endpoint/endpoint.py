@@ -229,16 +229,24 @@ class Endpoint:
             print(f"config dir <{ep_name}> already exists")
             raise Exception("ConfigExists")
 
-        Endpoint.init_endpoint_dir(
-            conf_dir,
-            endpoint_config,
-            user_config_template,
-            id_mapping,
-            high_assurance,
-            display_name,
-            auth_policy,
-            subscription_id,
-        )
+        try:
+            Endpoint.init_endpoint_dir(
+                conf_dir,
+                endpoint_config,
+                user_config_template,
+                id_mapping,
+                high_assurance,
+                display_name,
+                auth_policy,
+                subscription_id,
+            )
+        except Exception:
+            # Clean up the new EP directory as it may be incomplete/corrupt
+            if conf_dir.exists():
+                # Currently the first action in configure is to create the
+                # directory, so the exists() check may be unnecessary
+                shutil.rmtree(conf_dir)
+            raise
 
         config_path = Endpoint._config_file_path(conf_dir)
         user_conf_tmpl_path = Endpoint.user_config_template_path(conf_dir)

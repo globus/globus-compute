@@ -1,0 +1,4 @@
+Changed
+^^^^^^
+
+ If endpoint configuration fails, the newly created endpoint directory and files, if any, are cleaned up instead of being left behind in potentially partially complete states.
