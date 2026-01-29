@@ -8,6 +8,7 @@ import os
 import pathlib
 import random
 import shutil
+import tempfile
 import time
 import uuid
 from collections import namedtuple
@@ -241,6 +242,44 @@ def test_configure_config_arguments(
     dest_template = Endpoint.user_config_template_path(conf_dir)
     assert dest_template.exists()
     assert ("key: {{ value }}" in dest_template.read_text()) is bool(template_config)
+
+
+def test_endpoint_configure_error_cleanup(fs, conf_dir):
+    mock_uc = mock.patch.object(Endpoint, "user_config_template_path")
+    mock_uc.side_effect = ValueError("some_exception")
+
+    # First, giving an non-existent input path should error out
+    with pytest.raises(FileNotFoundError):
+        Endpoint.configure_endpoint(
+            conf_dir, user_config_template=pathlib.Path("blah.j2")
+        )
+    # Directory should have been cleaned up
+    assert not conf_dir.exists()
+
+    # Go through the happy configure path and ensure it is created as normal
+    # even if the source input files were cleaned up
+    with tempfile.TemporaryDirectory() as tmp_dir:
+        tmp_file = pathlib.Path(tmp_dir) / "blah.j2"
+        tmp_file.write_text("some text\n")
+        Endpoint.configure_endpoint(conf_dir, user_config_template=tmp_file)
+
+    assert conf_dir.exists()
+    assert Endpoint.user_config_template_path(conf_dir).exists()
+
+
+def test_endpoint_configure_leaves_existing(fs, conf_dir):
+    conf_dir.mkdir()
+    some_file = pathlib.Path(conf_dir / "some_file.txt")
+    some_file.touch()
+
+    with pytest.raises(Exception):
+        Endpoint.configure_endpoint(
+            conf_dir, user_config_template=pathlib.Path("blah.j2")
+        )
+
+    # Configure should have errored out but the existing dir should remain
+    assert conf_dir.exists()
+    assert some_file.exists()
 
 
 def test_start_without_engine(caplog, conf_dir, conf):
