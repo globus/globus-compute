@@ -1,0 +1,4 @@
+Deprecated
+^^^^^^^^^^
+
+- Deprecated the "detach_endpoint" configuration option in non-templatable endpoints.
