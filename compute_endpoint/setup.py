@@ -51,6 +51,7 @@ TEST_REQUIRES = [
     "coverage>=5.2",
     "pytest-mock==3.2.0",
     "pyfakefs<5.9.2",  # 5.9.2 (Jul 30, 2025), breaks us; retry after 6.0.0 lands?
+    "pytest-random-order",
 ]
 
 

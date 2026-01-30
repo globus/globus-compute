@@ -1,6 +1,7 @@
 import logging
 import os
 import random
+from itertools import chain
 from unittest import mock
 
 import pytest
@@ -69,14 +70,13 @@ def test_bad_run_dir(endpoint_uuid, task_uuid, run_dir):
         execute_task(task_uuid, b"", endpoint_uuid, run_dir=None)
 
 
-def test_happy_path(serde, caplog, task_uuid, ez_pack_task, execute_task_runner):
+def test_happy_path(serde, mock_log, task_uuid, ez_pack_task, execute_task_runner):
     out = random.randint(1, 100_000)
     divisor = random.randint(1, 100_000)
 
     task_bytes = ez_pack_task(divide, divisor * out, divisor)
 
-    with caplog.at_level(logging.DEBUG):
-        packed_result = execute_task_runner(task_bytes)
+    packed_result = execute_task_runner(task_bytes)
     assert isinstance(packed_result, bytes)
 
     result = messagepack.unpack(packed_result)
@@ -89,7 +89,12 @@ def test_happy_path(serde, caplog, task_uuid, ez_pack_task, execute_task_runner)
     assert "endpoint_id" in result.details
     assert serde.deserialize(result.data) == out
 
-    log_msgs = "\n".join(r.msg % r.args for r in caplog.records)
+    log_recs = []
+    for a, _ in chain(mock_log.info.call_args_list, mock_log.debug.call_args_list):
+        fmt, *a = a
+        log_recs.append(a and fmt % tuple(a) or fmt)
+    log_msgs = "\n".join(log_recs)
+
     assert "Preparing to execute" in log_msgs, "Expect log clue of progress"
     assert "Unpacking" in log_msgs, "Expect log clue of progress"
     assert "Deserializing function" in log_msgs, "Expect log to clue of progress"
@@ -98,8 +103,8 @@ def test_happy_path(serde, caplog, task_uuid, ez_pack_task, execute_task_runner)
     assert "Task function complete" in log_msgs, "Expect log clue of progress"
     assert "Execution completed" in log_msgs, "Expect log clue of progress"
     assert "Task processing completed in" in log_msgs, "Expect log clue of progress"
-    assert len(caplog.records) == 7, "Time to update test?"
-    assert log_msgs.count(str(task_uuid)) == len(caplog.records), "Expect id prefixed"
+    assert len(log_recs) == 7, "Time to update test?"
+    assert log_msgs.count(str(task_uuid)) == len(log_recs), "Expect id always prefixed"
 
 
 def test_sandbox(task_10_2, execute_task_runner, task_uuid, tmp_path):

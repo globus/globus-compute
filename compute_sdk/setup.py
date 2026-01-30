@@ -36,6 +36,7 @@ TEST_REQUIRES = [
     "flake8==3.8.0",
     "pytest>=7.2",
     "pytest-mock",
+    "pytest-random-order",
     "pyfakefs",
     "coverage",
     # easy mocking of the `requests` library
