@@ -143,8 +143,6 @@ class Executor(concurrent.futures.Executor):
     ):
         """
         :param endpoint_id: id of the endpoint to which to submit tasks
-        :param container_id: id of the container in which to execute tasks
-            DEPRECATED - Container functionality has moved to endpoint configuration.
         :param client: instance of Client to be used by the executor.  If not provided,
             the executor will instantiate one with default arguments.
         :param task_group_id: The Task Group to which to associate tasks.  If not set,
@@ -390,48 +388,6 @@ class Executor(concurrent.futures.Executor):
             except Exception as e:
                 raise TypeError("Configuration must be JSON-serializable") from e
         self._user_endpoint_config = val
-
-    @property
-    def container_id(self) -> uuid.UUID | None:
-        """
-        .. warning::
-
-            Deprecated since version 3.8.0. Container functionality has moved to
-            the endpoint configuration.
-
-        The container id with which this Executor instance is currently associated.
-        Tasks submitted after this is set will use this container.
-
-        Must be a UUID, valid uuid-like string, or None.  Set by simple assignment::
-
-            >>> import uuid
-            >>> from globus_compute_sdk import Executor
-            >>> c_id = "00000000-0000-0000-0000-000000000000"  # some known container id
-            >>> c_as_uuid = uuid.UUID(c_id)
-            >>> gce = Executor(container_id=c_id)
-
-            # May also alter after construction:
-            >>> gce.container_id = c_id
-            >>> gce.container_id = c_as_uuid  # also accepts a UUID object
-
-            # Internally, it is always stored as a UUID (or None):
-            >>> gce.container_id
-            UUID('00000000-0000-0000-0000-000000000000')
-
-        [default: ``None``]
-        """
-        return self._container_id
-
-    @container_id.setter
-    def container_id(self, c_id: UUID_LIKE_T | None):
-        if c_id:
-            warnings.warn(
-                "The 'container_id' attribute is deprecated."
-                " Container functionality has moved to the endpoint configuration.",
-                category=DeprecationWarning,
-                stacklevel=2,
-            )
-        self._container_id = as_optional_uuid(c_id)
 
     @property
     def amqp_port(self) -> int | None:

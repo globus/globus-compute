@@ -22,7 +22,6 @@ from globus_compute_sdk.sdk.executor import (
     _TaskSubmissionInfo,
 )
 from globus_compute_sdk.sdk.utils import chunk_by
-from globus_compute_sdk.sdk.utils.uuid_like import as_optional_uuid, as_uuid
 from globus_compute_sdk.sdk.web_client import WebClient
 from globus_compute_sdk.serialize.concretes import JSONData
 from globus_compute_sdk.serialize.facade import ComputeSerializer, validate_strategylike
@@ -594,37 +593,6 @@ def test_register_source_code_executor_stopped(gce: Executor, fs):
         gce.register_source_code(source, function_name)
 
     assert "refusing to register function" in str(pyt_e)
-
-
-def test_container_id_deprecated(gce: Executor):
-    gce.container_id = None
-    with pytest.warns(DeprecationWarning) as pyt_wrn:
-        gce.container_id = uuid.uuid4()
-    assert "'container_id' attribute is deprecated" in str(pyt_wrn[0].message)
-
-
-@pytest.mark.parametrize("container_id", (None, uuid.uuid4(), str(uuid.uuid4())))
-def test_container_id_as_id(gce, container_id):
-    assert gce.container_id is None, "Default value is None"
-    gce.container_id = container_id
-    if container_id is None:
-        assert gce.container_id is None
-    else:
-        expected_container_id = as_uuid(container_id)
-        assert gce.container_id == expected_container_id
-
-
-@pytest.mark.parametrize("container_id", (None, uuid.uuid4(), str(uuid.uuid4())))
-def test_register_function_sends_container_id(gce, container_id):
-    gcc = gce.client
-
-    gce.container_id = container_id
-    gce.register_function(noop)
-    assert gcc.register_function.called
-    a, k = gcc.register_function.call_args
-
-    expected_container_id = as_optional_uuid(container_id)
-    assert k["container_uuid"] == expected_container_id
 
 
 @pytest.mark.parametrize(

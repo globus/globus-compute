@@ -42,7 +42,6 @@ known_user_config_opts = {
     "local_compute_services": True,
     "environment": str,
     "high_assurance": False,
-    "executors": None,
     "engine": None,
 }
 
