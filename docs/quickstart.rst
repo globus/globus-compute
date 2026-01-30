@@ -168,37 +168,3 @@ refer to the :doc:`endpoints/index` documentation.
 
   $ globus-compute-endpoint start <ENDPOINT_NAME>
 
-
-Directories
-===========
-
-.. _config-dir:
-
-By default, Globus Compute uses ``$HOME/.globus_compute`` to store endpoint
-configuration, logs and cached credentials.
-
-This default location can be overridden via the ``GLOBUS_COMPUTE_USER_DIR``
-environment variable or the ``--config-dir`` option when issuing endpoint commands.
-
-* ``GLOBUS_COMPUTE_USER_DIR``
-
-.. code-block:: console
-
-  $ export GLOBUS_COMPUTE_USER_DIR=$HOME/.custom_dir_2
-
-  $ globus-compute-endpoint configure endpoint_in_new_group
-
-  $ globus-compute-endpoint start endpoint_in_new_group
-
-
-* ``--config-dir``
-
-.. code-block:: console
-
-  $ globus-compute-endpoint configure --config-dir ~/.custom_3 endpoint_in_group_3
-
-  $ globus-compute-endpoint start --config-dir ~/.custom_3 endpoint_in_group_3
-
-.. note::
-  ``--config-dir`` overrides ``GLOBUS_COMPUTE_USER_DIR`` if both are specified.
-
