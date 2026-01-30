@@ -186,7 +186,7 @@ def test_configs_repr_default_kwargs():
 def test_userconfig_repr_nondefault_kwargs(
     randomstring, kw, cls, get_random_of_datatype
 ):
-    if kw == "engine":
+    if kw in ("engine", "detach_endpoint"):
         return
 
     val = get_random_of_datatype(cls)
@@ -237,3 +237,11 @@ def test_multi_user_deprecated(multi_user, config_class):
         config_class(multi_user=multi_user)
 
     assert "multi_user" in str(pyt_warns.list[0].message)
+
+
+@pytest.mark.parametrize("detach_endpoint", (True, False))
+def test_detach_endpoint_deprecated(detach_endpoint):
+    with pytest.deprecated_call() as pyt_warns:
+        UserEndpointConfig(detach_endpoint=detach_endpoint)
+
+    assert "detach_endpoint" in str(pyt_warns.list[0].message)
