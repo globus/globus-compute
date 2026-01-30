@@ -218,7 +218,13 @@ def mock_props():
 
 @pytest.fixture
 def epmanager_as_user(
-    mocker, conf_dir, mock_close_fds, mock_client, mock_auth_client, mock_conf
+    mocker,
+    conf_dir,
+    mock_close_fds,
+    mock_client,
+    mock_auth_client,
+    mock_conf,
+    mock_reg_info,
 ):
     mock_os = mocker.patch(f"{_MOCK_BASE}os")
     mock_os.getuid.return_value = _mock_localuser_rec.pw_uid
@@ -252,7 +258,7 @@ def epmanager_as_user(
     mock_auth_client.userinfo.return_value = {"identity_set": [{"sub": ident}]}
 
     mock_conf.identity_mapping_config_path = None
-    em = EndpointManager(conf_dir, ep_uuid, mock_conf)
+    em = EndpointManager(conf_dir, ep_uuid, mock_conf, mock_reg_info)
     assert em.identity_mapper is None
 
     em._command_queue = mock.Mock()
@@ -272,6 +278,7 @@ def epmanager_as_root(
     mock_client,
     mock_auth_client,
     mock_pim,
+    mock_reg_info,
 ):
     mock_os = mocker.patch(f"{_MOCK_BASE}os")
     mock_os.getppid.return_value = 1111
@@ -309,7 +316,7 @@ def epmanager_as_root(
     ident = "epmanager_some_identity"
     mock_auth_client.userinfo.return_value = {"identity_set": [{"sub": ident}]}
 
-    em = EndpointManager(conf_dir, ep_uuid, mock_conf_root)
+    em = EndpointManager(conf_dir, ep_uuid, mock_conf_root, mock_reg_info)
     em._command = mock.Mock(spec=CommandQueueSubscriber)
     em._heartbeat_publisher = mock.Mock(spec=ResultPublisher)
 
@@ -463,14 +470,20 @@ def mock_ctl():
 
 @pytest.mark.parametrize("env", (None, "blar", "local", "production"))
 def test_sets_process_title(
-    randomstring, conf_dir, mock_conf, mock_client, mock_setproctitle, env
+    randomstring,
+    conf_dir,
+    mock_conf,
+    mock_client,
+    mock_setproctitle,
+    env,
+    mock_reg_info,
 ):
     mock_spt, orig_proc_title = mock_setproctitle
 
     ep_uuid, mock_gcc = mock_client
     mock_conf.environment = env
 
-    EndpointManager(conf_dir, ep_uuid, mock_conf)
+    EndpointManager(conf_dir, ep_uuid, mock_conf, mock_reg_info)
     assert mock_spt.setproctitle.called, "Sanity check"
 
     a, *_ = mock_spt.setproctitle.call_args
@@ -510,6 +523,7 @@ def test_gracefully_exits_if_registration_blocked(
     get_standard_compute_client,
     exit_code,
     status_code,
+    mock_reg_info,
 ):
     mock_gcc = get_standard_compute_client()
     mocker.patch(f"{_MOCK_BASE}Client", return_value=mock_gcc)
@@ -520,7 +534,7 @@ def test_gracefully_exits_if_registration_blocked(
     f = io.StringIO()
     with redirect_stdout(f):
         with pytest.raises((GlobusAPIError, SystemExit)) as pyexc:
-            EndpointManager(conf_dir, endpoint_uuid, mock_conf)
+            EndpointManager(conf_dir, endpoint_uuid, mock_conf, mock_reg_info)
         stdout_msg = f.getvalue()
 
     assert mock_log.warning.called
@@ -540,10 +554,11 @@ def test_handles_provided_endpoint_id_no_json(
     mock_client: t.Tuple[uuid.UUID, mock.Mock],
     conf_dir: pathlib.Path,
     mock_conf: ManagerEndpointConfig,
+    mock_reg_info,
 ):
     ep_uuid, mock_gcc = mock_client
 
-    EndpointManager(conf_dir, ep_uuid, mock_conf)
+    EndpointManager(conf_dir, ep_uuid, mock_conf, mock_reg_info)
 
     _a, k = mock_gcc.register_endpoint.call_args
     assert k["endpoint_id"] == ep_uuid
@@ -553,6 +568,7 @@ def test_handles_provided_endpoint_id_with_json(
     mock_client: t.Tuple[uuid.UUID, mock.Mock],
     conf_dir: pathlib.Path,
     mock_conf: ManagerEndpointConfig,
+    mock_reg_info,
 ):
     ep_uuid, mock_gcc = mock_client
     provided_ep_uuid_str = str(uuid.uuid4())
@@ -560,7 +576,7 @@ def test_handles_provided_endpoint_id_with_json(
     ep_json = conf_dir / "endpoint.json"
     ep_json.write_text(json.dumps({"endpoint_id": str(ep_uuid)}))
 
-    EndpointManager(conf_dir, provided_ep_uuid_str, mock_conf)
+    EndpointManager(conf_dir, provided_ep_uuid_str, mock_conf, mock_reg_info)
 
     _a, k = mock_gcc.register_endpoint.call_args
     assert k["endpoint_id"] == ep_uuid
@@ -574,6 +590,7 @@ def test_sets_user_config_template_and_schema_path(
     mock_conf: ManagerEndpointConfig,
     custom_template_path: bool,
     custom_schema_path: bool,
+    mock_reg_info,
 ):
     ep_uuid, _ = mock_client
 
@@ -591,7 +608,7 @@ def test_sets_user_config_template_and_schema_path(
     mock_conf.user_config_template_path = template_path
     mock_conf.user_config_schema_path = schema_path
 
-    em = EndpointManager(conf_dir, ep_uuid, mock_conf)
+    em = EndpointManager(conf_dir, ep_uuid, mock_conf, mock_reg_info)
 
     assert em.user_config_template_path == template_path
     assert em.user_config_schema_path == schema_path
@@ -600,7 +617,12 @@ def test_sets_user_config_template_and_schema_path(
 @pytest.mark.parametrize("public", (False, True))
 @pytest.mark.parametrize("privs", (False, True))
 def test_sends_data_during_registration(
-    conf_dir, mock_conf: ManagerEndpointConfig, mock_client, public: bool, privs: bool
+    conf_dir,
+    mock_conf: ManagerEndpointConfig,
+    mock_client,
+    public: bool,
+    privs: bool,
+    mock_reg_info,
 ):
     ep_uuid, mock_gcc = mock_client
     mock_conf.public = public
@@ -608,7 +630,7 @@ def test_sends_data_during_registration(
     with mock.patch(f"{_MOCK_BASE}is_privileged", return_value=privs):
         if privs:
             mock_conf._identity_mapping_config_path = "/some / path / "
-        EndpointManager(conf_dir, ep_uuid, mock_conf)
+        EndpointManager(conf_dir, ep_uuid, mock_conf, mock_reg_info)
 
     assert mock_gcc.register_endpoint.called
     _a, k = mock_gcc.register_endpoint.call_args
@@ -658,12 +680,13 @@ def test_handles_network_error_scriptably(
     mock_conf,
     endpoint_uuid,
     randomstring,
+    mock_reg_info,
 ):
     some_err = randomstring()
     mocker.patch(f"{_MOCK_BASE}Client", side_effect=NetworkError(some_err, Exception()))
 
     with pytest.raises(SystemExit) as pyexc:
-        EndpointManager(conf_dir, endpoint_uuid, mock_conf)
+        EndpointManager(conf_dir, endpoint_uuid, mock_conf, mock_reg_info)
 
     assert pyexc.value.code == os.EX_TEMPFAIL, "Expecting meaningful exit code"
     assert mock_log.exception.called, "Expected usable traceback"
@@ -674,14 +697,14 @@ def test_handles_network_error_scriptably(
 
 
 def test_mismatched_id_gracefully_exits(
-    mock_log, randomstring, conf_dir, mock_conf, mock_client
+    mock_log, randomstring, conf_dir, mock_conf, mock_client, mock_reg_info
 ):
     wrong_uuid, mock_gcc = mock_client
     ep_uuid = str(uuid.uuid4())
     assert wrong_uuid != ep_uuid, "Verify test setup"
 
     with pytest.raises(SystemExit) as pyexc:
-        EndpointManager(conf_dir, ep_uuid, mock_conf)
+        EndpointManager(conf_dir, ep_uuid, mock_conf, mock_reg_info)
 
     assert pyexc.value.code == os.EX_SOFTWARE, "Expected meaningful exit code"
     assert mock_log.error.called
@@ -727,14 +750,14 @@ def test_handles_invalid_reg_info(
 
     if not should_succeed:
         with pytest.raises(SystemExit) as pyexc:
-            EndpointManager(conf_dir, ep_uuid, mock_conf)
+            EndpointManager(conf_dir, ep_uuid, mock_conf, received_data[1])
         assert pyexc.value.code == os.EX_DATAERR, "Expected meaningful exit code"
         assert mock_log.error.called
         a = mock_log.error.call_args[0][0]
         assert "Invalid or unexpected" in a
     else:
         # "null" test
-        EndpointManager(conf_dir, ep_uuid, mock_conf)
+        EndpointManager(conf_dir, ep_uuid, mock_conf, received_data[1])
 
 
 def test_records_user_ep_as_running(successful_exec_from_mocked_root):
@@ -970,39 +993,39 @@ def test_emits_endpoint_id_if_isatty(mocker, mock_log, epmanager_as_root):
 
 
 def test_as_root_and_no_identity_mapper_configuration_allowed(
-    mocker, mock_client, conf_dir, mock_conf
+    mocker, mock_client, conf_dir, mock_conf, mock_reg_info
 ):
     mocker.patch(f"{_MOCK_BASE}is_privileged", return_value=True)
     ep_uuid, _ = mock_client
     mock_conf.identity_mapping_config_path = None
-    EndpointManager(conf_dir, ep_uuid, mock_conf)
+    EndpointManager(conf_dir, ep_uuid, mock_conf, mock_reg_info)
 
 
 def test_no_identity_mapper_if_unprivileged(
-    mocker, conf_dir, mock_conf_root, mock_client
+    mocker, conf_dir, mock_conf_root, mock_client, mock_reg_info
 ):
     mock_privilege = mocker.patch(f"{_MOCK_BASE}is_privileged")
     mock_privilege.return_value = True
 
-    em = EndpointManager(conf_dir, None, mock_conf_root)
+    em = EndpointManager(conf_dir, None, mock_conf_root, mock_reg_info)
     assert em.identity_mapper is not None
     em.identity_mapper.stop_watching()
 
     mock_privilege.return_value = False
-    em = EndpointManager(conf_dir, None, mock_conf_root)
+    em = EndpointManager(conf_dir, None, mock_conf_root, mock_reg_info)
     assert em.identity_mapper is None
 
 
 def test_unprivileged_warns_if_identity_conf_specified(
-    mocker, mock_log, conf_dir, mock_conf, mock_conf_root, mock_client
+    mocker, mock_log, conf_dir, mock_conf, mock_conf_root, mock_client, mock_reg_info
 ):
     mocker.patch(f"{_MOCK_BASE}is_privileged", return_value=False)
 
-    em = EndpointManager(conf_dir, None, mock_conf)
+    em = EndpointManager(conf_dir, None, mock_conf, mock_reg_info)
     assert em.identity_mapper is None
     assert not mock_log.warning.called
 
-    em = EndpointManager(conf_dir, None, mock_conf_root)
+    em = EndpointManager(conf_dir, None, mock_conf_root, mock_reg_info)
     assert em.identity_mapper is None
 
     a, _ = mock_log.warning.call_args
@@ -2053,7 +2076,7 @@ def test_ha_aligned(successful_exec_from_mocked_root, user_conf_template, mep_ha
 
 
 def test_run_as_same_user_disabled_if_admin(
-    mocker, conf_dir, mock_conf, mock_client, mock_pim
+    mocker, conf_dir, mock_conf, mock_client, mock_pim, mock_reg_info
 ):
     ep_uuid, mock_gcc = mock_client
 
@@ -2063,17 +2086,17 @@ def test_run_as_same_user_disabled_if_admin(
     mock_prctl.CapState.get_current.return_value.effective = set()
 
     mock_pwd.getpwuid.return_value = namedtuple("getent", "pw_name,pw_uid")("asdf", 0)
-    em = EndpointManager(conf_dir, ep_uuid, mock_conf)
+    em = EndpointManager(conf_dir, ep_uuid, mock_conf, mock_reg_info)
     assert em._allow_same_user is False, "Verify check against UID 0"
 
     mock_pwd.getpwuid.return_value = namedtuple("getent", "pw_name,pw_uid")("root", 999)
-    em = EndpointManager(conf_dir, ep_uuid, mock_conf)
+    em = EndpointManager(conf_dir, ep_uuid, mock_conf, mock_reg_info)
     assert em._allow_same_user is False, "Verify check against 'root' username"
 
 
 @pytest.mark.parametrize("cap", (pyprctl.Cap.SYS_ADMIN, pyprctl.Cap.SETUID))
 def test_run_as_same_user_disabled_if_privileged(
-    mocker, conf_dir, mock_conf_root, mock_client, cap
+    mocker, conf_dir, mock_conf_root, mock_client, cap, mock_reg_info
 ):
     # spot-check a couple of capabilities: if set, then same user is *disallowed*
     ep_uuid, mock_gcc = mock_client
@@ -2083,12 +2106,12 @@ def test_run_as_same_user_disabled_if_privileged(
     mock_prctl = mocker.patch(f"{_test_mock_base}_pyprctl")
 
     mock_prctl.CapState.get_current.return_value.effective = {cap}
-    em = EndpointManager(conf_dir, ep_uuid, mock_conf_root)
+    em = EndpointManager(conf_dir, ep_uuid, mock_conf_root, mock_reg_info)
     assert em._allow_same_user is False
 
 
 def test_run_as_same_user_enabled_if_not_admin(
-    mocker, conf_dir, mock_conf, mock_client
+    mocker, conf_dir, mock_conf, mock_client, mock_reg_info
 ):
     # spot-check a couple of capabilities: if set, then same user is *disallowed*
     ep_uuid, mock_gcc = mock_client
@@ -2097,7 +2120,7 @@ def test_run_as_same_user_enabled_if_not_admin(
     mocker.patch(f"{_test_mock_base}_pwd")
     mocker.patch(f"{_test_mock_base}_pyprctl")
 
-    em = EndpointManager(conf_dir, ep_uuid, mock_conf)
+    em = EndpointManager(conf_dir, ep_uuid, mock_conf, mock_reg_info)
     assert em._allow_same_user is True, "If not privileged, can only runas same user"
 
 
@@ -2430,13 +2453,15 @@ def test_user_debug_emits_ephemeral_config_to_user_log(
 
 
 @pytest.mark.parametrize("port", [random.randint(0, 65535)])
-def test_port_is_respected(mocker, mock_client, mock_conf, conf_dir, port):
+def test_port_is_respected(
+    mocker, mock_client, mock_conf, conf_dir, port, mock_reg_info
+):
     ep_uuid, _ = mock_client
     mock_conf.amqp_port = port
 
     mock_update_url_port = mocker.patch(f"{_MOCK_BASE}update_url_port")
 
-    EndpointManager(conf_dir, ep_uuid, mock_conf)
+    EndpointManager(conf_dir, ep_uuid, mock_conf, mock_reg_info)
 
     assert mock_update_url_port.call_args[0][1] == port
 

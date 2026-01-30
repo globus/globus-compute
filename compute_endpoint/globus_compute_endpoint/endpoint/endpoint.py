@@ -65,11 +65,19 @@ class Endpoint:
         return endpoint_dir / "daemon.pid"
 
     @staticmethod
-    def user_config_template_path(endpoint_dir: pathlib.Path) -> pathlib.Path:
+    def user_config_template_path(
+        endpoint_dir: pathlib.Path, config: ManagerEndpointConfig | None = None
+    ) -> pathlib.Path:
+        if config and config.user_config_template_path:
+            return pathlib.Path(config.user_config_template_path)
         return endpoint_dir / "user_config_template.yaml.j2"
 
     @staticmethod
-    def user_config_schema_path(endpoint_dir: pathlib.Path) -> pathlib.Path:
+    def user_config_schema_path(
+        endpoint_dir: pathlib.Path, config: ManagerEndpointConfig | None = None
+    ) -> pathlib.Path:
+        if config and config.user_config_schema_path:
+            return pathlib.Path(config.user_config_schema_path)
         return endpoint_dir / "user_config_schema.json"
 
     @staticmethod

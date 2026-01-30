@@ -16,8 +16,10 @@ import typing as t
 import uuid
 import warnings
 from dataclasses import asdict
+from http import HTTPStatus
 
 import click
+import daemon
 import lockfile
 from click import ClickException
 from click_option_group import optgroup
@@ -47,13 +49,14 @@ from globus_compute_endpoint.endpoint.utils import (
 )
 from globus_compute_endpoint.exception_handling import handle_auth_errors
 from globus_compute_endpoint.logging_config import setup_logging
+from globus_compute_sdk import Client
 from globus_compute_sdk.sdk.auth.auth_client import ComputeAuthClient
 from globus_compute_sdk.sdk.auth.whoami import print_whoami_info
 from globus_compute_sdk.sdk.batch import create_user_runtime
 from globus_compute_sdk.sdk.compute_dir import ensure_compute_dir
 from globus_compute_sdk.sdk.diagnostic import do_diagnostic_base
 from globus_compute_sdk.sdk.utils.gare import gare_handler
-from globus_sdk import MISSING, AuthClient, GlobusAPIError, MissingType
+from globus_sdk import MISSING, AuthClient, GlobusAPIError, MissingType, NetworkError
 
 if not _has_multi_user and "--debug" in sys.argv and sys.stderr.isatty():
     # We haven't set up logging yet so manually print for now
@@ -94,6 +97,7 @@ class CommandState:
         self.log_to_console = False
         self.endpoint_uuid = None
         self.die_with_parent = False
+        self.detach = False
 
     @classmethod
     def ensure(cls) -> CommandState:
@@ -181,6 +185,12 @@ def start_options(f):
         hidden=True,
         callback=set_param_to_config,
         help="Shutdown if parent process goes away",
+    )(f)
+    f = click.option(
+        "--detach",
+        is_flag=True,
+        callback=set_param_to_config,
+        help="Detach the endpoint process from the current terminal",
     )(f)
     return f
 
@@ -781,14 +791,6 @@ def _do_start_endpoint(
             if fn_allow_list != _no_fn_list_canary:
                 ep_config.allowed_functions = fn_allow_list
 
-            if not state.debug and ep_config.debug:
-                setup_logging(
-                    logfile=ep_dir / "endpoint.log",
-                    debug=ep_config.debug,
-                    console_enabled=state.log_to_console,
-                    no_color=state.no_color,
-                )
-
         except Exception as e:
             if isinstance(e, ClickException):
                 raise
@@ -802,6 +804,72 @@ def _do_start_endpoint(
             )
             log.critical(msg)
             raise
+
+        if not reg_info:
+            try:
+                gcc = Client(
+                    local_compute_services=ep_config.local_compute_services,
+                    environment=ep_config.environment,
+                    app=get_globus_app_with_scopes(),
+                )
+                reg_info = gcc.register_endpoint(
+                    name=ep_dir.name,
+                    endpoint_id=endpoint_uuid or Endpoint.get_endpoint_id(ep_dir),
+                    metadata=(
+                        EndpointManager.get_metadata(ep_dir, ep_config)
+                        if isinstance(ep_config, ManagerEndpointConfig)
+                        else Endpoint.get_metadata(ep_config)
+                    ),
+                    multi_user=is_privileged(),
+                    display_name=ep_config.display_name,
+                    allowed_functions=ep_config.allowed_functions,
+                    auth_policy=ep_config.authentication_policy,
+                    subscription_id=ep_config.subscription_id,
+                    public=ep_config.public,
+                    high_assurance=ep_config.high_assurance,
+                    admins=ep_config.admins,
+                )
+
+                # Mostly to appease mypy, but also a useful text if it ever
+                # *does* happen
+                assert reg_info is not None, "Empty response from Compute API"
+
+            except GlobusAPIError as e:
+                blocked_msg = f"Endpoint registration blocked.  [{e.text}]"
+                log.warning(blocked_msg)
+                print(blocked_msg)
+                if e.http_status in (
+                    HTTPStatus.CONFLICT,
+                    HTTPStatus.LOCKED,
+                    HTTPStatus.NOT_FOUND,
+                ):
+                    sys.exit(os.EX_UNAVAILABLE)
+                elif e.http_status in (
+                    HTTPStatus.BAD_REQUEST,
+                    HTTPStatus.UNPROCESSABLE_ENTITY,
+                ):
+                    sys.exit(os.EX_DATAERR)
+                raise
+            except NetworkError as e:
+                log.exception("Network error while registering manager endpoint")
+                log.critical(f"Network failure; unable to register endpoint: {e}")
+                sys.exit(os.EX_TEMPFAIL)
+
+        if state.detach:
+            daemon_context = daemon.DaemonContext(
+                working_directory=ep_dir,
+                umask=0o002,
+                files_preserve=[(ep_dir / "endpoint.log").open("a")],
+            )
+            stk.enter_context(daemon_context)
+
+        if not state.debug and ep_config.debug:
+            setup_logging(
+                logfile=ep_dir / "endpoint.log",
+                debug=ep_config.debug,
+                console_enabled=state.log_to_console,
+                no_color=state.no_color,
+            )
 
         pid_path = Endpoint.pid_path(ep_dir)
         stk.enter_context(_pidfile(pid_path, ep_config.heartbeat_period * 3))
@@ -1228,14 +1296,12 @@ def _do_render_user_config(
                 f"Endpoint {parent_ep_dir.name} does not support templating."
             )
 
-        user_config_template_path = (
-            parent_config.user_config_template_path
-            or Endpoint.user_config_template_path(parent_ep_dir)
+        user_config_template_path = Endpoint.user_config_template_path(
+            parent_ep_dir, parent_config
         )
         user_config_template = load_user_config_template(user_config_template_path)
-        _user_config_schema_path = (
-            parent_config.user_config_schema_path
-            or Endpoint.user_config_schema_path(parent_ep_dir)
+        _user_config_schema_path = Endpoint.user_config_schema_path(
+            parent_ep_dir, parent_config
         )
         user_config_schema = load_user_config_schema(_user_config_schema_path) or {}
 
