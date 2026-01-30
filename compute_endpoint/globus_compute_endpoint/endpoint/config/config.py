@@ -113,6 +113,8 @@ class BaseConfig:
             "multi_user",
             # remove after Apr 2026
             "force_mu_allow_same_user",
+            # remove after Jun 2026
+            "detach_endpoint",
         }
 
         kwds: dict[str, t.Any] = {}
@@ -229,8 +231,9 @@ class UserEndpointConfig(BaseConfig):
         equivalent to two days.  For example, if ``heartbeat_period`` is 30s, then
         suggest 5760.
 
-    :param detach_endpoint: Whether the endpoint daemon be run as a detached process.
-        This is good for a real edge node, but an anti-pattern for kubernetes pods
+    :param detach_endpoint: DEPRECATED - Whether the endpoint daemon be run as a
+        detached process.  This is good for a real edge node, but an anti-pattern for
+        kubernetes pods
 
     :param endpoint_setup: Command(s) to be run during the endpoint initialization
         process
@@ -254,7 +257,7 @@ class UserEndpointConfig(BaseConfig):
         heartbeat_threshold: int = 120,
         idle_heartbeats_soft: int = 0,
         idle_heartbeats_hard: int = 5760,  # Two days, divided by `heartbeat_period`
-        detach_endpoint: bool = True,
+        detach_endpoint: bool | None = None,
         endpoint_setup: str | None = None,
         endpoint_teardown: str | None = None,
         # Logging info
@@ -271,7 +274,17 @@ class UserEndpointConfig(BaseConfig):
         self.heartbeat_threshold = heartbeat_threshold
         self.idle_heartbeats_soft = int(max(0, idle_heartbeats_soft))
         self.idle_heartbeats_hard = int(max(0, idle_heartbeats_hard))
-        self.detach_endpoint = detach_endpoint
+
+        if detach_endpoint is None:
+            self.detach_endpoint = True  # default to True for backwards compatibility
+        else:
+            warnings.warn(
+                "`detach_endpoint` is deprecated and will be removed in a future"
+                " release. Start the endpoint using the `--detach` flag instead.",
+                DeprecationWarning,
+                stacklevel=2,
+            )
+            self.detach_endpoint = detach_endpoint
 
         self.endpoint_setup = endpoint_setup
         self.endpoint_teardown = endpoint_teardown
