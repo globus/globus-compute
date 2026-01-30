@@ -207,8 +207,10 @@ def test_configure_ha_audit_default(mock_print, conf_dir, ha):
 
     Endpoint.configure_endpoint(conf_dir, None, high_assurance=ha)
 
+    print(f"{config_file=}")
     assert config_file.exists(), "Verify setup"
     conf = yaml.safe_load(config_file.read_text())
+    print(f"{conf=}")
     if not ha:
         assert "audit_log_path" not in conf
     else:

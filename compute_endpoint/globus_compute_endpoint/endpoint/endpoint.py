@@ -230,21 +230,21 @@ class Endpoint:
             print(f"config dir <{ep_name}> already exists")
             raise Exception("ConfigExists")
 
-        with tempfile.TemporaryDirectory() as tmp_dir:
-            tmp_path = pathlib.Path(tmp_dir)
-            Endpoint.init_endpoint_dir(
-                tmp_path,
-                endpoint_config,
-                user_config_template,
-                id_mapping,
-                high_assurance,
-                display_name,
-                auth_policy,
-                subscription_id,
-            )
+        tmp_dir = tempfile.mkdtemp()
+        tmp_path = pathlib.Path(tmp_dir)
+        Endpoint.init_endpoint_dir(
+            tmp_path,
+            endpoint_config,
+            user_config_template,
+            id_mapping,
+            high_assurance,
+            display_name,
+            auth_policy,
+            subscription_id,
+        )
 
-            # All files created or imported successfully, safe to finalize
-            tmp_path.rename(conf_dir)
+        # All files created or imported successfully, safe to finalize
+        tmp_path.rename(conf_dir)
 
         config_path = Endpoint._config_file_path(conf_dir)
         user_conf_tmpl_path = Endpoint.user_config_template_path(conf_dir)
