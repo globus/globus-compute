@@ -189,11 +189,10 @@ def run_line(cli_runner):
             stdin = "{}"  # silence some logs; incurred by invoke's sys.stdin choice
         result = cli_runner.invoke(app, args, input=stdin)
         if assert_exit_code is not None:
-            assert result.exit_code == assert_exit_code, (
-                result.stdout,
-                result.stderr,
-                result.exception,
-            )
+            if result.exit_code != assert_exit_code and result.exception is not None:
+                print(f"\n    {result.stdout=}\n\n    {result.stderr=}\n")
+                raise result.exception
+            assert result.exit_code == assert_exit_code, (result.stdout, result.stderr)
         return result
 
     return func
