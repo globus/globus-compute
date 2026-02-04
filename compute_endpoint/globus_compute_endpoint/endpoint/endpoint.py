@@ -142,6 +142,7 @@ class Endpoint:
         endpoint_config: pathlib.Path | None = None,
         user_config_template: pathlib.Path | None = None,
         user_config_schema: pathlib.Path | None = None,
+        user_environment: pathlib.Path | None = None,
         id_mapping: bool = False,
         high_assurance: bool = False,
         display_name: str | None = None,
@@ -157,6 +158,8 @@ class Endpoint:
             to be used instead of the Globus Compute default user config template
         :param user_config_schema: Path to a user config schema file to be used
             instead of the Globus Compute default user config schema
+        :param user_environment: Path to a user environment config file
+            to be used instead of the Globus Compute default user environment config
         :param id_mapping: Whether the endpoint will map users
         :param display_name: A display name to use, if desired
         :param auth_policy: Globus authentication policy
@@ -209,6 +212,9 @@ class Endpoint:
             if user_config_schema is not None:
                 src_user_schema_path = user_config_schema
 
+            if user_environment is not None:
+                src_user_env_path = user_environment
+
             shutil.copyfile(src_user_tmpl_path, dst_user_tmpl_path)
             shutil.copyfile(src_user_schema_path, dst_user_schema_path)
             shutil.copyfile(src_user_env_path, dst_user_env_path)
@@ -226,6 +232,7 @@ class Endpoint:
         endpoint_config: pathlib.Path | None = None,
         user_config_template: pathlib.Path | None = None,
         user_config_schema: pathlib.Path | None = None,
+        user_environment: pathlib.Path | None = None,
         id_mapping: bool = False,
         high_assurance: bool = False,
         display_name: str | None = None,
@@ -244,6 +251,7 @@ class Endpoint:
                 endpoint_config,
                 user_config_template,
                 user_config_schema,
+                user_environment,
                 id_mapping,
                 high_assurance,
                 display_name,
