@@ -346,6 +346,15 @@ def version_command():
     ),
 )
 @click.option(
+    "--user-env-config",
+    type=click.Path(exists=True, dir_okay=False, path_type=pathlib.Path),
+    default=None,
+    help=(
+        "An override to the default user_environment.yaml,"
+        " which is copied into the new endpoint directory"
+    ),
+)
+@click.option(
     "--multi-user",
     type=click.BOOL,
     is_flag=False,
@@ -433,6 +442,7 @@ def configure_endpoint(
     manager_config: pathlib.Path | None,
     template_config: pathlib.Path | None,
     schema_config: pathlib.Path | None,
+    user_env_config: pathlib.Path | None,
     multi_user: bool | None,
     high_assurance: bool,
     display_name: str | None,
@@ -539,6 +549,7 @@ def configure_endpoint(
         endpoint_config=manager_config,
         user_config_template=template_config,
         user_config_schema=schema_config,
+        user_environment=user_env_config,
         id_mapping=id_mapping,
         high_assurance=high_assurance,
         display_name=display_name,

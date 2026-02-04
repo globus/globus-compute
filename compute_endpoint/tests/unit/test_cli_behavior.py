@@ -611,6 +611,7 @@ def test_configure_ep_manager_config_precedence(
 @pytest.mark.parametrize("manager_config", ("some-config.yaml", None))
 @pytest.mark.parametrize("template_config", ("some-template.yaml.j2", None))
 @pytest.mark.parametrize("schema_config", ("some-schema.json", None))
+@pytest.mark.parametrize("user_env_config", ("some-env.yaml", None))
 def test_configure_ep_config_options(
     run_line,
     randomstring,
@@ -619,6 +620,7 @@ def test_configure_ep_config_options(
     manager_config,
     template_config,
     schema_config,
+    user_env_config,
 ):
     gc_dir.mkdir(parents=True, exist_ok=True)
 
@@ -635,6 +637,10 @@ def test_configure_ep_config_options(
         schema_config = gc_dir / schema_config
         schema_config.touch()
         cmd += f" --schema-config {schema_config}"
+    if user_env_config:
+        user_env_config = gc_dir / user_env_config
+        user_env_config.touch()
+        cmd += f" --user-env-config {user_env_config}"
 
     run_line(cmd, assert_exit_code=0)
 
@@ -642,6 +648,7 @@ def test_configure_ep_config_options(
     assert call_kwargs["endpoint_config"] == manager_config
     assert call_kwargs["user_config_template"] == template_config
     assert call_kwargs["user_config_schema"] == schema_config
+    assert call_kwargs["user_environment"] == user_env_config
 
 
 @pytest.mark.parametrize("display_name", [None, "None"])
