@@ -141,6 +141,7 @@ class Endpoint:
         endpoint_dir: pathlib.Path,
         endpoint_config: pathlib.Path | None = None,
         user_config_template: pathlib.Path | None = None,
+        user_config_schema: pathlib.Path | None = None,
         id_mapping: bool = False,
         high_assurance: bool = False,
         display_name: str | None = None,
@@ -152,6 +153,10 @@ class Endpoint:
         :param endpoint_dir: Path to the endpoint configuration dir
         :param endpoint_config: Path to a config file to be used instead of
             the Globus Compute default config file
+        :param user_config_template: Path to a user config template file
+            to be used instead of the Globus Compute default user config template
+        :param user_config_schema: Path to a user config schema file to be used
+            instead of the Globus Compute default user config schema
         :param id_mapping: Whether the endpoint will map users
         :param display_name: A display name to use, if desired
         :param auth_policy: Globus authentication policy
@@ -201,6 +206,9 @@ class Endpoint:
             if user_config_template is not None:
                 src_user_tmpl_path = user_config_template
 
+            if user_config_schema is not None:
+                src_user_schema_path = user_config_schema
+
             shutil.copyfile(src_user_tmpl_path, dst_user_tmpl_path)
             shutil.copyfile(src_user_schema_path, dst_user_schema_path)
             shutil.copyfile(src_user_env_path, dst_user_env_path)
@@ -217,6 +225,7 @@ class Endpoint:
         conf_dir: pathlib.Path,
         endpoint_config: pathlib.Path | None = None,
         user_config_template: pathlib.Path | None = None,
+        user_config_schema: pathlib.Path | None = None,
         id_mapping: bool = False,
         high_assurance: bool = False,
         display_name: str | None = None,
@@ -234,6 +243,7 @@ class Endpoint:
                 conf_dir,
                 endpoint_config,
                 user_config_template,
+                user_config_schema,
                 id_mapping,
                 high_assurance,
                 display_name,
