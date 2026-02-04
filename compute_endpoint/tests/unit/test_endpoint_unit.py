@@ -218,8 +218,9 @@ def test_configure_ha_audit_default(mock_print, conf_dir, ha):
 
 @pytest.mark.parametrize("manager_config", ("some-config.yaml", None))
 @pytest.mark.parametrize("template_config", ("some-template.yaml.j2", None))
+@pytest.mark.parametrize("schema_config", ("some-schema.json", None))
 def test_configure_config_arguments(
-    fs, mock_print, conf_dir, manager_config, template_config
+    fs, mock_print, conf_dir, manager_config, template_config, schema_config
 ):
     # convert to Path here instead of in the parametrize so pyfakefs can patch properly
     if manager_config:
@@ -228,11 +229,15 @@ def test_configure_config_arguments(
     if template_config:
         template_config = pathlib.Path(template_config)
         template_config.write_text("key: {{ value }}\n")
+    if schema_config:
+        schema_config = pathlib.Path(schema_config)
+        schema_config.write_text('{"key": "value"}\n')
 
     Endpoint.configure_endpoint(
         conf_dir,
         endpoint_config=manager_config,
         user_config_template=template_config,
+        user_config_schema=schema_config,
     )
 
     dest_config = Endpoint._config_file_path(conf_dir)
@@ -242,6 +247,10 @@ def test_configure_config_arguments(
     dest_template = Endpoint.user_config_template_path(conf_dir)
     assert dest_template.exists()
     assert ("key: {{ value }}" in dest_template.read_text()) is bool(template_config)
+
+    dest_schema = Endpoint.user_config_schema_path(conf_dir)
+    assert dest_schema.exists()
+    assert ('{"key": "value"}' in dest_schema.read_text()) is bool(schema_config)
 
 
 def test_endpoint_configure_error_cleanup(fs, conf_dir):
