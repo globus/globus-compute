@@ -1246,14 +1246,12 @@ def _do_render_user_config(
                 f"Endpoint {parent_ep_dir.name} does not support templating."
             )
 
-        user_config_template_path = (
-            parent_config.user_config_template_path
-            or Endpoint.user_config_template_path(parent_ep_dir)
+        user_config_template_path = Endpoint.user_config_template_path(
+            parent_ep_dir, parent_config
         )
         user_config_template = load_user_config_template(user_config_template_path)
-        _user_config_schema_path = (
-            parent_config.user_config_schema_path
-            or Endpoint.user_config_schema_path(parent_ep_dir)
+        _user_config_schema_path = Endpoint.user_config_schema_path(
+            parent_ep_dir, parent_config
         )
         user_config_schema = load_user_config_schema(_user_config_schema_path) or {}
 
