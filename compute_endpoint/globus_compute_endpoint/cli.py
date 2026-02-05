@@ -314,56 +314,6 @@ def version_command():
 
 @app.command(name="configure", help="Configure an endpoint")
 @click.option(
-    "--endpoint-config",
-    default=None,
-    help="DEPRECATED: use --manager-config or --template-config",
-)
-@click.option(
-    "--manager-config",
-    type=click.Path(exists=True, dir_okay=False, path_type=pathlib.Path),
-    default=None,
-    help=(
-        "An override to the default config.yaml,"
-        " which is copied into the new endpoint directory"
-    ),
-)
-@click.option(
-    "--template-config",
-    type=click.Path(exists=True, dir_okay=False, path_type=pathlib.Path),
-    default=None,
-    help=(
-        "An override to the default user_config_template.yaml.j2,"
-        " which is copied into the new endpoint directory"
-    ),
-)
-@click.option(
-    "--schema-config",
-    type=click.Path(exists=True, dir_okay=False, path_type=pathlib.Path),
-    default=None,
-    help=(
-        "An override to the default user_config_schema.json,"
-        " which is copied into the new endpoint directory"
-    ),
-)
-@click.option(
-    "--user-env-config",
-    type=click.Path(exists=True, dir_okay=False, path_type=pathlib.Path),
-    default=None,
-    help=(
-        "An override to the default user_environment.yaml,"
-        " which is copied into the new endpoint directory"
-    ),
-)
-@click.option(
-    "--id-mapping-config",
-    type=click.Path(exists=True, dir_okay=False, path_type=pathlib.Path),
-    default=None,
-    help=(
-        "An override to the default example_identity_mapping_config.json,"
-        " which is copied into the new endpoint directory"
-    ),
-)
-@click.option(
     "--multi-user",
     type=click.BOOL,
     is_flag=False,
@@ -391,6 +341,52 @@ def version_command():
         " For more information on Globus authentication policies, visit"
         " https://docs.globus.org/api/auth/developer-guide/#authentication-policies."
     ),
+)
+@optgroup.group(
+    "Configuration File Overrides",
+    help=(
+        "Options to override default configuration files. When any of these are"
+        " specified, the file at the given path is copied into the new endpoint"
+        " directory instead of the default file."
+    ),
+)
+@optgroup.option(
+    "--manager-config",
+    type=click.Path(exists=True, dir_okay=False, path_type=pathlib.Path),
+    default=None,
+    help="Specify a custom manager configuration (config.yaml)",
+)
+@optgroup.option(
+    "--template-config",
+    type=click.Path(exists=True, dir_okay=False, path_type=pathlib.Path),
+    default=None,
+    help="Specify a custom user configuration template (user_config_template.yaml.j2)",
+)
+@optgroup.option(
+    "--schema-config",
+    type=click.Path(exists=True, dir_okay=False, path_type=pathlib.Path),
+    default=None,
+    help="Specify a custom user configuration schema (user_config_schema.json)",
+)
+@optgroup.option(
+    "--user-env-config",
+    type=click.Path(exists=True, dir_okay=False, path_type=pathlib.Path),
+    default=None,
+    help="Specify a custom user environment configuration (user_environment.yaml)",
+)
+@optgroup.option(
+    "--id-mapping-config",
+    type=click.Path(exists=True, dir_okay=False, path_type=pathlib.Path),
+    default=None,
+    help=(
+        "Specify a custom identity mapping configuration"
+        " (identity_mapping_config.json)"
+    ),
+)
+@optgroup.option(
+    "--endpoint-config",
+    default=None,
+    help="DEPRECATED: use --manager-config or --template-config",
 )
 @optgroup.group(
     "Authentication Policy Creation",
