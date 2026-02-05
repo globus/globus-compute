@@ -143,6 +143,7 @@ class Endpoint:
         user_config_template: pathlib.Path | None = None,
         user_config_schema: pathlib.Path | None = None,
         user_environment: pathlib.Path | None = None,
+        id_mapping_config: pathlib.Path | None = None,
         id_mapping: bool = False,
         high_assurance: bool = False,
         display_name: str | None = None,
@@ -161,6 +162,8 @@ class Endpoint:
         :param user_environment: Path to a user environment config file
             to be used instead of the Globus Compute default user environment config
         :param id_mapping: Whether the endpoint will map users
+        :param id_mapping_config: Path to an identity mapping configuration file
+            to be used instead of the Globus Compute default
         :param display_name: A display name to use, if desired
         :param auth_policy: Globus authentication policy
         :param subscription_id: Subscription ID to associate endpoint with
@@ -219,6 +222,8 @@ class Endpoint:
             shutil.copyfile(src_user_schema_path, dst_user_schema_path)
             shutil.copyfile(src_user_env_path, dst_user_env_path)
             if id_mapping:
+                if id_mapping_config is not None:
+                    src_example_idmap_path = id_mapping_config
                 shutil.copyfile(src_example_idmap_path, dst_idmap_conf_path)
                 dst_idmap_conf_path.chmod(owner_only)
                 dst_user_tmpl_path.chmod(world_readable)
@@ -233,6 +238,7 @@ class Endpoint:
         user_config_template: pathlib.Path | None = None,
         user_config_schema: pathlib.Path | None = None,
         user_environment: pathlib.Path | None = None,
+        id_mapping_config: pathlib.Path | None = None,
         id_mapping: bool = False,
         high_assurance: bool = False,
         display_name: str | None = None,
@@ -252,6 +258,7 @@ class Endpoint:
                 user_config_template,
                 user_config_schema,
                 user_environment,
+                id_mapping_config,
                 id_mapping,
                 high_assurance,
                 display_name,

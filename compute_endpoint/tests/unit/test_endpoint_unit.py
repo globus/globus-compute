@@ -220,6 +220,7 @@ def test_configure_ha_audit_default(mock_print, conf_dir, ha):
 @pytest.mark.parametrize("template_config", ("some-template.yaml.j2", None))
 @pytest.mark.parametrize("schema_config", ("some-schema.json", None))
 @pytest.mark.parametrize("user_env_config", ("some-env.yaml", None))
+@pytest.mark.parametrize("id_mapping_config", ("some-idmap.json", None))
 def test_configure_config_arguments(
     fs,
     mock_print,
@@ -228,6 +229,7 @@ def test_configure_config_arguments(
     template_config,
     schema_config,
     user_env_config,
+    id_mapping_config,
 ):
     # convert to Path here instead of in the parametrize so pyfakefs can patch properly
     if manager_config:
@@ -242,6 +244,9 @@ def test_configure_config_arguments(
     if user_env_config:
         user_env_config = pathlib.Path(user_env_config)
         user_env_config.write_text("env_key: env_value\n")
+    if id_mapping_config:
+        id_mapping_config = pathlib.Path(id_mapping_config)
+        id_mapping_config.write_text('{"id_map_key": "id_map_value"}\n')
 
     Endpoint.configure_endpoint(
         conf_dir,
@@ -249,6 +254,8 @@ def test_configure_config_arguments(
         user_config_template=template_config,
         user_config_schema=schema_config,
         user_environment=user_env_config,
+        id_mapping_config=id_mapping_config,
+        id_mapping=True,
     )
 
     dest_config = Endpoint._config_file_path(conf_dir)
@@ -266,6 +273,12 @@ def test_configure_config_arguments(
     dest_env = Endpoint._user_environment_path(conf_dir)
     assert dest_env.exists()
     assert ("env_key: env_value" in dest_env.read_text()) is bool(user_env_config)
+
+    dest_idmap = Endpoint._example_identity_mapping_configuration_path(conf_dir)
+    assert dest_idmap.exists()
+    assert ('{"id_map_key": "id_map_value"}' in dest_idmap.read_text()) is bool(
+        id_mapping_config
+    )
 
 
 def test_endpoint_configure_error_cleanup(fs, conf_dir):
