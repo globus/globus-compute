@@ -387,17 +387,17 @@ def version_command():
 @click.option(
     "--auth-policy",
     help=(
-        "Endpoint users are evaluated against this Globus authentication policy. "
-        "For more information on Globus authentication policies, visit "
-        "https://docs.globus.org/api/auth/developer-guide/#authentication-policies."
+        "Endpoint users are evaluated against this Globus authentication policy."
+        " For more information on Globus authentication policies, visit"
+        " https://docs.globus.org/api/auth/developer-guide/#authentication-policies."
     ),
 )
 @optgroup.group(
     "Authentication Policy Creation",
     help=(
-        "Options for creating an auth policy. If any of these options are specified, "
-        "the endpoint will be associated with an auth policy configured per those "
-        "options and users will be evaluated against that policy."
+        "Options for creating an auth policy. If any of these options are specified,"
+        " the endpoint will be associated with an auth policy configured per those"
+        " options and users will be evaluated against that policy."
     ),
 )
 @optgroup.option(
