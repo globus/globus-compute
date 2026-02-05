@@ -612,6 +612,7 @@ def test_configure_ep_manager_config_precedence(
 @pytest.mark.parametrize("template_config", ("some-template.yaml.j2", None))
 @pytest.mark.parametrize("schema_config", ("some-schema.json", None))
 @pytest.mark.parametrize("user_env_config", ("some-env.yaml", None))
+@pytest.mark.parametrize("id_mapping_config", ("some-id-mapping.json", None))
 def test_configure_ep_config_options(
     run_line,
     randomstring,
@@ -621,6 +622,7 @@ def test_configure_ep_config_options(
     template_config,
     schema_config,
     user_env_config,
+    id_mapping_config,
 ):
     gc_dir.mkdir(parents=True, exist_ok=True)
 
@@ -641,6 +643,10 @@ def test_configure_ep_config_options(
         user_env_config = gc_dir / user_env_config
         user_env_config.touch()
         cmd += f" --user-env-config {user_env_config}"
+    if id_mapping_config:
+        id_mapping_config = gc_dir / id_mapping_config
+        id_mapping_config.touch()
+        cmd += f" --id-mapping-config {id_mapping_config} --multi-user true"
 
     run_line(cmd, assert_exit_code=0)
 
@@ -649,6 +655,22 @@ def test_configure_ep_config_options(
     assert call_kwargs["user_config_template"] == template_config
     assert call_kwargs["user_config_schema"] == schema_config
     assert call_kwargs["user_environment"] == user_env_config
+    assert call_kwargs["id_mapping_config"] == id_mapping_config
+
+
+def test_configure_ep_errors_on_id_mapping_config_without_multiuser(
+    run_line, randomstring, gc_dir
+):
+    gc_dir.mkdir(parents=True, exist_ok=True)
+
+    id_mapping_config = gc_dir / "some-id-mapping.json"
+    id_mapping_config.touch()
+
+    cmd = f"configure {randomstring()} --id-mapping-config {id_mapping_config}"
+
+    res = run_line(cmd, assert_exit_code=1)
+
+    assert "--id-mapping-config requires multi user" in res.stderr
 
 
 @pytest.mark.parametrize("display_name", [None, "None"])

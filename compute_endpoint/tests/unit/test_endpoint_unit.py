@@ -220,6 +220,7 @@ def test_configure_ha_audit_default(mock_print, conf_dir, ha):
 @pytest.mark.parametrize("template_config", ("some-template.yaml.j2", None))
 @pytest.mark.parametrize("schema_config", ("some-schema.json", None))
 @pytest.mark.parametrize("user_env_config", ("some-env.yaml", None))
+@pytest.mark.parametrize("id_mapping_config", ("some-idmap.json", None))
 def test_configure_config_arguments(
     fs,
     mock_print,
@@ -228,11 +229,12 @@ def test_configure_config_arguments(
     template_config,
     schema_config,
     user_env_config,
+    id_mapping_config,
 ):
     # convert to Path here instead of in the parametrize so pyfakefs can patch properly
     if manager_config:
         manager_config = pathlib.Path(manager_config)
-        manager_config.write_text("key: value\n")
+        manager_config.write_text("public: false\n")
     if template_config:
         template_config = pathlib.Path(template_config)
         template_config.write_text("key: {{ value }}\n")
@@ -242,6 +244,9 @@ def test_configure_config_arguments(
     if user_env_config:
         user_env_config = pathlib.Path(user_env_config)
         user_env_config.write_text("env_key: env_value\n")
+    if id_mapping_config:
+        id_mapping_config = pathlib.Path(id_mapping_config)
+        id_mapping_config.write_text('{"key": "value"}\n')
 
     Endpoint.configure_endpoint(
         conf_dir,
@@ -249,11 +254,13 @@ def test_configure_config_arguments(
         user_config_template=template_config,
         user_config_schema=schema_config,
         user_environment=user_env_config,
+        id_mapping_config=id_mapping_config,
+        id_mapping=True,
     )
 
     dest_config = Endpoint._config_file_path(conf_dir)
     assert dest_config.exists()
-    assert ("key: value" in dest_config.read_text()) is bool(manager_config)
+    assert ("public: false" in dest_config.read_text()) is bool(manager_config)
 
     dest_template = Endpoint.user_config_template_path(conf_dir)
     assert dest_template.exists()
@@ -266,6 +273,14 @@ def test_configure_config_arguments(
     dest_env = Endpoint._user_environment_path(conf_dir)
     assert dest_env.exists()
     assert ("env_key: env_value" in dest_env.read_text()) is bool(user_env_config)
+
+    dest_idmap = (
+        Endpoint._default_custom_identity_mapping_config_path(conf_dir)
+        if id_mapping_config
+        else Endpoint._example_identity_mapping_configuration_path(conf_dir)
+    )
+    assert dest_idmap.exists()
+    assert ('{"key": "value"}' in dest_idmap.read_text()) is bool(id_mapping_config)
 
 
 def test_endpoint_configure_error_cleanup(fs, conf_dir):
@@ -1064,6 +1079,7 @@ def test_update_config_file_retains_order(fs):
         original_path,
         target_path,
         id_mapping=False,
+        identity_mapping_config_path=None,
         high_assurance=False,
         display_name=None,
         auth_policy=None,
@@ -1084,6 +1100,7 @@ def test_update_config_file_empty_comment(fs):
         original_path,
         target_path,
         id_mapping=False,
+        identity_mapping_config_path=None,
         high_assurance=False,
         display_name=None,
         auth_policy=None,
@@ -1106,6 +1123,7 @@ def test_update_config_file_original_must_be_mapping(fs, original_config):
         Endpoint.update_config_file(
             original_path,
             target_path,
+            identity_mapping_config_path=None,
             id_mapping=False,
             high_assurance=False,
             display_name=None,

@@ -355,6 +355,15 @@ def version_command():
     ),
 )
 @click.option(
+    "--id-mapping-config",
+    type=click.Path(exists=True, dir_okay=False, path_type=pathlib.Path),
+    default=None,
+    help=(
+        "An override to the default example_identity_mapping_config.json,"
+        " which is copied into the new endpoint directory"
+    ),
+)
+@click.option(
     "--multi-user",
     type=click.BOOL,
     is_flag=False,
@@ -441,6 +450,7 @@ def configure_endpoint(
     endpoint_config: str | None,
     manager_config: pathlib.Path | None,
     template_config: pathlib.Path | None,
+    id_mapping_config: pathlib.Path | None,
     schema_config: pathlib.Path | None,
     user_env_config: pathlib.Path | None,
     multi_user: bool | None,
@@ -489,6 +499,10 @@ def configure_endpoint(
         raise ClickException(str(e))
 
     id_mapping = is_privileged() if multi_user is None else multi_user
+    if id_mapping_config is not None and not id_mapping:
+        raise ClickException(
+            "--id-mapping-config requires multi user support (hint: --multi-user true)"
+        )
 
     create_policy = (
         auth_policy_project_id is not None
@@ -550,6 +564,7 @@ def configure_endpoint(
         user_config_template=template_config,
         user_config_schema=schema_config,
         user_environment=user_env_config,
+        id_mapping_config=id_mapping_config,
         id_mapping=id_mapping,
         high_assurance=high_assurance,
         display_name=display_name,

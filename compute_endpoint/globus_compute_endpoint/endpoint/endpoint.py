@@ -73,6 +73,15 @@ class Endpoint:
         return endpoint_dir / "user_config_schema.json"
 
     @staticmethod
+    def identity_mapping_config_path(
+        endpoint_dir: pathlib.Path, config: ManagerEndpointConfig
+    ) -> pathlib.Path:
+        return (
+            config.identity_mapping_config_path
+            or Endpoint._example_identity_mapping_configuration_path(endpoint_dir)
+        )
+
+    @staticmethod
     def _user_environment_path(endpoint_dir: pathlib.Path) -> pathlib.Path:
         return endpoint_dir / "user_environment.yaml"
 
@@ -83,6 +92,12 @@ class Endpoint:
         return endpoint_dir / "example_identity_mapping_config.json"
 
     @staticmethod
+    def _default_custom_identity_mapping_config_path(
+        endpoint_dir: pathlib.Path,
+    ) -> pathlib.Path:
+        return endpoint_dir / "identity_mapping_config.json"
+
+    @staticmethod
     def _audit_log_path(endpoint_dir: pathlib.Path) -> pathlib.Path:
         return endpoint_dir / "audit.log"
 
@@ -91,6 +106,7 @@ class Endpoint:
         original_path: pathlib.Path,
         target_path: pathlib.Path,
         id_mapping: bool,
+        identity_mapping_config_path: pathlib.Path,
         high_assurance: bool,
         display_name: str | None,
         auth_policy: str | None,
@@ -113,9 +129,7 @@ class Endpoint:
 
         if id_mapping:
             config_dict["identity_mapping_config_path"] = str(
-                Endpoint._example_identity_mapping_configuration_path(
-                    target_path.parent
-                )
+                identity_mapping_config_path
             )
 
         if auth_policy:
@@ -143,6 +157,7 @@ class Endpoint:
         user_config_template: pathlib.Path | None = None,
         user_config_schema: pathlib.Path | None = None,
         user_environment: pathlib.Path | None = None,
+        id_mapping_config: pathlib.Path | None = None,
         id_mapping: bool = False,
         high_assurance: bool = False,
         display_name: str | None = None,
@@ -161,6 +176,8 @@ class Endpoint:
         :param user_environment: Path to a user environment config file
             to be used instead of the Globus Compute default user environment config
         :param id_mapping: Whether the endpoint will map users
+        :param id_mapping_config: Path to an identity mapping configuration file
+            to be used instead of the Globus Compute default
         :param display_name: A display name to use, if desired
         :param auth_policy: Globus authentication policy
         :param subscription_id: Subscription ID to associate endpoint with
@@ -180,31 +197,23 @@ class Endpoint:
             if endpoint_config is None:
                 endpoint_config = package_dir / "config/default_config.yaml"
 
-            Endpoint.update_config_file(
-                endpoint_config,
-                config_target_path,
-                id_mapping,
-                high_assurance,
-                display_name,
-                auth_policy,
-                subscription_id,
-            )
-
             owner_only = 0o0600
             world_readable = 0o0644
 
             dst_user_tmpl_path = Endpoint.user_config_template_path(endpoint_dir)
             dst_user_schema_path = Endpoint.user_config_schema_path(endpoint_dir)
             dst_user_env_path = Endpoint._user_environment_path(endpoint_dir)
-            dst_idmap_conf_path = Endpoint._example_identity_mapping_configuration_path(
-                endpoint_dir
+            dst_idmap_conf_path = (
+                Endpoint._default_custom_identity_mapping_config_path(endpoint_dir)
+                if id_mapping_config is not None
+                else Endpoint._example_identity_mapping_configuration_path(endpoint_dir)
             )
 
             _src_conf_dir = package_dir / "config"
             src_user_tmpl_path = _src_conf_dir / dst_user_tmpl_path.name
             src_user_schema_path = _src_conf_dir / dst_user_schema_path.name
             src_user_env_path = _src_conf_dir / dst_user_env_path.name
-            src_example_idmap_path = _src_conf_dir / dst_idmap_conf_path.name
+            src_idmap_conf_path = _src_conf_dir / dst_idmap_conf_path.name
 
             if user_config_template is not None:
                 src_user_tmpl_path = user_config_template
@@ -215,13 +224,27 @@ class Endpoint:
             if user_environment is not None:
                 src_user_env_path = user_environment
 
+            if id_mapping_config is not None:
+                src_idmap_conf_path = id_mapping_config
+
             shutil.copyfile(src_user_tmpl_path, dst_user_tmpl_path)
             shutil.copyfile(src_user_schema_path, dst_user_schema_path)
             shutil.copyfile(src_user_env_path, dst_user_env_path)
             if id_mapping:
-                shutil.copyfile(src_example_idmap_path, dst_idmap_conf_path)
+                shutil.copyfile(src_idmap_conf_path, dst_idmap_conf_path)
                 dst_idmap_conf_path.chmod(owner_only)
                 dst_user_tmpl_path.chmod(world_readable)
+
+            Endpoint.update_config_file(
+                endpoint_config,
+                config_target_path,
+                id_mapping,
+                dst_idmap_conf_path,
+                high_assurance,
+                display_name,
+                auth_policy,
+                subscription_id,
+            )
 
         finally:
             os.umask(user_umask)
@@ -233,6 +256,7 @@ class Endpoint:
         user_config_template: pathlib.Path | None = None,
         user_config_schema: pathlib.Path | None = None,
         user_environment: pathlib.Path | None = None,
+        id_mapping_config: pathlib.Path | None = None,
         id_mapping: bool = False,
         high_assurance: bool = False,
         display_name: str | None = None,
@@ -252,6 +276,7 @@ class Endpoint:
                 user_config_template,
                 user_config_schema,
                 user_environment,
+                id_mapping_config,
                 id_mapping,
                 high_assurance,
                 display_name,
@@ -277,10 +302,10 @@ class Endpoint:
         )
 
         if id_mapping:
-            idmap_ex_conf_path = Endpoint._example_identity_mapping_configuration_path(
-                conf_dir
-            )
-            print(f"\n\tExample identity mapping configuration: {idmap_ex_conf_path}")
+            config = get_config(conf_dir)
+            assert isinstance(config, ManagerEndpointConfig)  # mypy...
+            idmap_conf_path = Endpoint.identity_mapping_config_path(conf_dir, config)
+            print(f"\n\tIdentity mapping configuration: {idmap_conf_path}")
 
         print(
             f"\n\tUser endpoint configuration template: {user_conf_tmpl_path}"
