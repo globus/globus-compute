@@ -130,13 +130,11 @@ class EndpointManager:
         self.conf_dir = conf_dir
         self._config = config
 
-        self.user_config_template_path = (
-            self._config.user_config_template_path
-            or Endpoint.user_config_template_path(self.conf_dir)
+        self.user_config_template_path = Endpoint.user_config_template_path(
+            self.conf_dir, self._config
         )
-        self.user_config_schema_path = (
-            self._config.user_config_schema_path
-            or Endpoint.user_config_schema_path(self.conf_dir)
+        self.user_config_schema_path = Endpoint.user_config_schema_path(
+            self.conf_dir, self._config
         )
 
         # UX - test conditional imports *now*, rather than when a request comes in;
