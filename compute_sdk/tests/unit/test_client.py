@@ -1152,7 +1152,6 @@ def test_batch_run_raises_ha_warning(gcc, mocker):
     assert "some arbitrary warning text" in str(record[0].message)
 
 
-@pytest.mark.skip("Temporary skip REMOVE BEFORE MERGE for SDK v4 PR (py313 error")
 def test_ha_register_and_submit_warning_deduplication(gcc, mocker):
     arbitrary_hatext = "some arbitrary warning text"
     gcc._compute_web_client.v3.register_function.return_value = types.SimpleNamespace(
