@@ -208,7 +208,7 @@ These will be injected into the user endpoint process as environment variables.
 .. _config-dir:
 
 Directories
------------
+===========
 
 By default, Globus Compute uses ``$HOME/.globus_compute`` to store endpoint
 configuration, logs and cached credentials.
@@ -218,22 +218,22 @@ environment variable or the ``--config-dir`` option when issuing endpoint comman
 
 * ``GLOBUS_COMPUTE_USER_DIR``
 
-.. code-block:: console
+  .. code-block:: console
 
-  $ export GLOBUS_COMPUTE_USER_DIR=$HOME/.custom_dir_2
+    $ export GLOBUS_COMPUTE_USER_DIR=$HOME/.custom_dir_2
 
-  $ globus-compute-endpoint configure endpoint_in_new_group
+    $ globus-compute-endpoint configure endpoint_in_new_group
 
-  $ globus-compute-endpoint start endpoint_in_new_group
+    $ globus-compute-endpoint start endpoint_in_new_group
 
 
 * ``--config-dir``
 
-.. code-block:: console
+  .. code-block:: console
 
-  $ globus-compute-endpoint configure --config-dir ~/.custom_3 endpoint_in_group_3
+    $ globus-compute-endpoint configure --config-dir ~/.custom_3 endpoint_in_group_3
 
-  $ globus-compute-endpoint start --config-dir ~/.custom_3 endpoint_in_group_3
+    $ globus-compute-endpoint start --config-dir ~/.custom_3 endpoint_in_group_3
 
 .. note::
   ``--config-dir`` overrides ``GLOBUS_COMPUTE_USER_DIR`` if both are specified.
