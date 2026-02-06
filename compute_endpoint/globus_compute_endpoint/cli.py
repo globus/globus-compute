@@ -314,29 +314,6 @@ def version_command():
 
 @app.command(name="configure", help="Configure an endpoint")
 @click.option(
-    "--endpoint-config",
-    default=None,
-    help="DEPRECATED: use --manager-config or --template-config",
-)
-@click.option(
-    "--manager-config",
-    type=click.Path(exists=True, dir_okay=False, path_type=pathlib.Path),
-    default=None,
-    help=(
-        "An override to the default config.yaml,"
-        " which is copied into the new endpoint directory"
-    ),
-)
-@click.option(
-    "--template-config",
-    type=click.Path(exists=True, dir_okay=False, path_type=pathlib.Path),
-    default=None,
-    help=(
-        "An override to the default user_config_template.yaml.j2,"
-        " which is copied into the new endpoint directory"
-    ),
-)
-@click.option(
     "--multi-user",
     type=click.BOOL,
     is_flag=False,
@@ -360,17 +337,60 @@ def version_command():
 @click.option(
     "--auth-policy",
     help=(
-        "Endpoint users are evaluated against this Globus authentication policy. "
-        "For more information on Globus authentication policies, visit "
-        "https://docs.globus.org/api/auth/developer-guide/#authentication-policies."
+        "Endpoint users are evaluated against this Globus authentication policy."
+        " For more information on Globus authentication policies, visit"
+        " https://docs.globus.org/api/auth/developer-guide/#authentication-policies."
     ),
+)
+@optgroup.group(
+    "Configuration File Overrides",
+    help=(
+        "Options to override default configuration files. When any of these are"
+        " specified, the file at the given path is copied into the new endpoint"
+        " directory instead of the default file."
+    ),
+)
+@optgroup.option(
+    "--manager-config",
+    type=click.Path(exists=True, dir_okay=False, path_type=pathlib.Path),
+    default=None,
+    help="Replaces endpoint_config.yaml",
+)
+@optgroup.option(
+    "--template-config",
+    type=click.Path(exists=True, dir_okay=False, path_type=pathlib.Path),
+    default=None,
+    help="Replaces user_config_template.yaml.j2",
+)
+@optgroup.option(
+    "--schema-config",
+    type=click.Path(exists=True, dir_okay=False, path_type=pathlib.Path),
+    default=None,
+    help="Replaces user_config_schema.json",
+)
+@optgroup.option(
+    "--user-env-config",
+    type=click.Path(exists=True, dir_okay=False, path_type=pathlib.Path),
+    default=None,
+    help="Replaces user_environment.yaml",
+)
+@optgroup.option(
+    "--id-mapping-config",
+    type=click.Path(exists=True, dir_okay=False, path_type=pathlib.Path),
+    default=None,
+    help="Replaces example_identity_mapping_config.json",
+)
+@optgroup.option(
+    "--endpoint-config",
+    default=None,
+    help="DEPRECATED: use --manager-config or --template-config",
 )
 @optgroup.group(
     "Authentication Policy Creation",
     help=(
-        "Options for creating an auth policy. If any of these options are specified, "
-        "the endpoint will be associated with an auth policy configured per those "
-        "options and users will be evaluated against that policy."
+        "Options for creating an auth policy. If any of these options are specified,"
+        " the endpoint will be associated with an auth policy configured per those"
+        " options and users will be evaluated against that policy."
     ),
 )
 @optgroup.option(
@@ -423,6 +443,9 @@ def configure_endpoint(
     endpoint_config: str | None,
     manager_config: pathlib.Path | None,
     template_config: pathlib.Path | None,
+    id_mapping_config: pathlib.Path | None,
+    schema_config: pathlib.Path | None,
+    user_env_config: pathlib.Path | None,
     multi_user: bool | None,
     high_assurance: bool,
     display_name: str | None,
@@ -469,6 +492,10 @@ def configure_endpoint(
         raise ClickException(str(e))
 
     id_mapping = is_privileged() if multi_user is None else multi_user
+    if id_mapping_config is not None and not id_mapping:
+        raise ClickException(
+            "--id-mapping-config requires multi user support (hint: --multi-user true)"
+        )
 
     create_policy = (
         auth_policy_project_id is not None
@@ -528,6 +555,9 @@ def configure_endpoint(
         conf_dir=ep_dir,
         endpoint_config=manager_config,
         user_config_template=template_config,
+        user_config_schema=schema_config,
+        user_environment=user_env_config,
+        id_mapping_config=id_mapping_config,
         id_mapping=id_mapping,
         high_assurance=high_assurance,
         display_name=display_name,

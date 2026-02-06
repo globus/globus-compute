@@ -141,6 +141,9 @@ class Endpoint:
         endpoint_dir: pathlib.Path,
         endpoint_config: pathlib.Path | None = None,
         user_config_template: pathlib.Path | None = None,
+        user_config_schema: pathlib.Path | None = None,
+        user_environment: pathlib.Path | None = None,
+        id_mapping_config: pathlib.Path | None = None,
         id_mapping: bool = False,
         high_assurance: bool = False,
         display_name: str | None = None,
@@ -152,7 +155,15 @@ class Endpoint:
         :param endpoint_dir: Path to the endpoint configuration dir
         :param endpoint_config: Path to a config file to be used instead of
             the Globus Compute default config file
+        :param user_config_template: Path to a user config template file
+            to be used instead of the Globus Compute default user config template
+        :param user_config_schema: Path to a user config schema file to be used
+            instead of the Globus Compute default user config schema
+        :param user_environment: Path to a user environment config file
+            to be used instead of the Globus Compute default user environment config
         :param id_mapping: Whether the endpoint will map users
+        :param id_mapping_config: Path to an identity mapping configuration file
+            to be used instead of the Globus Compute default
         :param display_name: A display name to use, if desired
         :param auth_policy: Globus authentication policy
         :param subscription_id: Subscription ID to associate endpoint with
@@ -201,10 +212,18 @@ class Endpoint:
             if user_config_template is not None:
                 src_user_tmpl_path = user_config_template
 
+            if user_config_schema is not None:
+                src_user_schema_path = user_config_schema
+
+            if user_environment is not None:
+                src_user_env_path = user_environment
+
             shutil.copyfile(src_user_tmpl_path, dst_user_tmpl_path)
             shutil.copyfile(src_user_schema_path, dst_user_schema_path)
             shutil.copyfile(src_user_env_path, dst_user_env_path)
             if id_mapping:
+                if id_mapping_config is not None:
+                    src_example_idmap_path = id_mapping_config
                 shutil.copyfile(src_example_idmap_path, dst_idmap_conf_path)
                 dst_idmap_conf_path.chmod(owner_only)
                 dst_user_tmpl_path.chmod(world_readable)
@@ -217,6 +236,9 @@ class Endpoint:
         conf_dir: pathlib.Path,
         endpoint_config: pathlib.Path | None = None,
         user_config_template: pathlib.Path | None = None,
+        user_config_schema: pathlib.Path | None = None,
+        user_environment: pathlib.Path | None = None,
+        id_mapping_config: pathlib.Path | None = None,
         id_mapping: bool = False,
         high_assurance: bool = False,
         display_name: str | None = None,
@@ -234,6 +256,9 @@ class Endpoint:
                 conf_dir,
                 endpoint_config,
                 user_config_template,
+                user_config_schema,
+                user_environment,
+                id_mapping_config,
                 id_mapping,
                 high_assurance,
                 display_name,

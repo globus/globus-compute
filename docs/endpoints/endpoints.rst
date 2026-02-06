@@ -239,6 +239,22 @@ environment variable or the ``--config-dir`` option when issuing endpoint comman
   ``--config-dir`` overrides ``GLOBUS_COMPUTE_USER_DIR`` if both are specified.
 
 
+File Overrides
+--------------
+
+The files used during endpoint configuration can be customized using the ``--*-config``
+options to ``globus-compute-endpoint configure``. This can be useful for automating
+endpoint configuration with pre-defined files. For example, to specify a custom user
+config template:
+
+.. code-block:: console
+
+   $ globus-compute-endpoint configure \
+       --template-config /path/to/custom_user_config_template.yaml.j2 \
+       my_custom_endpoint
+
+For more details on these options, see ``globus-compute-endpoint configure --help``.
+
 .. _starting-the-endpoint:
 
 Starting the Endpoint
