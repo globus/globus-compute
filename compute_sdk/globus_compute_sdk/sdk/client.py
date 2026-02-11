@@ -37,7 +37,6 @@ from .auth.auth_client import ComputeAuthClient
 from .auth.globus_app import get_globus_app
 from .batch import Batch, create_user_runtime
 from .login_manager import LoginManagerProtocol
-from .web_client import WebClient
 
 logger = logging.getLogger(__name__)
 
@@ -52,9 +51,6 @@ def _client_gares_handler(f: t.Callable):
 
             def _login(auth_params: GlobusAuthorizationParameters):
                 self.login_manager.run_login_flow(auth_params=auth_params)
-                self.web_client = self.login_manager.get_web_client(
-                    base_url=self.web_service_address
-                )
 
         if _login:
             return gare_handler(_login, f, self, *args, **kwargs)
@@ -161,7 +157,6 @@ class Client:
         self.app: globus_sdk.GlobusApp | None = None
         self.authorizer: globus_sdk.authorizers.GlobusAuthorizer | None = None
         self._login_manager: LoginManagerProtocol | None = None
-        self._web_client: WebClient | None = None
         self._auth_client: globus_sdk.AuthClient | None = None
         self._request_lock = threading.Lock()
 
@@ -177,7 +172,8 @@ class Client:
         elif login_manager:
             self.login_manager = login_manager
             self._compute_web_client = _ComputeWebClient(
-                base_url=self.web_service_address, authorizer=self.web_client.authorizer
+                base_url=self.web_service_address,
+                authorizer=self.login_manager.get_web_client().authorizer,
             )
         else:
             self.app = app if app else get_globus_app(environment=environment)
@@ -227,30 +223,6 @@ class Client:
     @auth_client.setter
     def auth_client(self, val: globus_sdk.AuthClient):
         self._auth_client = val
-
-    @property
-    def web_client(self):
-        warnings.warn(
-            "The 'Client.web_client' attribute is deprecated"
-            " and will be removed in a future release.",
-            DeprecationWarning,
-            stacklevel=2,
-        )
-        if self._web_client:
-            return self._web_client
-        elif self.login_manager:
-            self._web_client = self.login_manager.get_web_client(
-                base_url=self.web_service_address
-            )
-        else:
-            self._web_client = WebClient(
-                base_url=self.web_service_address, app=self.app
-            )
-        return self._web_client
-
-    @web_client.setter
-    def web_client(self, val: WebClient):
-        self._web_client = val
 
     def version_check(self, endpoint_version: str | None = None) -> None:
         """Check this client version meets the service's minimum supported version.
@@ -375,6 +347,7 @@ class Client:
 
         with self._request_lock:
             r = self._compute_web_client.v2.get_task(task_id)
+        print(f"Response string: {r}")
         logger.debug("Response string: %s", r)
         return self._update_task_table(r.text, tid)
 
