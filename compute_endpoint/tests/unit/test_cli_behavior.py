@@ -13,10 +13,12 @@ import time
 import typing as t
 import uuid
 from contextlib import redirect_stderr, redirect_stdout
+from http import HTTPStatus
 from unittest import mock
 
 import globus_sdk
 import pytest
+import responses
 import yaml
 from click import ClickException
 from click import File as ClickFile
@@ -40,10 +42,11 @@ from globus_compute_endpoint.endpoint.config import (
 from globus_compute_endpoint.endpoint.config.utils import load_config_yaml
 from globus_compute_endpoint.endpoint.endpoint import Endpoint
 from globus_compute_endpoint.endpoint.identity_mapper import MappedPosixIdentity
+from globus_compute_sdk import Client
 from globus_compute_sdk.sdk.auth.auth_client import ComputeAuthClient
 from globus_compute_sdk.sdk.auth.globus_app import UserApp
 from globus_compute_sdk.sdk.compute_dir import ensure_compute_dir
-from globus_sdk import MISSING
+from globus_sdk import MISSING, GlobusAPIError, NetworkError
 from pytest_mock import MockFixture
 
 _MOCK_BASE = "globus_compute_endpoint.cli."
@@ -103,6 +106,14 @@ def mock_ep(gc_dir, ep_name):
 
 
 @pytest.fixture
+def mock_client():
+    with mock.patch(f"{_MOCK_BASE}Client") as m:
+        mock_client = mock.Mock(spec=Client)
+        m.return_value = mock_client
+        yield mock_client
+
+
+@pytest.fixture
 def mock_load_config_yaml():
     conf = UserEndpointConfig()
     with mock.patch(f"{_MOCK_BASE}load_config_yaml") as m:
@@ -121,6 +132,18 @@ def mock_get_config():
 @pytest.fixture
 def mock_render_config_user_template():
     with mock.patch(f"{_MOCK_BASE}render_config_user_template") as m:
+        yield m
+
+
+@pytest.fixture
+def mock_send_endpoint_startup_failure_to_amqp():
+    with mock.patch(f"{_MOCK_BASE}send_endpoint_startup_failure_to_amqp") as m:
+        yield m
+
+
+@pytest.fixture
+def mock_daemon():
+    with mock.patch(f"{_MOCK_BASE}daemon") as m:
         yield m
 
 
@@ -268,13 +291,17 @@ def test_start_endpoint_no_such_ep(run_line, mock_ep, ep_name):
     assert ep_name in res.stderr
 
 
-def test_start_endpoint_existing_ep(run_line, mock_ep, make_endpoint_dir, ep_name):
+def test_start_endpoint_existing_ep(
+    run_line, mock_ep, make_endpoint_dir, ep_name, mock_client
+):
     make_endpoint_dir()
     run_line(f"start {ep_name}")
     mock_ep.start_endpoint.assert_called_once()
 
 
-def test_start_endpoint_already_running(make_endpoint_dir, ep_name):
+def test_start_endpoint_already_running(
+    make_endpoint_dir, mock_client, ep_name, mock_send_endpoint_startup_failure_to_amqp
+):
     """Check to ensure endpoint already active message prints to console"""
     ep_dir = make_endpoint_dir()
     pid_path = Endpoint.pid_path(ep_dir)
@@ -292,7 +319,7 @@ def test_start_endpoint_already_running(make_endpoint_dir, ep_name):
     assert "remove the PID file" in serr, "Expect suggested action conveyed"
 
 
-def test_start_endpoint_stale(mock_ep, make_endpoint_dir, ep_name):
+def test_start_endpoint_stale(mock_ep, make_endpoint_dir, ep_name, mock_client):
     ep_dir = make_endpoint_dir()
     pid_path = Endpoint.pid_path(ep_dir)
     pid_path.write_text("12345")
@@ -309,7 +336,9 @@ def test_start_endpoint_stale(mock_ep, make_endpoint_dir, ep_name):
 
 
 @pytest.mark.parametrize("is_uep", (False, True))
-def test_start_non_template_emits_upgrade_message(mock_ep, make_endpoint_dir, is_uep):
+def test_start_non_template_emits_upgrade_message(
+    mock_ep, make_endpoint_dir, is_uep, mock_client
+):
     ep_dir = make_endpoint_dir()
     f = io.StringIO()
     with redirect_stdout(f):
@@ -346,12 +375,23 @@ def test_endpoint_uuid_name_not_supported(run_line, cli_cmd):
     ],
 )
 def test_start_ep_reads_stdin(
-    mocker, run_line, mock_ep, mock_get_config, make_endpoint_dir, stdin_data, ep_name
+    mocker,
+    run_line,
+    mock_ep,
+    mock_get_config,
+    make_endpoint_dir,
+    stdin_data,
+    ep_name,
+    randomstring,
 ):
     data_is_valid, data = stdin_data
 
     mock_load_conf = mocker.patch(f"{_MOCK_BASE}load_config_yaml")
     mock_load_conf.return_value = mock_get_config.return_value
+
+    remote_register_endpoint_response = {}
+    mock__do_register_endpoint = mocker.patch(f"{_MOCK_BASE}_do_register_endpoint")
+    mock__do_register_endpoint.return_value = remote_register_endpoint_response
 
     mock_log = mocker.patch(f"{_MOCK_BASE}log")
     mock_sys = mocker.patch(f"{_MOCK_BASE}sys")
@@ -369,7 +409,7 @@ def test_start_ep_reads_stdin(
 
     if data_is_valid:
         data_dict = json.loads(data)
-        reg_info = data_dict.get("amqp_creds", {})
+        reg_info = data_dict.get("amqp_creds", remote_register_endpoint_response)
         config_str = data_dict.get("config")
         audit_fd = data_dict.get("audit_fd")
 
@@ -381,15 +421,23 @@ def test_start_ep_reads_stdin(
 
     else:
         assert mock_get_config.called
+        assert mock__do_register_endpoint.called
         assert mock_log.debug.called
         a, k = mock_log.debug.call_args
         assert "Invalid info on stdin" in a[0]
-        assert reg_info_found == {}
+        assert reg_info_found == remote_register_endpoint_response
 
 
 @pytest.mark.parametrize("fn_count", range(-1, 5))
 def test_start_ep_stdin_allowed_fns_overrides_conf(
-    mocker, run_line, mock_ep, mock_get_config, make_endpoint_dir, ep_name, fn_count
+    mocker,
+    run_line,
+    mock_ep,
+    mock_get_config,
+    make_endpoint_dir,
+    ep_name,
+    fn_count,
+    mock_client,
 ):
     if fn_count == -1:
         allowed_fns = None
@@ -423,13 +471,153 @@ def test_stop_endpoint(
 
 
 def test_restart_endpoint_does_start_and_stop(
-    run_line, mock_ep, make_endpoint_dir, ep_name
+    run_line, mock_ep, make_endpoint_dir, ep_name, mock_client
 ):
     make_endpoint_dir()
     run_line(f"restart {ep_name}")
 
     mock_ep.stop_endpoint.assert_called_once()
     mock_ep.start_endpoint.assert_called_once()
+
+
+@responses.activate
+@pytest.mark.parametrize(
+    "exit_code,status_code",
+    (
+        (os.EX_UNAVAILABLE, HTTPStatus.CONFLICT),
+        (os.EX_UNAVAILABLE, HTTPStatus.LOCKED),
+        (os.EX_UNAVAILABLE, HTTPStatus.NOT_FOUND),
+        (os.EX_DATAERR, HTTPStatus.BAD_REQUEST),
+        (os.EX_DATAERR, HTTPStatus.UNPROCESSABLE_ENTITY),
+        ("Error", HTTPStatus.IM_A_TEAPOT),
+    ),
+)
+def test__do_register_endpoint_registration_blocked(
+    exit_code,
+    status_code,
+    mocker,
+    get_standard_compute_client,
+    randomstring,
+    register_endpoint_failure_response,
+    make_endpoint_dir,
+    ep_uuid,
+):
+    mock_gcc = get_standard_compute_client()
+    mocker.patch(f"{_MOCK_BASE}Client", return_value=mock_gcc)
+
+    mock_log = mocker.patch(f"{_MOCK_BASE}log")
+
+    some_err = randomstring()
+    register_endpoint_failure_response(ep_uuid, status_code, some_err)
+
+    ep_dir = make_endpoint_dir(ep_uuid=ep_uuid)
+
+    f = io.StringIO()
+    with redirect_stdout(f):
+        with pytest.raises((GlobusAPIError, SystemExit)) as pyexc:
+            cli._do_register_endpoint(ep_dir, UserEndpointConfig(), ep_uuid)
+        stdout_msg = f.getvalue()
+
+    assert mock_log.warning.called
+    a, *_ = mock_log.warning.call_args
+    assert some_err in str(a), "Expected upstream response still shared"
+
+    assert some_err in stdout_msg, "Expect error message in stdout"
+    assert pyexc.value.code == exit_code, "Expect meaningful exit code"
+
+    if exit_code == "Error":
+        # The other route tests SystemExit; nominally this route is an unhandled
+        # traceback -- good.  We should _not_ blanket hide all exceptions.
+        assert pyexc.value.http_status == status_code
+
+
+@pytest.mark.parametrize("with_json", (False, True))
+def test__do_register_endpoint_provided_endpoint_id(
+    mock_client, ep_uuid, make_endpoint_dir, with_json
+):
+    ep_dir = make_endpoint_dir(ep_uuid=ep_uuid if with_json else None)
+
+    cli._do_register_endpoint(ep_dir, UserEndpointConfig(), ep_uuid)
+
+    _a, k = mock_client.register_endpoint.call_args
+    assert k["endpoint_id"] == ep_uuid
+
+
+@pytest.mark.parametrize("public", (False, True))
+@pytest.mark.parametrize("privs", (False, True))
+def test__do_register_endpoint_sends_data_during_registration(
+    make_manager_endpoint_dir,
+    mock_client,
+    ep_uuid,
+    public: bool,
+    privs: bool,
+):
+    conf_dir = make_manager_endpoint_dir()
+
+    mock_conf = ManagerEndpointConfig()
+    mock_conf.public = public
+    mock_conf.source_content = "foo: bar"
+
+    with mock.patch(f"{_MOCK_BASE}is_privileged", return_value=privs):
+        if privs:
+            mock_conf._identity_mapping_config_path = "/some / path / "
+        cli._do_register_endpoint(conf_dir, mock_conf, ep_uuid)
+
+    assert mock_client.register_endpoint.called
+    _a, k = mock_client.register_endpoint.call_args
+    expected_keys = {
+        "name",
+        "endpoint_id",
+        "metadata",
+        "multi_user",
+        "high_assurance",
+        "display_name",
+        "allowed_functions",
+        "auth_policy",
+        "subscription_id",
+        "admins",
+        "public",
+    }
+    assert expected_keys == k.keys(), "Missing or unexpected keys; update this test?"
+
+    expected_keys = {
+        "endpoint_version",
+        "python_version",
+        "hostname",
+        "local_user",
+        "endpoint_config",
+        "user_config_template",
+        "user_config_schema",
+    }
+    assert expected_keys == k["metadata"].keys(), "Expected minimal metadata"
+
+    assert k["public"] is mock_conf.public
+    assert k["multi_user"] is privs
+    assert k["metadata"]["endpoint_config"] == mock_conf.source_content
+
+
+def test__do_register_endpoint_handles_network_error_scriptably(
+    mocker,
+    mock_client,
+    make_manager_endpoint_dir,
+    ep_uuid,
+    randomstring,
+):
+    conf_dir = make_manager_endpoint_dir()
+    mock_log = mocker.patch(f"{_MOCK_BASE}log")
+
+    some_err = randomstring()
+    mock_client.register_endpoint.side_effect = NetworkError(some_err, Exception())
+
+    with pytest.raises(SystemExit) as pyexc:
+        cli._do_register_endpoint(conf_dir, ManagerEndpointConfig(), ep_uuid)
+
+    assert pyexc.value.code == os.EX_TEMPFAIL, "Expecting meaningful exit code"
+    assert mock_log.exception.called, "Expected usable traceback"
+    assert mock_log.critical.called
+    a = mock_log.critical.call_args[0][0]
+    assert "Network failure" in a
+    assert some_err in a
 
 
 @mock.patch(f"{_MOCK_BASE}setup_logging")
@@ -726,7 +914,7 @@ def test_start_ep_incorrect_config_py(
 
 @mock.patch("globus_compute_endpoint.endpoint.config.utils.load_config_yaml")
 def test_start_ep_config_py_takes_precedence(
-    mock_load, run_line, mock_ep, make_endpoint_dir, ep_name
+    mock_load, run_line, mock_ep, make_endpoint_dir, ep_name, mock_client
 ):
     conf_py = make_endpoint_dir() / "config.py"
     conf_py.write_text(
@@ -739,11 +927,42 @@ def test_start_ep_config_py_takes_precedence(
     assert not mock_load.called, "Key outcome: config.py takes precedence"
 
 
-def test_start_ep_umask_set_restrictive(run_line, make_endpoint_dir, ep_name, mock_ep):
+def test_start_ep_umask_set_restrictive(
+    run_line, make_endpoint_dir, ep_name, mock_ep, mock_client
+):
     orig_umask = os.umask(0)
     make_endpoint_dir()
     run_line(f"start {ep_name}")
     assert os.umask(orig_umask) == 0o077
+
+
+def test_start_ep_detached(
+    run_line,
+    mock_command_ensure,
+    make_endpoint_dir,
+    ep_name,
+    mock_daemon,
+    mock_client,
+    mock_send_endpoint_startup_failure_to_amqp,
+):
+    make_endpoint_dir()
+
+    mock_daemon_context_class = mock_daemon.DaemonContext
+    mock_daemon_context_class.return_value.__enter__.side_effect = Exception(
+        "early exit"
+    )
+
+    res = run_line(f"start {ep_name} --detach", assert_exit_code=1)
+
+    assert mock_command_ensure.detach is True, "Expect --detach sets detach"
+    assert "detach" in res.stdout, "Expect message about detach in stdout"
+    assert mock_daemon_context_class.called, "Expect DaemonContext was created"
+    assert (
+        res.exception is not None
+    ), "Expect exception raised from DaemonContext.__enter__"
+    assert "early exit" in str(
+        res.exception
+    ), "Expect exception from DaemonContext.__enter__ propagated"
 
 
 @pytest.mark.parametrize("use_uuid", (True, False))
@@ -791,6 +1010,7 @@ def test_die_with_parent_detached(
     die_with_parent,
     ep_name,
     make_endpoint_dir,
+    mock_client,
 ):
     make_endpoint_dir()
 
@@ -882,6 +1102,8 @@ def test_handle_globus_auth_error(
     cmd,
     ep_method,
     auth_err_msg,
+    mock_client,
+    mock_send_endpoint_startup_failure_to_amqp,
 ):
     make_endpoint_dir()
 
