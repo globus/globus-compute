@@ -1,4 +1,10 @@
 Deprecated
 ^^^^^^^^^^
 
-- Deprecated the "detach_endpoint" configuration option in non-templatable endpoints.
+- Deprecated the ``detach_endpoint`` configuration option in non-templatable endpoints.
+
+New Functionality
+^^^^^^^^^^^^^^^^^
+
+- Added the ``--detach`` flag to ``globus-compute-endpoint start``, which starts the
+  endpoint as a background daemon process.

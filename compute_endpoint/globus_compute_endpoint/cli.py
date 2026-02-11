@@ -16,8 +16,10 @@ import typing as t
 import uuid
 import warnings
 from dataclasses import asdict
+from http import HTTPStatus
 
 import click
+import daemon
 import lockfile
 from click import ClickException
 from click_option_group import optgroup
@@ -25,6 +27,7 @@ from daemon.pidfile import PIDLockFile
 from globus_compute_endpoint.auth import get_globus_app_with_scopes
 from globus_compute_endpoint.boot_persistence import disable_on_boot, enable_on_boot
 from globus_compute_endpoint.endpoint.config import (
+    BaseConfig,
     ManagerEndpointConfig,
     UserEndpointConfig,
 )
@@ -47,12 +50,13 @@ from globus_compute_endpoint.endpoint.utils import (
 )
 from globus_compute_endpoint.exception_handling import handle_auth_errors
 from globus_compute_endpoint.logging_config import setup_logging
+from globus_compute_sdk import Client
 from globus_compute_sdk.sdk.auth.auth_client import ComputeAuthClient
 from globus_compute_sdk.sdk.auth.whoami import print_whoami_info
 from globus_compute_sdk.sdk.batch import create_user_runtime
 from globus_compute_sdk.sdk.compute_dir import ensure_compute_dir
 from globus_compute_sdk.sdk.utils.gare import gare_handler
-from globus_sdk import MISSING, AuthClient, GlobusAPIError, MissingType
+from globus_sdk import MISSING, AuthClient, GlobusAPIError, MissingType, NetworkError
 
 if not _has_multi_user and "--debug" in sys.argv and sys.stderr.isatty():
     # We haven't set up logging yet so manually print for now
@@ -93,6 +97,7 @@ class CommandState:
         self.log_to_console = False
         self.endpoint_uuid = None
         self.die_with_parent = False
+        self.detach = False
 
     @classmethod
     def ensure(cls) -> CommandState:
@@ -180,6 +185,12 @@ def start_options(f):
         hidden=True,
         callback=set_param_to_config,
         help="Shutdown if parent process goes away",
+    )(f)
+    f = click.option(
+        "--detach",
+        is_flag=True,
+        callback=set_param_to_config,
+        help="Detach the endpoint process from the current terminal",
     )(f)
     return f
 
@@ -737,6 +748,67 @@ def _pidfile(pid_path: pathlib.Path, stale_after_s: int | float):
             pass
 
 
+def _do_register_endpoint(
+    ep_dir: pathlib.Path, ep_config: BaseConfig, ep_uuid: str | None
+) -> dict:
+    gcc = Client(
+        local_compute_services=ep_config.local_compute_services,
+        environment=ep_config.environment,
+        app=get_globus_app_with_scopes(),
+    )
+
+    if isinstance(ep_config, ManagerEndpointConfig):
+        metadata = EndpointManager.get_metadata(ep_dir, ep_config)
+        public = ep_config.public
+        multi_user = is_privileged()
+    else:
+        assert isinstance(ep_config, UserEndpointConfig)  # mypy
+        metadata = Endpoint.get_metadata(ep_config.source_content)
+        public = False
+        multi_user = False
+
+    try:
+        reg_info = gcc.register_endpoint(
+            name=ep_dir.name,
+            endpoint_id=ep_uuid or Endpoint.get_endpoint_id(ep_dir),
+            metadata=metadata,
+            public=public,
+            multi_user=multi_user,
+            display_name=ep_config.display_name,
+            allowed_functions=ep_config.allowed_functions,
+            auth_policy=ep_config.authentication_policy,
+            subscription_id=ep_config.subscription_id,
+            high_assurance=ep_config.high_assurance,
+            admins=ep_config.admins,
+        )
+    except GlobusAPIError as e:
+        blocked_msg = f"Endpoint registration blocked.  [{e.text}]"
+        log.warning(blocked_msg)
+        print(blocked_msg)
+        if e.http_status in (
+            HTTPStatus.CONFLICT,
+            HTTPStatus.LOCKED,
+            HTTPStatus.NOT_FOUND,
+        ):
+            sys.exit(os.EX_UNAVAILABLE)
+        elif e.http_status in (
+            HTTPStatus.BAD_REQUEST,
+            HTTPStatus.UNPROCESSABLE_ENTITY,
+        ):
+            sys.exit(os.EX_DATAERR)
+        raise
+    except NetworkError as e:
+        log.exception("Network error while registering endpoint")
+        log.critical(f"Network failure; unable to register endpoint: {e}")
+        sys.exit(os.EX_TEMPFAIL)
+
+    # Mostly to appease mypy, but also a useful text if it ever
+    # *does* happen
+    assert reg_info is not None, "Empty response from Compute API"
+
+    return reg_info
+
+
 def _do_start_endpoint(
     *,
     ep_dir: pathlib.Path,
@@ -834,6 +906,27 @@ def _do_start_endpoint(
             )
             log.critical(msg)
             raise
+
+        if not reg_info:
+            reg_info = _do_register_endpoint(ep_dir, ep_config, endpoint_uuid)
+
+        # detach after reading config and registration so errors are still printed to
+        # terminal, but otherwise as early as possible so any files created aren't lost
+        # during daemonization
+        if state.detach:
+            print(f"> Endpoint <{ep_dir.name}> starting in detached mode.")
+            daemon_context = daemon.DaemonContext(
+                working_directory=ep_dir,
+                umask=0o002,
+            )
+            stk.enter_context(daemon_context)
+
+            setup_logging(
+                logfile=ep_dir / "endpoint.log",
+                debug=ep_config.debug or state.debug,
+                console_enabled=state.log_to_console,
+                no_color=state.no_color,
+            )
 
         pid_path = Endpoint.pid_path(ep_dir)
         stk.enter_context(_pidfile(pid_path, ep_config.heartbeat_period * 3))

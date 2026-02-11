@@ -24,7 +24,6 @@ import uuid
 from concurrent.futures import Future
 from contextlib import contextmanager
 from datetime import datetime
-from http import HTTPStatus
 
 import setproctitle
 import yaml
@@ -60,7 +59,6 @@ from globus_compute_endpoint.endpoint.utils import (
 from globus_compute_sdk import Client
 from globus_compute_sdk.sdk.auth.auth_client import ComputeAuthClient
 from globus_compute_sdk.sdk.compute_dir import ensure_compute_dir
-from globus_sdk import GlobusAPIError, NetworkError
 
 if t.TYPE_CHECKING:
     from pika.spec import BasicProperties
@@ -123,7 +121,7 @@ class EndpointManager:
         conf_dir: pathlib.Path,
         endpoint_uuid: str | None,
         config: ManagerEndpointConfig,
-        reg_info: dict | None = None,
+        reg_info: dict,
     ):
         log.debug("Endpoint Manager initialization")
 
@@ -171,58 +169,10 @@ class EndpointManager:
         if self._audit_log_handler_stop:
             self._audit_selector.close()  # for mypy: closed, but always defined
 
-        endpoint_uuid = Endpoint.get_endpoint_id(conf_dir) or endpoint_uuid
-
         self._mu_user = pwd.getpwuid(os.getuid())
         privileged = is_privileged(self._mu_user)
 
         self._allow_same_user = not privileged
-
-        if not reg_info:
-            try:
-                gcc = Client(
-                    local_compute_services=config.local_compute_services,
-                    environment=config.environment,
-                    app=get_globus_app_with_scopes(),
-                )
-                reg_info = gcc.register_endpoint(
-                    name=conf_dir.name,
-                    endpoint_id=endpoint_uuid,
-                    metadata=self.get_metadata(config.source_content),
-                    multi_user=privileged,
-                    display_name=config.display_name,
-                    allowed_functions=config.allowed_functions,
-                    auth_policy=config.authentication_policy,
-                    subscription_id=config.subscription_id,
-                    public=config.public,
-                    high_assurance=config.high_assurance,
-                    admins=config.admins,
-                )
-
-                # Mostly to appease mypy, but also a useful text if it ever
-                # *does* happen
-                assert reg_info is not None, "Empty response from Compute API"
-
-            except GlobusAPIError as e:
-                blocked_msg = f"Endpoint registration blocked.  [{e.text}]"
-                log.warning(blocked_msg)
-                print(blocked_msg)
-                if e.http_status in (
-                    HTTPStatus.CONFLICT,
-                    HTTPStatus.LOCKED,
-                    HTTPStatus.NOT_FOUND,
-                ):
-                    sys.exit(os.EX_UNAVAILABLE)
-                elif e.http_status in (
-                    HTTPStatus.BAD_REQUEST,
-                    HTTPStatus.UNPROCESSABLE_ENTITY,
-                ):
-                    sys.exit(os.EX_DATAERR)
-                raise
-            except NetworkError as e:
-                log.exception("Network error while registering manager endpoint")
-                log.critical(f"Network failure; unable to register endpoint: {e}")
-                sys.exit(os.EX_TEMPFAIL)
 
         upstream_ep_uuid = reg_info.get("endpoint_id")
         if endpoint_uuid and upstream_ep_uuid != endpoint_uuid:
@@ -325,15 +275,20 @@ class EndpointManager:
         )
         self._heartbeat_publisher = ResultPublisher(queue_info=hbq_info)
 
-    def get_metadata(self, config_src: str | None) -> dict:
-        user_config_template = load_user_config_template(self.user_config_template_path)
-        user_config_schema = load_user_config_schema(self.user_config_schema_path)
+    @staticmethod
+    def get_metadata(ep_dir: pathlib.Path, config: ManagerEndpointConfig) -> dict:
+        user_config_template = load_user_config_template(
+            Endpoint.user_config_template_path(ep_dir, config)
+        )
+        user_config_schema = load_user_config_schema(
+            Endpoint.user_config_schema_path(ep_dir, config)
+        )
         return {
             "endpoint_version": __version__,
             "python_version": platform.python_version(),
             "hostname": socket.getfqdn(),
             "local_user": pwd.getpwuid(os.getuid()).pw_name,
-            "endpoint_config": config_src,
+            "endpoint_config": config.source_content,
             "user_config_template": user_config_template,
             "user_config_schema": user_config_schema,
         }

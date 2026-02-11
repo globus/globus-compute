@@ -153,6 +153,31 @@ def get_standard_compute_client():
     return func
 
 
+@pytest.fixture
+def register_endpoint_failure_response(endpoint_uuid: uuid.UUID):
+    def create_response(
+        endpoint_id: uuid.UUID = endpoint_uuid,
+        status_code: int = 200,
+        err_msg: str = "some error msg",
+    ):
+        responses.add(
+            method=responses.POST,
+            url="https://compute.api.globus.org/v3/endpoints",
+            headers={"Content-Type": "application/json"},
+            json={"error": err_msg},
+            status=status_code,
+        )
+        responses.add(
+            method=responses.PUT,
+            url=f"https://compute.api.globus.org/v3/endpoints/{endpoint_id}",
+            headers={"Content-Type": "application/json"},
+            json={"error": err_msg},
+            status=status_code,
+        )
+
+    return create_response
+
+
 ###
 # Engines
 ###

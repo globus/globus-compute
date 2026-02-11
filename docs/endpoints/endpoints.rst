@@ -919,6 +919,36 @@ config that omits ``allowed_serializers``:
    No other glob-style options are supported.
 
 
+Running in the Background
+=========================
+
+The endpoint process usually runs in the foreground, attached to the console. To run it
+in the background, add the ``--detach`` flag to the ``start`` subcommand:
+
+.. code-block:: console
+
+   $ globus-compute-endpoint start my_endpoint --detach
+   Endpoint <my_endpoint> starting in detached mode.
+   $ globus-compute-endpoint list
+   +--------------------------------------+--------------+-----------------------+
+   |             Endpoint ID              |    Status    |   Endpoint Name       |
+   +======================================+==============+=======================+
+   |   <...the same registered UUID...>   | Running      | my_endpoint           |
+   +--------------------------------------+--------------+-----------------------+
+
+This returns control to the terminal immediately, while the endpoint process continues
+to run in the background.  Logs are no longer written to the terminal, but are still
+available at the endpoint's config directory (e.g., ``~/.globus_compute/my_endpoint/endpoint.log``).
+
+To stop the endpoint, use the ``stop`` subcommand:
+
+.. code-block:: console
+
+   $ globus-compute-endpoint stop my_endpoint
+   > Endpoint <my_endpoint> is now stopped
+
+
+
 .. _enable_on_boot:
 
 Installing as a Service
