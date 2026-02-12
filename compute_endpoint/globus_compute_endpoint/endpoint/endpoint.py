@@ -29,7 +29,7 @@ from globus_compute_endpoint.endpoint.config import (
     ManagerEndpointConfig,
     UserEndpointConfig,
 )
-from globus_compute_endpoint.endpoint.config.utils import get_config, serialize_config
+from globus_compute_endpoint.endpoint.config.utils import get_config
 from globus_compute_endpoint.endpoint.interchange import EndpointInterchange
 from globus_compute_endpoint.endpoint.result_store import ResultStore
 from globus_compute_endpoint.endpoint.utils import _redact_url_creds, update_url_port
@@ -547,7 +547,7 @@ class Endpoint:
                 reg_info = fx_client.register_endpoint(
                     name=endpoint_dir.name,
                     endpoint_id=endpoint_uuid,
-                    metadata=Endpoint.get_metadata(endpoint_config),
+                    metadata=Endpoint.get_metadata(endpoint_config.source_content),
                     multi_user=False,
                     display_name=endpoint_config.display_name,
                     allowed_functions=endpoint_config.allowed_functions,
@@ -1032,23 +1032,15 @@ class Endpoint:
         print(table.draw(), file=ofile)
 
     @staticmethod
-    def get_metadata(config: UserEndpointConfig) -> dict:
+    def get_metadata(config_src: str | None) -> dict:
         metadata: dict = {
             "endpoint_version": __version__,
             "python_version": platform.python_version(),
             "hostname": socket.getfqdn(),
             # should be more accurate than `getpass.getuser()` in non-login situations
             "local_user": pwd.getpwuid(os.getuid()).pw_name,
-            "endpoint_config": config.source_content,
+            "endpoint_config": config_src,
         }
-
-        try:
-            metadata["config"] = serialize_config(config)
-        except Exception as e:
-            log.warning(
-                f"Error when serializing config ({type(e).__name__}). Ignoring."
-            )
-            log.debug("Config serialization exception details", exc_info=e)
 
         return metadata
 

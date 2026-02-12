@@ -13,8 +13,6 @@ from globus_compute_common.messagepack.message_types import (
     TaskTransition,
 )
 from globus_compute_common.tasks import ActorName, TaskState
-from globus_compute_endpoint.endpoint.config import UserEndpointConfig
-from globus_compute_endpoint.endpoint.config.utils import serialize_config
 from globus_compute_endpoint.engines import (
     GCFuture,
     GlobusComputeEngine,
@@ -172,15 +170,6 @@ def test_gc_engine_system_failure(serde, ez_pack_task, task_uuid, engine_runner)
     assert r.is_error
     assert r.error_details.code == "RemoteExecutionError"
     assert "ManagerLost" in r.data
-
-
-def test_serialized_engine_config_has_provider():
-    loopback = "::1"
-    ep_config = UserEndpointConfig(engine=GlobusComputeEngine(address=loopback))
-
-    res = serialize_config(ep_config)
-    assert res["engine"]["executor"].get("provider")
-    ep_config.engine.shutdown()
 
 
 def test_gcengine_compute_launch_cmd(gce):
