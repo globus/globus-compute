@@ -632,23 +632,15 @@ def test_sends_data_during_registration(
         "python_version",
         "hostname",
         "local_user",
-        "config",
         "endpoint_config",
         "user_config_template",
         "user_config_schema",
     }
     assert expected_keys == k["metadata"].keys(), "Expected minimal metadata"
 
-    for key in (
-        "type",
-        "environment",
-    ):
-        assert key in k["metadata"]["config"]
-
     assert k["public"] is mock_conf.public
     assert k["multi_user"] is privs
     assert k["metadata"]["endpoint_config"] == mock_conf.source_content
-    assert "engine" not in k["metadata"]["config"]
 
 
 def test_handles_network_error_scriptably(

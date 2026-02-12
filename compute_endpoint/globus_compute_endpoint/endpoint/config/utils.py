@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import importlib.util
-import inspect
 import json
 import logging
 import os
@@ -9,7 +8,6 @@ import pathlib
 import re
 import shlex
 import typing as t
-import uuid
 
 import yaml
 from click import ClickException
@@ -322,69 +320,3 @@ def render_config_user_template(
     except jinja2.exceptions.SecurityError as e:
         log.debug("Template tried accessing insecure code: %s", e)
         raise
-
-
-def serialize_config(config: UserEndpointConfig | ManagerEndpointConfig) -> dict:
-    """Converts a configuration object into a dict that matches the standard YAML
-    config schema.
-
-    N.B. the output of this method is ignored by the web service's API; the field
-         is deprecated since Aug 2024.
-
-    Example structure partial:
-    {
-        ...
-        "display_name": "My Endpoint",
-        ...
-        "engine": {
-            "executor": {
-                "provider": {
-                    ...
-                    "type": "LocalProvider"
-                    ...
-                }
-                ...
-            }
-            ...
-        }
-    }
-    """
-
-    def _prep(val):
-        if hasattr(val, "__dict__") and hasattr(val, "__init__"):
-            return _to_dict(val)
-        if isinstance(val, uuid.UUID):
-            val = str(val)
-        try:
-            json.dumps(val, allow_nan=False)
-            return val
-        except (TypeError, ValueError):
-            return repr(val)
-
-    def _to_dict(obj):
-        res = {"type": type(obj).__name__}
-
-        # We only want to include attributes that are
-        # configurable as constructor arguments
-        signatures = [
-            # abuse knowledge of class structure, knowing that some attributes are
-            # stated in the parent signature
-            inspect.signature(super(type(obj), obj).__init__),
-            inspect.signature(obj.__init__),
-        ]
-        params = [k for sig in signatures for k in sig.parameters.keys()]
-
-        for param in params:
-            val = getattr(obj, param, 0)
-            if val == 0:
-                continue
-
-            if isinstance(val, (list, tuple)):
-                res[param] = [_prep(item) for item in val]
-
-            else:
-                res[param] = _prep(val)
-
-        return res
-
-    return _to_dict(config)

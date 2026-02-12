@@ -40,7 +40,6 @@ from globus_compute_endpoint.endpoint.config.utils import (
     load_user_config_schema,
     load_user_config_template,
     render_config_user_template,
-    serialize_config,
 )
 from globus_compute_endpoint.endpoint.endpoint import Endpoint
 from globus_compute_endpoint.endpoint.identity_mapper import (
@@ -191,7 +190,7 @@ class EndpointManager:
                 reg_info = gcc.register_endpoint(
                     name=conf_dir.name,
                     endpoint_id=endpoint_uuid,
-                    metadata=self.get_metadata(config),
+                    metadata=self.get_metadata(config.source_content),
                     multi_user=privileged,
                     display_name=config.display_name,
                     allowed_functions=config.allowed_functions,
@@ -328,7 +327,7 @@ class EndpointManager:
         )
         self._heartbeat_publisher = ResultPublisher(queue_info=hbq_info)
 
-    def get_metadata(self, config: ManagerEndpointConfig) -> dict:
+    def get_metadata(self, config_src: str | None) -> dict:
         user_config_template = load_user_config_template(self.user_config_template_path)
         user_config_schema = load_user_config_schema(self.user_config_schema_path)
         return {
@@ -336,8 +335,7 @@ class EndpointManager:
             "python_version": platform.python_version(),
             "hostname": socket.getfqdn(),
             "local_user": pwd.getpwuid(os.getuid()).pw_name,
-            "config": serialize_config(config),
-            "endpoint_config": config.source_content,
+            "endpoint_config": config_src,
             "user_config_template": user_config_template,
             "user_config_schema": user_config_schema,
         }

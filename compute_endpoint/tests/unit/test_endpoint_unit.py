@@ -26,7 +26,6 @@ from globus_compute_endpoint.endpoint.config import (
     ManagerEndpointConfig,
     UserEndpointConfig,
 )
-from globus_compute_endpoint.endpoint.config.utils import serialize_config
 from globus_compute_endpoint.endpoint.endpoint import Endpoint
 from globus_compute_endpoint.engines import (
     GlobusComputeEngine,
@@ -700,7 +699,7 @@ def test_endpoint_get_metadata(mocker, engine_cls):
         k["address"] = "::1"
     test_config = UserEndpointConfig(engine=engine_cls(**k))
     test_config.source_content = "foo: bar"
-    meta = Endpoint.get_metadata(test_config)
+    meta = Endpoint.get_metadata(test_config.source_content)
 
     test_config.engine.shutdown()
 
@@ -708,10 +707,6 @@ def test_endpoint_get_metadata(mocker, engine_cls):
         assert meta[k] == v
 
     assert meta["endpoint_config"] == test_config.source_content
-    config = meta["config"]
-    assert config["engine"]["type"] == engine_cls.__name__
-    if engine_cls is GlobusComputeEngine:
-        assert config["engine"]["executor"]["provider"]["type"] == "LocalProvider"
 
 
 @pytest.mark.parametrize("env", (None, "blar", "local", "production"))
@@ -817,48 +812,6 @@ def test_always_prints_endpoint_id_to_terminal(
 
     assert not mock_sys.stdout.write.called
     assert not mock_sys.stderr.write.called
-
-
-def test_serialize_config_field_types():
-    fns = [str(uuid.uuid4()) for _ in range(5)]
-
-    ep_config = UserEndpointConfig(engine=GlobusComputeEngine(address="::1"))
-    ep_config._hidden_attr = "123"
-    ep_config.rando_attr = "howdy"
-    ep_config.allowed_functions = fns
-    ep_config.heartbeat_threshold = float("inf")
-
-    class Foo:
-        def __init__(self, foo):
-            self._foo = foo
-
-        @property
-        def foo(self):
-            return self._foo
-
-    # Testing support for properties
-    ep_config.environment = Foo("bar")
-
-    result = serialize_config(ep_config)
-    ep_config.engine.shutdown()
-
-    # Objects with a __dict__ attr are expanded
-    assert "type" in result["engine"]["executor"]["provider"]
-
-    # Only constructor parameters should be included
-    assert "_hidden_attr" not in result
-    assert "rando_attr" not in result
-
-    # Most values should retain their type
-    assert isinstance(result["allowed_functions"], list)
-    assert len(result["allowed_functions"]) == len(fns)
-    assert result["allowed_functions"] == fns
-    assert isinstance(result["heartbeat_period"], int)
-    assert isinstance(result["detach_endpoint"], bool)
-    assert result["environment"]["foo"] == "bar"
-
-    # Others should not
-    assert isinstance(result["heartbeat_threshold"], str)
 
 
 @pytest.mark.parametrize(
