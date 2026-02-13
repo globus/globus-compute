@@ -3,6 +3,59 @@ Changelog
 
 .. scriv-insert-here
 
+.. _changelog-4.6.0:
+
+globus-compute-sdk & globus-compute-endpoint v4.6.0
+---------------------------------------------------
+
+New Functionality
+^^^^^^^^^^^^^^^^^
+
+- Added the ``--detach`` flag to ``globus-compute-endpoint start``, which
+  starts the endpoint as a background daemon process.
+
+- Added ``--schema-config``, ``--user-env-config``, and ``--id-mapping-config``
+  options to ``globus-compute-endpoint configure``, for overriding the default
+  configuration files that are copied into the endpoint directory. For more
+  details, see ``globus-compute-endpoint configure --help``.
+
+Removed
+^^^^^^^
+
+- The following deprecated features were removed:
+
+    - The ``executors`` config option (use ``engine`` instead)
+    - Support for environment variables prefixed with ``FUNCX_``, namely
+      ``FUNCX_SDK_CLIENT_ID``, ``FUNCX_SDK_CLIENT_SECRET``, and ``FUNCX_SCOPE``
+      (use ``GLOBUS_COMPUTE_``-prefixed environment variables instead)
+    - The ``globus-compute-endpoint self-diagnostic`` command (use
+      ``globus-compute-diagnostic`` instead)
+    - Legacy function-level container features (configure containers on the
+      endpoint instead)
+    - The ``function_name`` argument to ``Client.register_function`` (use the
+      ``__name__`` attribute of the function instead)
+    - The non-functional ``searchable`` argument to
+      ``Client.register_function``
+
+Deprecated
+^^^^^^^^^^
+
+- Deprecated the ``detach_endpoint`` configuration option in non-templatable
+  endpoints.
+
+Changed
+^^^^^^^
+
+- Removed the noisy ``/bin/false`` example identity mapping configuration; it
+  was functionally useless other than to show how to configure for an
+  externally-called executable during the identity mapping phase.  Opt to
+  remove the potential for unnecessary noise in the logs and provide a direct
+  example in the documentation instead.
+
+- If endpoint configuration fails, the newly created endpoint directory and
+  files, if any, are cleaned up instead of being left behind in potentially
+  partially complete states.
+
 .. _changelog-4.5.0:
 
 globus-compute-sdk & globus-compute-endpoint v4.5.0

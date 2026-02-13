@@ -1,7 +1,0 @@
-New Functionality
-^^^^^^^^^^^^^^^^^
-
-- Added ``--schema-config``, ``--user-env-config``, and ``--id-mapping-config`` options
-  to ``globus-compute-endpoint configure``, for overriding the default configuration
-  files that are copied into the endpoint directory. For more details, see
-  ``globus-compute-endpoint configure --help``.
