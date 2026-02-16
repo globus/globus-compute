@@ -1083,10 +1083,44 @@ def test_get_endpoint_by_name_or_uuid_error_message(tmp_path, run_line, data):
     assert error in result.stderr
 
 
+@pytest.mark.parametrize("is_tty", [True, False])
+def test_invalid_grant_triggers_login_if_interactive(
+    mocker: MockFixture,
+    run_line,
+    mock_ep,
+    make_endpoint_dir,
+    mock_send_endpoint_startup_failure_to_amqp,
+    ep_name,
+    mock_client,
+    is_tty,
+):
+    make_endpoint_dir()
+
+    mock_resp = mock.MagicMock(
+        status_code=400,
+        reason="Bad Request",
+        text='{"error":"invalid_grant"}',
+    )
+    mocker.patch.object(
+        mock_ep,
+        "start_endpoint",
+        side_effect=globus_sdk.AuthAPIError(r=mock_resp),
+    )
+    exc_base = "globus_compute_endpoint.exception_handling"
+    mock_globus_app = mocker.patch(f"{exc_base}.get_globus_app_with_scopes")
+    mock_app = mock.MagicMock()
+    mock_globus_app.return_value = mock_app
+
+    mock_sys = mocker.patch(f"{exc_base}.sys")
+    mock_sys.stdin.isatty.return_value = is_tty
+    run_line(f"start {ep_name}")
+
+    assert mock_app.login.called == is_tty
+
+
 @pytest.mark.parametrize(
     "cmd,ep_method,auth_err_msg",
     [
-        ("start", "start_endpoint", '{"error":"invalid_grant"}'),
         ("start", "start_endpoint", '{"error":"something else"}'),
         ("start", "start_endpoint", ""),
         ("stop", "stop_endpoint", "err_msg"),
