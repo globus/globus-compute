@@ -34,4 +34,4 @@ A clear and concise description of what you expected to happen.
 - What is your endpoint-uuid?
 - If this is an endpoint issue, run `globus-compute-diagnostic` and attach the resulting zip file.
   This archive will contain logs, configuration, and machine information; if you'd prefer to share it privately,
-  you can reach the [Compute team via Slack](https://join.slack.com/t/funcx/shared_invite/zt-gfeclqkz-RuKjkZkvj1t~eWvlnZV0KA).
+  you can reach Globus Support privately at support@globus.org or [submit a support desk ticket](https://support.globus.org/hc/en-us/requests/new).
