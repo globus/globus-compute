@@ -9,9 +9,9 @@ requirements of the site-administrator often takes trial and error.  Below are
 example user endpoint configuration templates for some well-known systems that
 are known to work.  These serve as a reference for getting started.
 
-If you would like to add your system to this list please contact the Globus
-Compute Team via `Slack <https://funcx.slack.com/>`_.  (The `#help channel`_ is
-a good place to start.)
+If you would like to add your system to this list, please submit a PR with your
+configuration template and a brief description of the system to `the Globus
+Compute repository <https://github.com/globus/globus-compute/>`_.
 
 .. note::
    All configuration examples below must be customized for the user's
@@ -287,8 +287,6 @@ environment variables set to the worker specific identity assigned:
 
 .. |nbsp| unicode:: 0xA0
    :trim:
-
-.. _#help channel: https://funcx.slack.com/archives/C017637NZFA
 
 .. |GlobusMPIEngine| replace:: ``GlobusMPIEngine``
 .. _GlobusMPIEngine: ../reference/mpi_engine.html
