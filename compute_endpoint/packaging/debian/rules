@@ -15,7 +15,8 @@ export DEB_BUILD_OPTIONS
 export DEB_BUILD_MAINT_OPTIONS = hardening=+all
 
 name := @PACKAGE_NAME@
-package_executable := @PIP_NAME@
+package_executable := @PIP_NAME_D@
+package_alias := @PIP_NAME_S@
 VIRTUAL_ENV := /opt/$(name)/@VIRTUALENV@
 TMP_BUILD_DIR := debian/$(name)-tmp
 TMP_VIRTUAL_ENV := $(TMP_BUILD_DIR)$(VIRTUAL_ENV)
@@ -34,7 +35,7 @@ override_dh_auto_configure:
 	. "$${PWD}/$(TMP_VIRTUAL_ENV)/bin/activate"; \
 	set -x; \
 	python -mpip install --no-index --no-cache-dir -I --compile -U prereqs/pip-*.whl; \
-	python -mpip install --no-index --no-cache-dir -I --pre --compile --find-links=file://$${PWD}/prereqs/ "@PIP_NAME@"
+	python -mpip install --no-index --no-cache-dir -I --pre --compile --find-links=file://$${PWD}/prereqs/ "@PIP_NAME_D@"
 
 .PHONY: override_dh_auto_clean
 override_dh_auto_clean:
@@ -56,6 +57,7 @@ override_dh_auto_install:
 	  "$(DEST_ROOT)$(_unitdir)"; \
 	sed -i "$${PWD}/package_shim.sh" -e "s|@VIRTUAL_ENV@|$(VIRTUAL_ENV)|"
 	install -m 755 "$${PWD}/package_shim.sh" "$(DEST_ROOT)$(_sbindir)/$(package_executable)"
+	ln -sf "$(package_executable)" "$(DEST_ROOT)$(_sbindir)/$(package_alias)"
 	tar -C $(TMP_VIRTUAL_ENV) -cf - . | tar -C $(DEST_VIRTUAL_ENV) -xf -; \
 	set +x; \
 	for script in "$(DEST_VIRTUAL_ENV)"/bin/*; do \
