@@ -21,6 +21,7 @@ import typing as t
 
 import click
 import globus_sdk
+from globus_compute_endpoint.auth import get_globus_app_with_scopes
 from globus_compute_endpoint.exceptions import CouldNotExecuteUserTaskError
 from globus_compute_sdk.errors import MaxResultSizeExceeded
 
@@ -86,20 +87,15 @@ def handle_auth_errors(f: t.Callable) -> t.Callable:
                 message:           {e.text}
                 """)
 
-            # This specific Auth error has a common cause
-            if e.http_status == 400 and e.code == "Error":
+            # Check for auth error that should go through login flow
+            if e.http_status == 400 and e.code == "Error" and sys.stdin.isatty():
                 try:
                     error_info = json.loads(e.text)
                     if "invalid_grant" == error_info.get("error"):
-                        msg += (
-                            "\nGlobus Compute credentials may have expired."
-                            " Use `logout` to clear them.\n"
-                            "Note that Globus Connect (Transfer) credentials are"
-                            " managed via the `globus` command, separately from"
-                            " the Globus Compute ones."
-                        )
-                except Exception:
-                    # Shouldn't get here unless Globus Auth changes its response
+                        app = get_globus_app_with_scopes()
+                        app.login(force=True)
+                        return wrapper
+                except json.decoder.JSONDecodeError:
                     pass
 
             log.warning(msg)
