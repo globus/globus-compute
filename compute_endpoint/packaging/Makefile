@@ -20,10 +20,11 @@ ifeq ($(wildcard $(VENV_PY)),)
 	_DUMMY := $(shell "$(VENV_PY)" -mpip install -U pip -U setuptools)
 endif
 
-# "package name - dash" and "package name - underscore"
+# package name - dash, underscore, and short
 PKG_NAME := "globus-compute-agent"
 PIP_NAME_D := $(shell cd ../; "$(VENV_PY)" setup.py --name)
 PIP_NAME_U := $(shell echo $(PIP_NAME_D) | tr '-' '_')
+PIP_NAME_S := $(shell echo $(PIP_NAME_D) | tr '-' '\n' | cut -c1 | tr -d '\n')
 SDK_NAME_D := $(shell cd ../../compute_sdk; "$(VENV_PY)" setup.py --name)
 SDK_NAME_U := $(shell echo $(SDK_NAME_D) | tr '-' '_')
 
@@ -69,6 +70,7 @@ show_vars:   ##-For debugging, show the Makefile variables; will install a venv
 	@echo "VENV_PIP             : $(VENV_PIP)"
 	@echo "PIP_NAME_D           : $(PIP_NAME_D)"
 	@echo "PIP_NAME_U           : $(PIP_NAME_U)"
+	@echo "PIP_NAME_S           : $(PIP_NAME_S)"
 	@echo "PKG_NAME             : $(PKG_NAME)"
 	@echo "PKG_VERSION          : $(PKG_VERSION)"
 	@echo "PREREQS_DIR          : $(PREREQS_DIR)"
@@ -196,7 +198,8 @@ _setup_dist_for_deb:
 	 && sed -i debian/rules \
 	    -e "s/@PACKAGE_NAME@/$(PKG_NAME)/g" \
 	    -e "s/@PACKAGE_VERSION@/$(PKG_VERSION)/g" \
-	    -e "s/@PIP_NAME@/$(PIP_NAME_D)/g" \
+	    -e "s/@PIP_NAME_D@/$(PIP_NAME_D)/g" \
+	    -e "s/@PIP_NAME_S@/$(PIP_NAME_S)/g" \
 	    -e "s/@VIRTUALENV@/$(VIRTUALENV)/g" \
 	)
 
@@ -233,7 +236,8 @@ _setup_dist_for_rpm:
 	    -e "s/@PACKAGE_WHEEL@/$(PKG_WHEEL)/g" \
 	    -e "s/@PACKAGE_TARBALL_NAME@/$(PKG_TARBALL)/g" \
 	    -e "s/@PREREQS_TARBALL_NAME@/$(PREREQS_TARBALL_NAME)/g" \
-	    -e "s/@PIP_NAME@/$(PIP_NAME_D)/g" \
+	    -e "s/@PIP_NAME_D@/$(PIP_NAME_D)/g" \
+	    -e "s/@PIP_NAME_S@/$(PIP_NAME_S)/g" \
 	    -e "s/@PACKAGE_SOURCE_DIR@/$(PKG_SOURCE_DIR)/" \
 	    -e "s/@PREREQS_DIR@/$(PREREQS_DIR)/" \
 	    < ../fedora/$(PKG_NAME).spec.in > ./$(PKG_NAME).spec \

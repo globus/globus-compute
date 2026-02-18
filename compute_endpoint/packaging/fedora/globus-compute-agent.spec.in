@@ -5,7 +5,8 @@ Name:           @PACKAGE_NAME@
 %global         pythonversion                py313
 %global         VIRTUAL_ENV                  /opt/%{name}/venv-%{pythonversion}
 %global         src_dir                      %{_sourcedir}/%{name}
-%global         package_executable           @PIP_NAME@
+%global         package_executable           @PIP_NAME_D@
+%global         package_alias                @PIP_NAME_S@
 %global         globus_python3_version       3.13
 %global         __python                     /opt/globus-python313/bin/python3
 
@@ -44,7 +45,7 @@ BuildRequires:  file
 %description
 An agent to receive tasks as sent from the Globus Compute SDK.
 This module is intended for system administrators; end-users will most-likely
-want to install the `@PIP_NAME@` directly from PyPI.
+want to install the `@PIP_NAME_D@` directly from PyPI.
 
 %prep
 %global DEST_VIRTUAL_ENV "$PWD/TMP_RPM_BUILD_ROOT%{VIRTUAL_ENV}"
@@ -59,7 +60,7 @@ rm -f "%{DEST_VIRTUAL_ENV}/.gitignore"  # Python 3.13 adds this to new venvs (!!
 %build
 . "%{DEST_VIRTUAL_ENV}/bin/activate"
 python3 -mpip install --no-index --no-cache-dir -I --compile -U pip-*.whl
-python3 -mpip install --pre --compile --no-index --no-cache-dir -I --find-links=./ "@PIP_NAME@"
+python3 -mpip install --pre --compile --no-index --no-cache-dir -I --find-links=./ "@PIP_NAME_D@"
 deactivate
 
 %install
@@ -84,6 +85,7 @@ sed -i "${RPM_BUILD_ROOT}%{VIRTUAL_ENV}/bin/activate" \
 install -d -m 755 ${RPM_BUILD_ROOT}%{_sbindir}
 install -m 755 "%{_builddir}/@PACKAGE_SOURCE_DIR@"/package_shim.sh "${RPM_BUILD_ROOT}%{_sbindir}/%{package_executable}"
 sed -i "${RPM_BUILD_ROOT}%{_sbindir}/%{package_executable}" -e "s|@VIRTUAL_ENV@|%{VIRTUAL_ENV}|"
+ln -sf "%{package_executable}" "${RPM_BUILD_ROOT}%{_sbindir}/%{package_alias}"
 
 %pre
 
@@ -101,6 +103,7 @@ sed -i "${RPM_BUILD_ROOT}%{_sbindir}/%{package_executable}" -e "s|@VIRTUAL_ENV@|
 %dir %{VIRTUAL_ENV}
 %{VIRTUAL_ENV}/*
 %{_sbindir}/%{package_executable}
+%{_sbindir}/%{package_alias}
 
 %changelog
 * Mon May 02 2024 Globus Toolkit <support@globus.org> - @PACKAGE_VERSION@-%{release}
