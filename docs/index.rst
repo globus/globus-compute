@@ -95,6 +95,7 @@ how to download and configure an endpoint for local (multi-process) execution:
    limits
    changelog
    api_docs/index
+   contact
 
 Indices and tables
 ==================
