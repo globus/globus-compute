@@ -918,6 +918,10 @@ def _do_start_endpoint(
             daemon_context = daemon.DaemonContext(
                 working_directory=ep_dir,
                 umask=0o002,
+                # DaemonContext tries to not detach when the parent pid is 1 because
+                # it assumes that means the parent is `init`, but that prevents users
+                # from detaching in `docker run` context, so force the issue
+                detach_process=True,
             )
             stk.enter_context(daemon_context)
 

@@ -954,15 +954,17 @@ def test_start_ep_detached(
 
     res = run_line(f"start {ep_name} --detach", assert_exit_code=1)
 
-    assert mock_command_ensure.detach is True, "Expect --detach sets detach"
-    assert "detach" in res.stdout, "Expect message about detach in stdout"
+    assert mock_command_ensure.detach is True, "Expect CommandState to update"
+    assert "detach" in res.stdout, "Expect user-facing message"
+
     assert mock_daemon_context_class.called, "Expect DaemonContext was created"
+    daemon_constructor_kwargs = mock_daemon_context_class.call_args.kwargs
     assert (
-        res.exception is not None
-    ), "Expect exception raised from DaemonContext.__enter__"
-    assert "early exit" in str(
-        res.exception
-    ), "Expect exception from DaemonContext.__enter__ propagated"
+        daemon_constructor_kwargs.get("detach_process") is True
+    ), "Expect DaemonContext is told to detach, not use its own heuristic"
+
+    assert res.exception is not None, "Expect *an* exception was raised"
+    assert "early exit" in str(res.exception), "Expect the *correct* exception"
 
 
 @pytest.mark.parametrize("use_uuid", (True, False))
