@@ -1,0 +1,5 @@
+New Functionality
+^^^^^^^^^^^^^^^^^
+
+- Added ``gce`` as an alias to the ``globus-compute-endpoint`` command for reduced
+  finger stress.

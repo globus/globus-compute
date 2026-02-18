@@ -85,7 +85,8 @@ setup(
     keywords=["Globus Compute", "FaaS", "Function Serving"],
     entry_points={
         "console_scripts": [
-            "globus-compute-endpoint=globus_compute_endpoint.cli:cli_run"
+            "globus-compute-endpoint=globus_compute_endpoint.cli:cli_run",
+            "gce=globus_compute_endpoint.cli:cli_run",
         ]
     },
     include_package_data=True,
