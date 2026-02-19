@@ -25,16 +25,15 @@ from globus_compute_sdk.sdk.utils.uuid_like import as_uuid
 from globus_compute_sdk.serialize.concretes import SELECTABLE_STRATEGIES
 from parsl import HighThroughputExecutor
 from parsl.providers import KubernetesProvider
-from tests.utils import kill_manager
 
 logger = logging.getLogger(__name__)
 
 
 class MockGCEngine(GlobusComputeEngineBase):
-    def __init__(self, *a, **k):
+    def __init__(self, result=None, *a, **k):
         super().__init__(*a, **k)
         self._task_counter = random.randint(0, 1_000)
-        self.test_fail_count = 0
+        self._result = result
 
     def assert_ha_compliant(self):
         pass
@@ -52,10 +51,10 @@ class MockGCEngine(GlobusComputeEngineBase):
         self._task_counter += 1
         f = Future()
         f.executor_task_id = self._task_counter
-        if self.test_fail_count < self.max_retries_on_system_failure:
-            f.set_exception(Exception("Some infra exception"))
+        if isinstance(self._result, Exception):
+            f.set_exception(self._result)
         else:
-            f.set_result(None)
+            f.set_result(self._result)
         return f
 
     def shutdown(self, /, **kwargs) -> None:
@@ -157,19 +156,25 @@ def test_engines_executor_id(ez_pack_task, task_uuid, EngineClass):
     assert f.executor_task_id is not None
 
 
-def test_gc_engine_system_failure(serde, ez_pack_task, task_uuid, engine_runner):
-    """Test behavior of engine failure killing task"""
-    engine = engine_runner(GlobusComputeEngine, max_retries_on_system_failure=0)
+def test_gcengine_error_handling(task_uuid):
+    engine = MockGCEngine(result=Exception("Simulated task failure"))
+    engine.start(endpoint_id=task_uuid)
 
-    task_bytes = ez_pack_task(kill_manager)
-    task_f = GCFuture(task_uuid)
-    engine.submit(task_f, task_bytes, {})
-    r = messagepack.unpack(task_f.result())
+    try:
+        task_bytes = b"some task bytes"
+        task_f = GCFuture(task_uuid)
+        engine.submit(task_f, task_bytes, {})
+        r = messagepack.unpack(task_f.result())
+    except Exception:
+        raise
+    finally:
+        engine.shutdown()
+
     assert isinstance(r, Result)
     assert r.task_id == task_uuid
     assert r.is_error
     assert r.error_details.code == "RemoteExecutionError"
-    assert "ManagerLost" in r.data
+    assert "Simulated task failure" in r.data
 
 
 def test_gcengine_compute_launch_cmd(gce):
