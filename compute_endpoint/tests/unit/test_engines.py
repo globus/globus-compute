@@ -100,7 +100,7 @@ def test_result_message_packing(serde, task_uuid):
     "engine_type",
     (ProcessPoolEngine, ThreadPoolEngine, GlobusComputeEngine),
 )
-def test_allowed_serializers_passthrough_to_serde(engine_type, engine_runner) -> None:
+def test_allowed_serializers_passthrough_to_serde(engine_type) -> None:
     engine: GlobusComputeEngineBase
     if hasattr(engine_type, "_ExecutorClass"):
         with mock.patch.object(engine_type, "_ExecutorClass") as mock_ex:
@@ -165,8 +165,6 @@ def test_gcengine_error_handling(task_uuid):
         task_f = GCFuture(task_uuid)
         engine.submit(task_f, task_bytes, {})
         r = messagepack.unpack(task_f.result())
-    except Exception:
-        raise
     finally:
         engine.shutdown()
 
@@ -252,10 +250,9 @@ def test_gcengine_start_provider_without_channel(
 
 
 @pytest.mark.parametrize("encrypted", (True, False))
-def test_gcengine_encrypted(encrypted: bool, engine_runner):
-    engine: GlobusComputeEngine = engine_runner(
-        GlobusComputeEngine, encrypted=encrypted
-    )
+def test_gcengine_encrypted(encrypted: bool):
+    engine = GlobusComputeEngine(encrypted=encrypted)
+
     assert engine.encrypted is engine.executor.encrypted is encrypted
 
     with pytest.raises(AttributeError):
