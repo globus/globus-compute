@@ -1447,10 +1447,12 @@ class _ResultWatcher(threading.Thread):
                         fut.set_exception(self._cancellation_reason)
                         log.debug("Cancelled: %s", fut.task_id)
                     self._open_futures_empty.set()
+        self.shutdown()
         log.debug("%r AMQP thread complete.", self)
 
     def shutdown(self, wait=True, *, cancel_futures=False):
         if not self.is_alive():
+            _RESULT_WATCHERS.pop(self.task_group_id, None)
             return
 
         self._closed = True  # No more futures will be accepted
