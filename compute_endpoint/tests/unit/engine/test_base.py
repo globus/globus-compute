@@ -4,6 +4,7 @@ from unittest import mock
 
 import pytest
 from globus_compute_endpoint.engines import GCFuture, ThreadPoolEngine
+from globus_compute_endpoint.engines.base import GlobusComputeEngineBase
 from globus_compute_endpoint.engines.helper import execute_task
 from globus_compute_sdk.serialize import ComputeSerializer
 from globus_compute_sdk.serialize.concretes import (
@@ -114,3 +115,39 @@ def test_submit_specifies_deserializers(mock_eng, task_bytes, endpoint_uuid, tas
     assert exp_task_deser == set(
         k["kwargs"]["task_deserializers"]
     ), eng.serde.allowed_deserializer_types
+
+
+def test_expected_abstract_methods(mock_eng):
+    exp_abstract_methods = {
+        "assert_ha_compliant": (),
+        "start": (),
+        "get_status_report": (),
+        "_submit": ({}, lambda: 1),
+        "shutdown": (),
+    }
+
+    found_abstract_methods = {
+        attr
+        for attr in dir(GlobusComputeEngineBase)
+        if "__isabstractmethod__" in dir(getattr(GlobusComputeEngineBase, attr))
+    }
+
+    def create_method(sup_cls, meth_name, *args):
+        def _test_meth(self):
+            getattr(sup_cls, meth_name)(self, *args)
+
+        return _test_meth
+
+    class _MockGCEng(GlobusComputeEngineBase):
+        def __new__(cls, *args, **kwargs):
+            sup_cls = super()
+            for am_name, a in exp_abstract_methods.items():
+                setattr(cls, am_name, create_method(sup_cls, am_name, *a))
+            return cls
+
+    assert found_abstract_methods == set(exp_abstract_methods), "Update test?"
+
+    test_eng = _MockGCEng()
+    for am_name in exp_abstract_methods:
+        with pytest.raises(NotImplementedError):
+            getattr(test_eng, am_name)(test_eng)

@@ -8,12 +8,26 @@ _MOCK_BASE = "globus_compute_endpoint.engines.process_pool."
 
 
 @pytest.fixture
-def eng(endpoint_uuid):
+def ppe():
     with mock.patch(f"{_MOCK_BASE}NativeExecutor"):
-        ppe = ProcessPoolEngine()
-        ppe.start(endpoint_id=endpoint_uuid)
+        yield ProcessPoolEngine()
+
+
+@pytest.fixture
+def eng(endpoint_uuid, ppe):
+    ppe.start(endpoint_id=endpoint_uuid)
+    try:
         yield ppe
+    finally:
         ppe.shutdown(block=True)
+
+
+def test_not_started(ppe, task_uuid):
+    f = GCFuture(task_uuid)
+    with pytest.raises(RuntimeError) as pyt_e:
+        ppe.submit(f, b"bytes", {})
+
+    assert "Engine not started" in str(pyt_e.value)
 
 
 def test_sets_task_id(eng, task_uuid):

@@ -82,6 +82,15 @@ def htex(htex_factory):
     _htex.shutdown()
 
 
+def test_not_started(htex, task_uuid):
+    gce = GlobusComputeEngine(endpoint_id=task_uuid, executor=htex)
+    f = GCFuture(task_uuid)
+    with pytest.raises(RuntimeError) as pyt_e:
+        gce.submit(f, b"bytes", {})
+
+    assert "Engine not started" in str(pyt_e.value)
+
+
 def test_status_report_content(htex, mock_managers, mock_managers_packages):
     ep_id = uuid.uuid4()
     gce = GlobusComputeEngine(endpoint_id=ep_id, executor=htex)

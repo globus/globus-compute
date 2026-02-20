@@ -221,7 +221,7 @@ class GlobusComputeEngineBase(ABC, RepresentationMixin):
         * All manager-worker communication happens within one host machine
         * Network traffic is encrypted
         """
-        raise NotImplementedError
+        raise NotImplementedError()
 
     @abstractmethod
     def start(
@@ -229,11 +229,11 @@ class GlobusComputeEngineBase(ABC, RepresentationMixin):
         *args,
         **kwargs,
     ) -> None:
-        raise NotImplementedError
+        raise NotImplementedError()
 
     @abstractmethod
     def get_status_report(self) -> EPStatusReport:
-        raise NotImplementedError
+        raise NotImplementedError()
 
     def set_working_dir(self, run_dir: str | None = None):
         if not os.path.isabs(self.working_dir):
