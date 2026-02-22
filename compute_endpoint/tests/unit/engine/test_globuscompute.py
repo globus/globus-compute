@@ -206,3 +206,11 @@ def test_submit_adds_task_context(tmp_path, mock_htex, endpoint_uuid, task_uuid,
         assert ctxt["resource_spec"] == rspec
     else:
         assert "resource_spec" not in ctxt
+
+
+def test_validates_resource_spec(tmp_path, mock_mpiex, noop, task_uuid):
+    eng = GlobusComputeEngine(executor=mock_mpiex)
+    res_spec = {"FOO": "BAR"}
+    eng._submit(res_spec, noop, b'"task bytes"')
+    assert mock_mpiex.validate_resource_spec.called
+    assert res_spec in mock_mpiex.validate_resource_spec.call_args[0]

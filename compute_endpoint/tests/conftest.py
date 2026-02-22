@@ -255,6 +255,10 @@ def engine_runner(
 ###
 
 
+def noop_impl(*args, **kwargs):
+    pass
+
+
 def randomstring_impl(length=5, alphabet=string.ascii_letters):
     return "".join(random.choice(alphabet) for _ in range(length))
 
@@ -266,10 +270,7 @@ def randomstring():
 
 @pytest.fixture
 def noop():
-    def _wrapped(*args, **kwargs):
-        pass
-
-    return _wrapped
+    return noop_impl
 
 
 @pytest.fixture
