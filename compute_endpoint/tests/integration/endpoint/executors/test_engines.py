@@ -1,4 +1,3 @@
-import concurrent.futures
 import random
 import typing as t
 from unittest import mock
@@ -20,7 +19,7 @@ from tests.utils import double, get_cwd
     "engine_type", (ProcessPoolEngine, ThreadPoolEngine, GlobusComputeEngine)
 )
 def test_engine_start(
-    engine_type: t.Type[GlobusComputeEngineBase], engine_runner, endpoint_uuid, tmp_path
+    engine_type: t.Type[GlobusComputeEngineBase], endpoint_uuid, tmp_path
 ):
     """Engine.submit should fail before engine is started"""
 
@@ -42,17 +41,23 @@ def test_engine_start(
 @pytest.mark.parametrize(
     "engine_type", (ProcessPoolEngine, ThreadPoolEngine, GlobusComputeEngine)
 )
-def test_engine_submit(engine_type: GlobusComputeEngineBase, engine_runner):
-    """Test engine.submit with multiple engines"""
+def test_engine_submit(
+    engine_type: GlobusComputeEngineBase, engine_runner, serde, task_uuid, ez_pack_task
+):
     engine = engine_runner(engine_type)
 
-    param = random.randint(1, 100)
-    resource_spec: dict = {}
-    future = engine._submit(resource_spec, double, param)
-    assert isinstance(future, concurrent.futures.Future)
+    arg = random.randint(0, 10000)
+    task_bytes = ez_pack_task(double, arg)
+    f = GCFuture(task_uuid)
+    engine.submit(f, task_bytes, resource_specification={})
+    packed_result = f.result()
 
-    # 5-seconds is nominally "overkill," but gc on CI appears to need (at least) >1s
-    assert future.result(timeout=5) == param * 2
+    # Confirm that the future got the right answer
+    assert isinstance(packed_result, bytes)
+    result = messagepack.unpack(packed_result)
+    assert isinstance(result, Result)
+    assert result.task_id == task_uuid
+    assert serde.deserialize(result.data) == arg * 2
 
 
 @pytest.mark.parametrize(
@@ -88,27 +93,6 @@ def test_engine_working_dir(
     cwd1 = serde.deserialize(unpacked1.data)
     cwd2 = serde.deserialize(unpacked2.data)
     assert cwd1 == cwd2, "working dir should be idempotent"
-
-
-@pytest.mark.parametrize(
-    "engine_type", (ProcessPoolEngine, ThreadPoolEngine, GlobusComputeEngine)
-)
-def test_engine_submit_internal(
-    engine_type: GlobusComputeEngineBase, engine_runner, serde, task_uuid, ez_pack_task
-):
-    engine = engine_runner(engine_type)
-
-    task_bytes = ez_pack_task(double, 3)
-    f = GCFuture(task_uuid)
-    engine.submit(f, task_bytes, resource_specification={})
-    packed_result = f.result()
-
-    # Confirm that the future got the right answer
-    assert isinstance(packed_result, bytes)
-    result = messagepack.unpack(packed_result)
-    assert isinstance(result, Result)
-    assert result.task_id == task_uuid
-    assert serde.deserialize(result.data) == 6
 
 
 def test_gcengine_monitors_tasks(tmp_path, ez_pack_task, task_uuid):
