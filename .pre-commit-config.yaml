@@ -22,7 +22,7 @@ repos:
   hooks:
     - id: black
 - repo: https://github.com/PyCQA/isort
-  rev: 7.0.0
+  rev: 8.0.0
   hooks:
     - id: isort
       # explicitly pass settings file so that isort does not try to deduce
