@@ -594,6 +594,105 @@ authentications.
 Please refer to :ref:`auth-policies` for more information.
 
 
+With Globus OIDC
+----------------
+
+Administrators can create a custom OIDC server by following the `Globus OIDC guide`__.
+(Note that this requires an existing Globus Connect Server endpoint.) This OIDC server
+can then be combined with Globus Auth Policies to authenticate users on a multi-user
+endpoint.
+
+__ https://docs.globus.org/globus-connect-server/v5.4/globus-oidc-guide/
+
+With a Globus OIDC server configured, run ``gcs oidc show`` to retrieve the OIDC
+server's configured domain:
+
+.. code-block:: console
+   :emphasize-lines: 6
+
+   $ globus-connect-server oidc show
+   Current OIDC server configuration:
+   {
+      "auth_client": {
+         "client_id": "00000000-1111-2222-3333-444444444444",
+         "domain": "<some custom OIDC domain>",
+         "env": "production"
+      },
+      "clients": {
+         "00000000-1111-2222-3333-444444444444": {
+            "client_salt": "NOT_ACTUALLY_USED",
+            "redirect_uris": [
+               [
+                  "https://auth.globus.org/p/authenticate/callback",
+                  null
+               ]
+            ]
+         }
+      },
+      "oidc_server": {
+         "display_name": "My Globus OIDC Server",
+         "pam_service": "login",
+         "support_contact": "Alice Administrator",
+         "support_email": "alice@example.org"
+      }
+   }
+
+.. note::
+
+   The value of the domain field will be referenced in the following steps as
+   ``<OIDC-domain>``.
+
+When configuring a new multi-user endpoint, use the ``--allowed-domains`` option to
+restrict access to users authenticated via the OIDC server:
+
+.. code-block:: console
+
+   $ globus-compute-endpoint configure \
+       --allowed-domains "<OIDC-domain>" \
+       my_oidc_compute_endpoint
+
+To apply the same restriction to an existing multi-user endpoint, create an
+authentication policy using either the `Globus Auth API <https://docs.globus.org/api/auth/reference/#create_policy>`_
+or the `Globus SDK <https://globus-sdk-python.readthedocs.io/en/stable/services/auth.html#globus_sdk.AuthClient.create_policy>`_,
+with ``domain_constraints_include`` set to something like ``[<OIDC-domain>]``.
+Then, :ref:`add that policy to the endpoint config <apply-existing-auth-policy>`.
+
+After configuring the endpoint to authenticate against the OIDC server, start or
+restart the endpoint to ensure the administrator running the endpoint is also properly
+authenticated against the same OIDC server.
+
+Finally, create an :ref:`identity mapping configuration <example-idmap-config>` so
+OIDC-authenticated users can run tasks on the endpoint. The following config maps
+identities of the form ``user@<OIDC-domain>`` to the local username ``user`` (which
+must exist on the endpoint host system):
+
+.. code-block:: json
+   :caption: ``identity_mapping.json``
+   :emphasize-lines: 8
+
+   [
+      {
+         "comment": "Map OIDC identities to local usernames",
+         "DATA_TYPE": "expression_identity_mapping#1.0.0",
+         "mappings": [
+            {
+               "source": "{username}",
+               "match": "(.*)@<OIDC-domain>",
+               "output": "{0}"
+            }
+         ]
+      }
+   ]
+
+Save this configuration to a file (e.g., ``identity_mapping.json``) and reference it in
+the endpoint's ``config.yaml`` under the ``identity_mapping`` key:
+
+.. code-block:: yaml
+   :caption: ``config.yaml``
+
+   identity_mapping: /path/to/identity_mapping.json
+
+
 Administrator Quickstart
 ========================
 
