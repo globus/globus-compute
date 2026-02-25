@@ -3,6 +3,24 @@ Changelog
 
 .. scriv-insert-here
 
+.. _changelog-4.7.0:
+
+globus-compute-sdk & globus-compute-endpoint v4.7.0
+-----------------------------------------------------
+
+Bug Fixes
+^^^^^^^^^
+
+- Fixed an issue where endpoints would not detach properly inside a Docker container
+  using ``docker run``.
+
+Changed
+^^^^^^^
+
+- Globus Compute is now compatible with the latest globus-sdk (4.4.0 as of this compute release)
+
+- When starting an endpoint, expired tokens will redirect users to the auth flow instead of merely displaying the 'invalid_grant' error.
+
 .. _changelog-4.6.0:
 
 globus-compute-sdk & globus-compute-endpoint v4.6.0
