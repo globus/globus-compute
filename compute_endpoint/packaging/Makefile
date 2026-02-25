@@ -91,6 +91,28 @@ clean:  ##-Remove the venv, build/ dist/, prereqs tarball, and the package wheel
 distclean: clean  ##-Run `clean` target, then additionally remove venv-*, *tar.xz, *whl
 	rm -rf -- venv-* "$(PIP_NAME_U)"-*tar.xz "$(PIP_NAME_U)"-*whl
 
+.PHONY: container_deb
+container_deb:  ##-Start a container for hacking on deb builds
+	docker build -f debian.dockerfile -t gce-pkg-deb .
+	docker run \
+		--platform linux/amd64 \
+		--rm -it \
+		--mount src="$(shell pwd)/../..",target=/globus_compute,type=bind \
+		--workdir /globus_compute/compute_endpoint/packaging \
+		gce-pkg-deb \
+		/bin/bash -i
+
+.PHONY: container_rpm
+container_rpm:  ##-Start a container for hacking on rpm builds
+	docker build -f fedora.dockerfile -t gce-pkg-rpm .
+	docker run \
+		--platform linux/amd64 \
+		--rm -it \
+		--mount src="$(shell pwd)/../..",target=/globus_compute,type=bind \
+		--workdir /globus_compute/compute_endpoint/packaging \
+		gce-pkg-rpm \
+		/bin/bash -i
+
 _build_needs:
 	@([ -t 1 ] && _C="\033[36;1;40m" _R="\033[m"; \
 	  /bin/echo -e "$${_C}Checking build dependencies before starting build$${_R} ...\n"; \
