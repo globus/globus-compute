@@ -4,8 +4,6 @@ on:
   push:
     branches:
       - "*"
-    tags:
-      - "*"
 #   schedule:
 #     - cron: "*/5 * * * *"
 #   workflow_dispatch:
