@@ -32,7 +32,9 @@ jobs:
           GLOBUS_COMPUTE_CLIENT_SECRET: ${{ secrets.API_CLIENT_SECRET }}
         shell: python
         run: |
+          import random
           from globus_compute_sdk import Executor
+
           def double(x: float | int) -> float | int:
               return 2 * x
 
