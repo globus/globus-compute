@@ -1,0 +1,153 @@
+name: Canary
+
+run-name: "Canary (${{ github.event_name != 'workflow_dispatch' && 'production' || format('{0}{1}', github.event.inputs.environment, github.event.inputs.pd_test != '' && format(' [no test, just PD: {0}]', github.event.inputs.pd_test) || '') }})"
+
+on:
+  schedule:
+    - cron: "*/5 * * * *"
+  workflow_dispatch:
+    inputs:
+      environment:
+        type: choice
+        description: "Target environment"
+        required: true
+        default: "production"
+        options:
+          - sandbox
+          - integration
+          - test
+          - preview
+          - staging
+          - production
+
+      pd_test:
+        type: choice
+        description: "Don't run infrastructure test; just invoke PagerDuty's API"
+        required: true
+        default: ""
+        options:
+          - ""
+          - "signal success"
+          - "signal failure"
+
+
+jobs:
+  canary:
+    timeout-minutes: 4
+    runs-on: ubuntu-slim
+    steps:
+      - name: "Only 'production' currently handled ..."
+        if: github.event_name == 'workflow_dispatch' && inputs.environment != 'production'
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+        run: |
+            gh run cancel ${{ github.run_id }}
+
+      - uses: actions/checkout@v6
+        with:
+          ref: main
+
+      - uses: astral-sh/setup-uv@v2
+        with:
+            enable-cache: true
+
+      - name: "Collect Canary metadata cache"
+        id: restore_metadata
+        if: inputs.pd_test == ''
+        uses: actions/cache@v5
+        with:
+          path: canary_metadata.json
+          key: canary-cache-metadata
+
+      - name: "Calculate Canary Cache Key"
+        if: inputs.pd_test == ''
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+            hour_ago=$(date -u -d'1 hour ago' +'%Y-%m-%dT%H:%M:%SZ')
+            gh api /repos/globus/globus-compute/actions/workflows/compute_canary.yml/runs?per_page=50\&status=completed\&created=">$hour_ago" > ./recent_runs.json
+            latest_canary=$(jq '.workflow_runs | map(select(.name == "Canary")) | map({status, conclusion, updated_at}) | max_by(.updated_at)' recent_runs.json)
+            rm recent_runs.json
+            conclusion=$(jq -r '.conclusion' <<< "$latest_canary")
+            last_run=$(jq -r '.updated_at' <<< "$latest_canary")
+
+            jq -C <<< "$latest_canary"
+
+            echo "Last Canary Run: $conclusion at $last_run"
+            if [[ $conclusion = failure ]]; then
+                # An existing incident exists; operate on that cache key/incident
+                [[ -f canary_metadata.json ]] && CANARY_CACHE_KEY=$(jq -r '.CANARY_CACHE_KEY' canary_metadata.json)
+            fi
+
+            if [[ -z "$CANARY_CACHE_KEY" || $CANARY_CACHE_KEY = null ]]; then
+                ts=$(date -u +'%Y%m%d%H%M')
+                CANARY_CACHE_KEY="canary_incident_${ts}"
+            fi
+
+            echo "Computed CANARY_CACHE_KEY=${CANARY_CACHE_KEY}"
+            # save for next workflow run
+            echo "{\"CANARY_CACHE_KEY\":\"${CANARY_CACHE_KEY}\"}" > canary_metadata.json
+
+            # export for later steps
+            echo "CANARY_CACHE_KEY=${CANARY_CACHE_KEY}" >> "$GITHUB_ENV"
+            echo "CANARY_CACHE_KEY=${CANARY_CACHE_KEY}" >> "$GITHUB_OUTPUT"
+
+      - name: "Save Canary metadata cache"
+        if: inputs.pd_test == ''
+        uses: actions/cache@v5
+        with:
+          path: canary_metadata.json
+          key: canary-cache-metadata
+
+      - name: "Install Globus Compute SDK"
+        if: inputs.pd_test == ''
+        run: |
+          uv venv
+          uv pip install -U pip setuptools
+          uv pip install globus-compute-sdk
+
+      - name: "Test Kernel: Executor.submit() a task"
+        if: inputs.pd_test == ''
+        env:
+          GLOBUS_COMPUTE_CLIENT_ID: ${{ secrets.API_CLIENT_ID }}
+          GLOBUS_COMPUTE_CLIENT_SECRET: ${{ secrets.API_CLIENT_SECRET }}
+        run: |
+          uv run python << 'EOF'
+          # Python script; submit task to tutorial endpoint via Executor
+          import random
+          from globus_compute_sdk import Executor
+
+          def double(x: float | int) -> float | int:
+              return 2 * x
+
+          tut_endpoint_id = "4b116d3c-1703-4f8f-9f6f-39921e5864df"
+          inp_value = random.randint(-2**30, 2**30)
+          exp_value = 2 * inp_value
+          with Executor(tut_endpoint_id) as ex:
+              f = ex.submit(double, inp_value)
+              res = f.result(timeout=60)
+              assert res == exp_value
+          EOF
+
+      - name: "Notify PagerDuty"
+        if: ${{ !cancelled() }}
+        run: |
+          curl -X POST 'https://events.pagerduty.com/v2/enqueue' \
+            -H 'Content-Type: application/json' \
+            --data '{
+              "routing_key": "${{ secrets.PAGERDUTY_ROUTING_KEY }}",
+              "dedup_key": "end_to_end_compute_service_status-${{ env.CANARY_CACHE_KEY }}",
+              "event_action": "${{ job.status == 'success' && 'resolve' || 'trigger' }}",
+              "payload": {
+                "summary": "Compute Service Not Processing Jobs",
+                "severity": "critical",
+                "source": "Compute Services Canary Tester",
+                "custom_details": {
+                  "repository": "${{ github.repository }}",
+                  "branch": "${{ github.ref }}",
+                  "commit": "${{ github.sha }}",
+                  "run_url": "${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}",
+                  "AlarmName": "production-canary"
+                }
+              }
+            }'
