@@ -1,0 +1,55 @@
+name: Canary
+
+on:
+  push:
+    branches:
+      - "*"
+    tags:
+      - "*"
+#   schedule:
+#     - cron: "*/5 * * * *"
+#   workflow_dispatch:
+#     inputs:
+#       tags:
+#         required: false
+#         description: "Verify that the Compute infrastructure can run tasks"
+
+
+jobs:
+  canaryy:
+    timeout-minutes: 4
+    runs-on: ubuntu-slim
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          ref: main
+      - uses: actions/setup-python@v6
+        with:
+          python-version: "3.11"
+      - run: python -m pip install -U pip setuptools
+      - run: python -m pip install globus-compute-sdk
+      - name: test_kernel
+        env:
+          GLOBUS_COMPUTE_CLIENT_ID: ${{ secrets.API_CLIENT_ID }}
+          GLOBUS_COMPUTE_CLIENT_SECRET: ${{ secrets.API_CLIENT_SECRET }}
+        shell: python
+        run: |
+          from globus_compute_sdk import Executor
+          def double(x: float | int) -> float | int:
+              return 2 * x
+
+          tut_endpoint_id = "4b116d3c-1703-4f8f-9f6f-39921e5864df"
+          inp_value = random.randint(-2**30, 2**30)
+          exp_value = 2 * inp_value
+          with Executor(tut_endpoint_id) as ex:
+              f = ex.submit(double, inp_value)
+              res = None
+              try:
+                  res = f.result(timeout=60)
+              except Exception as e:
+                  res = e
+
+          if res != exp_value:
+              print("WOULD EXECUTE CURL COMMAND")
+
+
