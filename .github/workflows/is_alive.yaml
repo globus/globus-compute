@@ -2,15 +2,15 @@ name: Canary
 
 on:
   push:
-    branches:
-      - "*"
+    branches-ignore:
+      - master
 #   schedule:
 #     - cron: "*/5 * * * *"
-#   workflow_dispatch:
-#     inputs:
-#       tags:
-#         required: false
-#         description: "Verify that the Compute infrastructure can run tasks"
+  workflow_dispatch:
+    inputs:
+      tags:
+        required: false
+        description: "Verify that the Compute infrastructure can run tasks"
 
 
 jobs:
