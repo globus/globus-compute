@@ -43,13 +43,29 @@ jobs:
           exp_value = 2 * inp_value
           with Executor(tut_endpoint_id) as ex:
               f = ex.submit(double, inp_value)
-              res = None
-              try:
-                  res = f.result(timeout=60)
-              except Exception as e:
-                  res = e
+              res = f.result(timeout=60)
+              assert res == exp_value
 
-          if res != exp_value:
-              print("WOULD EXECUTE CURL COMMAND")
+          raise SystemExit(2)
 
-
+      - name: "Notify PagerDuty"
+        if: always()
+        run: |
+          curl -X POST 'https://events.pagerduty.com/v2/enqueue' \
+            -H 'Content-Type: application/json' \
+            --data '{
+              "payload": {
+                "routing_key": "${{ secrets.PAGERDUTY_ROUTING_KEY }}",
+                "dedup_key": "end_to_end_compute_service_status",
+                "event_action": "${{ job.status == 'success' && 'resolve' || 'trigger' }}",
+                "summary": "Test alert",
+                "severity": "info",
+                "source": "Compute Services Canary Tester",
+                "custom_details": {
+                  "repository": "${{ github.repository }}",
+                  "branch": "${{ github.ref }}",
+                  "commit": "${{ github.sha }}",
+                  "run_url": "${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"
+                }
+              }
+            }'
