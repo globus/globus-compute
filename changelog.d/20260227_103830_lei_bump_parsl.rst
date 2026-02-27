@@ -1,0 +1,4 @@
+New Functionality
+^^^^^^^^^^^^^^^^^
+
+- Parsl version has been upgraded to 2026.2.23 which include some gpu options for SlurmProvider
