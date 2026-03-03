@@ -69,7 +69,6 @@ class MockedExecutor(Executor):
         }
         kwargs.setdefault("client", mock_client)
         super().__init__(*args, **kwargs)
-        Executor._default_task_group_id = None  # Reset for each test
         self._test_task_submitter_exception: t.Type[Exception] | None = None
         self._test_task_submitter_done = False
 
@@ -110,6 +109,11 @@ class MockedResultWatcher(_ResultWatcher):
         if self._time_to_stop:  # important to identify bugs
             self._time_to_stop_mock.set()
         super().join(timeout=timeout)
+
+
+@pytest.fixture(autouse=True)
+def reset_default_executor_id():
+    Executor._default_task_group_id = None  # Reset for each test
 
 
 @pytest.fixture
@@ -1581,6 +1585,7 @@ def test_resultwatcher_onmessage_verifies_result_type(mocker, unpacked):
     mrw._on_message(mock_channel, mock_deliver, mock_props, b"some_bytes")
     mock_channel.basic_nack.assert_called()
     assert not mrw._received_results
+    mrw.shutdown()
 
 
 def test_resultwatcher_onmessage_sets_check_results_flag():
@@ -1594,6 +1599,7 @@ def test_resultwatcher_onmessage_sets_check_results_flag():
     mock_channel.basic_nack.assert_not_called()
     assert mrw._received_results
     assert mrw._time_to_check_results.is_set()
+    mrw.shutdown()
 
 
 @pytest.mark.parametrize("exc", (MemoryError("some description"), "some description"))
