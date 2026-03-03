@@ -129,6 +129,12 @@ jobs:
               assert res == exp_value
           EOF
 
+      - name: "PD Signaling Test"
+        if: inputs.pd_test != ''
+        run: |
+          [[ "signal failure" = "${{ inputs.pd_test }}" ]] && exit 1
+          exit 0
+
       - name: "Notify PagerDuty"
         if: ${{ !cancelled() }}
         run: |
