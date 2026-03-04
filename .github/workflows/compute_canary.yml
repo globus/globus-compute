@@ -3,8 +3,10 @@ name: Canary
 run-name: "Canary (${{ github.event_name != 'workflow_dispatch' && 'production' || format('{0}{1}', github.event.inputs.environment, github.event.inputs.pd_test != '' && format(' [no test, just PD: {0}]', github.event.inputs.pd_test) || '') }})"
 
 on:
+  # Start the first run at 3 min past the hour as GitHub is more likely to skip runs
+  # at the top of the hour (minute 0)
   schedule:
-    - cron: "*/5 * * * *"
+    - cron: "3/5 * * * *"
   workflow_dispatch:
     inputs:
       environment:
