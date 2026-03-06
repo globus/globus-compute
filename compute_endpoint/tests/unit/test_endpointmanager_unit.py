@@ -1587,8 +1587,14 @@ def test_non_root_keeps_original_environment(
     mock_os, *_, em = successful_exec_from_mocked_user
 
     sentinel_key = randomstring()
-    mock_os.environ = {sentinel_key: randomstring()}
-    expected_env = dict(mock_os.environ)
+    expected_env = {
+        sentinel_key: randomstring(),
+        "HOME": randomstring(),
+        "USER": randomstring(),
+        "PATH": randomstring(),
+    }
+    exp_keys = list(expected_env)
+    mock_os.environ = dict(expected_env)
 
     with pytest.raises(SystemExit) as pyexc:
         em._event_loop()
@@ -1596,10 +1602,9 @@ def test_non_root_keeps_original_environment(
     assert (
         pyexc.value.code == _GOOD_UNPRIVILEGED_EC
     ), "Q&D: verify we exec'ed, based on '+= 1'"
-    _a, k = mock_os.execvpe.call_args
+    _, k = mock_os.execvpe.call_args
     env = k["env"]
-    assert sentinel_key in env
-    assert env[sentinel_key] == expected_env[sentinel_key]
+    assert all(env[k] and env[k] == expected_env[k] for k in exp_keys)
 
 
 def test_environment_default_path(successful_exec_from_mocked_root):
@@ -1663,8 +1668,8 @@ def test_handles_invalid_user_environment_file_gracefully(
     assert "Is it a valid YAML file?" in msg, "Expect suggested reason"
     assert str(env_path) in msg, "Expect problem file shared"
     assert "ScannerError" in msg, "Expect underlying exception shared"
-    assert "Default environment:" in msg
-    assert str({"PATH": None})[:7] in msg
+    assert "Default environment: {}" in msg
+    assert str({}) in msg
 
 
 def test_environment_default_path_set_if_not_specified(

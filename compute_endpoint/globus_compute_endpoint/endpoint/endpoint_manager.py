@@ -1052,9 +1052,6 @@ class EndpointManager:
             template_str = load_user_config_template(self.user_config_template_path)
             user_config_schema = load_user_config_schema(self.user_config_schema_path)
 
-            pybindir = pathlib.Path(sys.executable).parent
-            default_path = ("/usr/local/bin", "/usr/bin", "/bin", pybindir)
-            env.update({"PATH": ":".join(map(str, default_path))})
             env_path = self.conf_dir / "user_environment.yaml"
             if env_path.exists():
                 try:
@@ -1073,12 +1070,9 @@ class EndpointManager:
                         f"\n    Environment file: {env_path}"
                         f"\n           Exception: [{type(e).__name__}] {e}"
                     )
-            user_home = {"HOME": udir, "USER": uname}
 
             if not os.path.isdir(udir):
                 udir = "/"
-
-            wd = env.get("PWD", udir)
 
             os.chdir("/")  # always succeeds, so start from known place
             exit_code += 1
@@ -1122,10 +1116,20 @@ class EndpointManager:
                 exit_code += 1
 
             # Reminder: we are now the UID that will run the UEP.
-            env.update(user_home)
 
             os.setsid()
             exit_code += 1
+
+            upath: str = env.get("PATH", "")
+            if not upath:
+                pybindir = pathlib.Path(sys.executable).parent
+                default_path = ("/usr/local/bin", "/usr/bin", "/bin", pybindir)
+                upath = ":".join(map(str, default_path))
+
+            # only set if env cleared / MEP privileged
+            env.setdefault("HOME", udir)
+            env.setdefault("USER", uname)
+            env.setdefault("PATH", upath)
 
             umask = 0o077  # Let child process set less restrictive, if desired
             log.debug("Setting process umask for %s to 0o%04o (%s)", pid, umask, uname)
@@ -1144,9 +1148,10 @@ class EndpointManager:
                     " environment in a root-only accessible location, like /root/?"
                 )
 
+            wd = env.get("CWD", udir)
             log.debug("Changing directory to '%s'", wd)
-            env["PWD"] = wd
             os.chdir(wd)
+            env["CWD"] = os.getcwd()
             exit_code += 1
 
             # in case "something gets stuck," let cmdline show it
