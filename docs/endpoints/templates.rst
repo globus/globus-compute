@@ -92,7 +92,7 @@ control, they can specify the value(s) to render to any reserved variable:
 .. code-block:: console
    :caption: Custom ``user_runtime``
 
-   $ globus-compute-endpoint render-user-config -e template-snippet.yaml.j2 \
+   $ globus-compute-endpoint render-user-config -t template-snippet.yaml.j2 \
       --user-runtime my-custom-user-runtime.json
 
    > Rendered user config:
