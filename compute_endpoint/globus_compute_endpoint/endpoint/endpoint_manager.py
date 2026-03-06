@@ -1056,29 +1056,23 @@ class EndpointManager:
             default_path = ("/usr/local/bin", "/usr/bin", "/bin", pybindir)
             env.update({"PATH": ":".join(map(str, default_path))})
             env_path = self.conf_dir / "user_environment.yaml"
-            try:
-                log.debug("Load default environment variables from: %s", env_path)
-                if env_path.exists():
-                    env_text = env_path.read_text().strip()
-                    env_data = yaml.safe_load(env_text)
-                    if env_data:
-                        os.environ.update({k: str(v) for k, v in env_data.items()})
+            if env_path.exists():
+                try:
+                    log.info(f"Load default environment variables from: {env_path}")
+                    if env_data := yaml.safe_load(env_path.read_text().strip()):
+                        env.update({k: str(v) for k, v in env_data.items()})
                     else:
-                        log.warning(
-                            "Environment file read, but no variables parsed."
-                            "  (Uncomment a line?  Editor buffer saved?)"
-                            f"\n  Environment file: {env_path}"
-                        )
-                    del env_data, env_text
-            except Exception as e:
-                log.warning(
-                    "Using only default environment variables as no variables read"
-                    " from environment file.  Is it a valid YAML file?  (Hint: the"
-                    " `yq` command line utility may be helpful.)"
-                    f"\n Default environment: {dict(env)}"
-                    f"\n    Environment file: {env_path}"
-                    f"\n           Exception: [{type(e).__name__}] {e}"
-                )
+                        log.info(f"No variables parsed from: {env_path}")
+                    del env_data
+                except Exception as e:
+                    log.warning(
+                        "Using only default environment variables as no variables read"
+                        " from environment file.  Is it a valid YAML file?  (Hint: the"
+                        " `yq` command line utility may be helpful.)"
+                        f"\n Default environment: {dict(env)}"
+                        f"\n    Environment file: {env_path}"
+                        f"\n           Exception: [{type(e).__name__}] {e}"
+                    )
             user_home = {"HOME": udir, "USER": uname}
 
             if not os.path.isdir(udir):
@@ -1143,7 +1137,7 @@ class EndpointManager:
                 log.warning(
                     "Unable to find executable."
                     f"\n  Executable (not found): {proc_args[0]}"
-                    f'\n  Path: "{os.environ.get("PATH")}"'
+                    f'\n  Path: "{env.get("PATH")}"'
                     f"\n\n  Will attempt exec anyway -- WARNING - it will likely fail."
                     f"\n  (pid: {pid}, user: {uname}, {ep_name})"
                     f"\n\nA common reason for this error is permissions; is the virtual"

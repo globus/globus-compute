@@ -1634,7 +1634,7 @@ def test_loads_user_environment(successful_exec_from_mocked_root, randomstring):
     assert env[sentinel_key] == expected_env[sentinel_key]
 
 
-def test_warns_if_environment_file_empty(successful_exec_from_mocked_root, caplog):
+def test_notify_if_environment_file_empty(successful_exec_from_mocked_root, caplog):
     _, conf_dir, *_, em = successful_exec_from_mocked_root
 
     conf_path = conf_dir / "user_environment.yaml"
@@ -1643,8 +1643,7 @@ def test_warns_if_environment_file_empty(successful_exec_from_mocked_root, caplo
         em._event_loop()
 
     assert pyexc.value.code == _GOOD_EC, "Q&D: verify we exec'ed, based on '+= 1'"
-    assert "Environment file read, but no variables parsed." in caplog.text
-    assert f"\n  Environment file: {conf_path}" in caplog.text, "Expect path to env"
+    assert f"No variables parsed from: {conf_path}" in caplog.text, "Expect path to env"
 
 
 def test_handles_invalid_user_environment_file_gracefully(
