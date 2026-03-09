@@ -94,12 +94,27 @@ For more information, see:
 """
 
 
+WORKER_LOST_MESSAGE = """*****
+ One common cause of WorkerLost exceptions is Python version mismatch
+ between the submitting Globus Compute SDK and the Endpoint, as
+ serialization is typically not compatible across differing major
+ Python versions.
+*****
+"""
+
+
 class TaskExecutionFailed(Exception):
     """
     Error result from the remote end, wrapped as an exception object
     """
 
     SERDE_REGEX = re.compile("dill|pickle|serializ", re.IGNORECASE)
+
+    # Looking for this specific Exception stack trace.  Can be rendered
+    #   out-of-date if parsl refactors WorkerLost by moving/renaming it
+    # This is currently
+    #   parsl.executors.......errors.WorkerLost: Task failure due to...
+    WORKER_LOST_REGEX = re.compile(r"\s*parsl\.\S+\.WorkerLost:")
 
     def __init__(
         self,
@@ -115,6 +130,10 @@ class TaskExecutionFailed(Exception):
     def __str__(self) -> str:
         remote_data = textwrap.indent(self.remote_data, " ")
         message = "\n" + remote_data
-        if re.search(TaskExecutionFailed.SERDE_REGEX, remote_data):
+        serial_err = TaskExecutionFailed.SERDE_REGEX.search(remote_data)
+        worker_err = TaskExecutionFailed.WORKER_LOST_REGEX.search(remote_data)
+        if serial_err or worker_err:
             message += SERDE_TASK_EXECUTION_FAILED_HELP_MESSAGE
+        if worker_err:
+            message += WORKER_LOST_MESSAGE
         return message
