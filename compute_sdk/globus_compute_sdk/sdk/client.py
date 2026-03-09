@@ -315,6 +315,22 @@ class Client:
             warnings.warn(check_result, UserWarning)
             self._version_mismatch_already_warned_eps.add(worker_ep_id)
 
+    @staticmethod
+    def is_worker_lost_exception(stack_trace_str: str | None = None) -> bool:
+        """
+        Looking for this specific Exception stack trace.  Can be rendered
+        out-of-date if parsl refactors the WorkerLost class by moving/renaming it
+        """
+        if not stack_trace_str:
+            return False
+        for line in stack_trace_str.splitlines():
+            if line.startswith(
+                "parsl.executors.high_throughput.errors.WorkerLost:"
+                " Task failure due to loss of worker "
+            ):
+                return True
+        return False
+
     def _update_task_table(
         self,
         return_msg: str | t.Dict,
@@ -362,7 +378,19 @@ class Client:
                 else:
                     status.update({"result": r_obj, "completion_t": completion_t})
             elif "exception" in r_dict:
-                raise TaskExecutionFailed(r_dict["exception"], completion_t)
+                extra = ""
+                if self.is_worker_lost_exception(r_dict["exception"]):
+                    # Add a custom message for WorkerLost and use the magic
+                    # 'serialization' word to trigger the serialization
+                    # regex/output in TaskExecutionFailed()
+                    extra = (
+                        "*****\n One common cause of WorkerLost exceptions is"
+                        " Python version mismatch between the submitting Globus"
+                        " Compute SDK and the Endpoint.\n*****"
+                    )
+                raise TaskExecutionFailed(
+                    f"{r_dict['exception']}\n{extra}", completion_t
+                )
             else:
                 raise NotImplementedError("unreachable")
 
