@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import platform
+import traceback
 import typing as t
 from datetime import datetime, timezone
 from itertools import islice

@@ -1051,3 +1051,19 @@ def test_get_endpoints_with_role(gcc, role):
 
     gcc.get_endpoints(role=role)
     gcc._compute_web_client.v2.get_endpoints.assert_called_with(role=role)
+
+
+def test_worker_lost_warn_serialization(gcc, mock_worker_lost_task):
+    tid = mock_worker_lost_task["task_id"]
+
+    mock_v2_get_task = mock.MagicMock()
+    mock_v2_get_task.text = mock_worker_lost_task
+
+    gcc._task_status_table[tid] = mock_worker_lost_task
+    gcc._compute_web_client = mock.MagicMock()
+    gcc._compute_web_client.v2.get_task.return_value = mock_v2_get_task
+
+    with pytest.raises(TaskExecutionFailed) as e:
+        gcc.get_task(tid)
+
+    assert "One common cause of WorkerLost exceptions" in str(e.value)
