@@ -196,23 +196,40 @@ user or admin:
   user submitting tasks, such as their Python version.  The following fields are
   available:
 
-  - ``globus_compute_sdk_version``: Version string of the Globus Compute SDK
-  - ``globus_sdk_version``: Version string of the base Globus SDK dependency
-  - ``python_version``: Complete Python version string from ``sys.version``,
-    including implementation details
+  - ``globus_compute_sdk_version``: Version string of the Globus Compute SDK (e.g., ``"3.14.0"``)
+
+  - ``globus_sdk_version``: Version string of the base Globus SDK dependency (e.g., ``"3.63.0"``)
+
+  - ``python``: Contains information about the Python runtime. The following fields are available:
+
+    - ``version``: Python version string (e.g., ``"3.13.7"``)
+    - ``version_description``: Full Python version string from ``sys.version`` (e.g., ``"3.13.7 (main, Jul  1 2024, 12:00:00) [Clang 14.0.6]"``)
+    - ``version_tuple``: Python version tuple as a list (e.g., ``[3, 13, 7]``)
+    - ``version_info``: Python version info from ``list(sys.version_info)`` (e.g., ``[3, 13, 7, 'final', 0]``)
+    - ``implementation``: Python implementation (e.g., ``"CPython"``)
+    - ``compiler``: String identifying the compiler used for compiling Python (e.g., ``"Clang 14.0.6"``)
+
+  - ``platform``: Contains general platform information from the host. The following fields are available:
+
+    - ``architecture``: Host architecture tuple as a list (e.g., ``["64bit", "ELF"]``)
+    - ``machine``: Host machine type (e.g., ``"x86_64"``)
+    - ``node``: Host node name (e.g., ``"login03"``)
+    - ``platform``: Host platform (e.g., ``"Linux-6.14.0-29-generic-x86_64-with-glibc2.39"``)
+    - ``processor``: Host processor name (e.g., ``"x86_64"``)
+    - ``release``: Host OS release (e.g., ``"6.16.5-2-generic"``)
 
 - ``mapped_identity``: Contains information about the user's mapped identity.
   The following fields are available:
 
-  - ``mapped_identity.local.uname``: Local user's username
-  - ``mapped_identity.local.uid``: Local user's ID
-  - ``mapped_identity.local.gid``: Local user's primary group ID
-  - ``mapped_identity.local.groups``: List of group IDs the local user is a
+  - ``local.uname``: Local user's username
+  - ``local.uid``: Local user's ID
+  - ``local.gid``: Local user's primary group ID
+  - ``local.groups``: List of group IDs the local user is a
     member of
-  - ``mapped_identity.local.gecos``: Local user's GECOS field
-  - ``mapped_identity.local.shell``: Local user's login shell
-  - ``mapped_identity.local.dir``: Local user's home directory
-  - ``mapped_identity.globus.id``: Matched Globus identity ID
+  - ``local.gecos``: Local user's GECOS field
+  - ``local.shell``: Local user's login shell
+  - ``local.dir``: Local user's home directory
+  - ``globus.id``: Matched Globus identity ID
 
   .. code-block:: yaml+jinja
      :caption: Example usage of ``mapped_identity`` in a template
