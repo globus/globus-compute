@@ -51,6 +51,9 @@ class UserRuntime:
         ----------
         version
             Python version string (e.g., ``"3.13.7"``)
+        version_description
+            Complete Python version string from ``sys.version`` (e.g.,
+            ``"3.13.7 (main, Sep 30 2025, 03:50:19) [GCC 14.2.0]"``)
         version_tuple
             Python version as a tuple (e.g., ``(3, 13, 7)``)
         version_info
@@ -64,6 +67,7 @@ class UserRuntime:
         """
 
         version: str
+        version_description: str
         version_tuple: tuple[int, int, int]
         version_info: tuple[int, int, int, str, int]
         implementation: str
@@ -108,6 +112,7 @@ def create_user_runtime() -> UserRuntime:
         python_version=sys.version,
         python=UserRuntime.PythonInfo(
             version=platform.python_version(),
+            version_description=sys.version,
             version_tuple=sys.version_info[:3],
             version_info=tuple(sys.version_info),  # type: ignore[arg-type]
             compiler=platform.python_compiler(),

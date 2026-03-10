@@ -315,6 +315,7 @@ def test_batch_includes_user_runtime_info(gcc):
         "python_version": sys.version,
         "python": {
             "version": platform.python_version(),
+            "version_description": sys.version,
             "version_tuple": sys.version_info[:3],
             "version_info": tuple(sys.version_info),
             "implementation": platform.python_implementation(),
