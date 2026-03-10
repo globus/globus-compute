@@ -54,7 +54,7 @@ from globus_compute_sdk import Client
 from globus_compute_sdk.sdk.auth.auth_client import ComputeAuthClient
 from globus_compute_sdk.sdk.auth.whoami import print_whoami_info
 from globus_compute_sdk.sdk.batch import create_user_runtime
-from globus_compute_sdk.sdk.compute_dir import ensure_compute_dir
+from globus_compute_sdk.sdk.compute_dir import ensure_compute_dir, get_compute_dir
 from globus_compute_sdk.sdk.utils.gare import gare_handler
 from globus_sdk import MISSING, AuthClient, GlobusAPIError, MissingType, NetworkError
 
@@ -91,7 +91,8 @@ _AUTH_POLICY_DEFAULT_DESC = "This policy was created automatically by Globus Com
 
 class CommandState:
     def __init__(self):
-        self.endpoint_config_dir: pathlib.Path = init_config_dir()
+        # self.endpoint_config_dir: pathlib.Path = init_config_dir()
+        self.endpoint_config_dir = None
         self.debug = False
         self.no_color = False
         self.log_to_console = False
@@ -105,6 +106,12 @@ class CommandState:
 
 
 def init_config_dir() -> pathlib.Path:
+    """
+    Fetches the base Compute dir, which defaults to ~/.globus-compute but
+    can be overridden via the ENV var GLOBUS_COMPUTE_USER_DIR.
+
+    If the directory does not exist, it will be created.
+    """
     try:
         return ensure_compute_dir()
     except (FileExistsError, PermissionError) as e:
@@ -112,8 +119,8 @@ def init_config_dir() -> pathlib.Path:
 
 
 def get_config_dir() -> pathlib.Path:
-    state = CommandState.ensure()
-    return state.endpoint_config_dir
+    CommandState.ensure()
+    return get_compute_dir()
 
 
 def get_cli_endpoint(conf: UserEndpointConfig) -> Endpoint:
@@ -142,6 +149,7 @@ def log_flag_callback(ctx, param, value):
     setup_logging(debug=state.debug, no_color=state.no_color)
 
 
+@click.group("globus-compute-endpoint")
 def common_options(f):
     f = click.option(
         "--debug",
@@ -169,6 +177,7 @@ def common_options(f):
     )(f)
 
     f = click.help_option("-h", "--help")(f)
+    print('test from common options with info?')
     return f
 
 
@@ -300,22 +309,27 @@ def config_dir_callback(ctx, param, value):
 
 
 @click.group("globus-compute-endpoint")
-@click.option(
-    "-c",
-    "--config-dir",
-    default=None,
-    help="override default config dir",
-    callback=config_dir_callback,
-    expose_value=False,
-)
+# @click.option(
+#     "-c",
+#     "--config-dir",
+#     default=None,
+#     help="override default config dir",
+#     callback=config_dir_callback,
+#     expose_value=True,
+# )
 def app():
     # the main command group body runs on every command, so the block below will always
     # execute
+    print("config_dir should be available 1 - 3 s")
+    time.sleep(3.1)
+    print("config_dir should be available now")
     setup_logging()  # Until we parse the CLI flags, just setup default logging
+    # print("config_dir should be available 2")
+    # time.sleep(3.1)
 
 
 @app.command("version")
-@common_options
+# @common_options
 def version_command():
     """Show the version of globus-compute-endpoint"""
     import globus_compute_endpoint as gce
@@ -936,10 +950,10 @@ def _do_start_endpoint(
         stk.enter_context(_pidfile(pid_path, ep_config.heartbeat_period * 3))
 
         if isinstance(ep_config, ManagerEndpointConfig):
-            if not _has_multi_user:
-                raise ClickException(
-                    "multi-user endpoints are not supported on this system"
-                )
+            # if not _has_multi_user:
+            #     raise ClickException(
+            #         "multi-user endpoints are not supported on this system"
+            #     )
             epm = EndpointManager(ep_dir, endpoint_uuid, ep_config, reg_info)
             epm.start()
         else:

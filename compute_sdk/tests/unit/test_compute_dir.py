@@ -9,28 +9,35 @@ from pyfakefs.fake_filesystem import FakeFilesystem
 
 
 @pytest.mark.parametrize("dir_exists", [True, False])
-@pytest.mark.parametrize("user_dir", ["/my/dir", None, ""])
+@pytest.mark.parametrize("env_dir", ["/my/dir", None, ""])
+@pytest.mark.parametrize("config_dir", ["/my/config_dir", None])
 def test_ensure_compute_dir(
     dir_exists: bool,
-    user_dir: str | None,
+    env_dir: str | None,
+    config_dir: str | None,
     fs: FakeFilesystem,
     monkeypatch: pytest.MonkeyPatch,
 ):
     home = pathlib.Path.home()
 
-    dirname = home / ".globus_compute"
+    if env_dir:
+        monkeypatch.setenv("GLOBUS_COMPUTE_USER_DIR", str(env_dir))
+
+    if config_dir:
+        dirname = pathlib.Path(config_dir)
+    elif env_dir:
+        dirname = pathlib.Path(env_dir)
+        monkeypatch.setenv("GLOBUS_COMPUTE_USER_DIR", str(env_dir))
+    else:
+        dirname = home / ".globus_compute"
 
     if dir_exists:
         fs.create_dir(dirname)
 
-    if user_dir is not None:
-        dirname = pathlib.Path(user_dir)
-        monkeypatch.setenv("GLOBUS_COMPUTE_USER_DIR", str(dirname))
+    compute_base_path = ensure_compute_dir(config_dir)
 
-    compute_dirname = ensure_compute_dir()
-
-    assert compute_dirname.is_dir()
-    assert compute_dirname == dirname
+    assert compute_base_path.is_dir()
+    assert compute_base_path.samefile(dirname)
 
 
 @pytest.mark.parametrize("user_dir_defined", [True, False])
