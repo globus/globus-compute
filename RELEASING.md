@@ -18,6 +18,9 @@ You will also need the following credentials:
 - a configured GPG key in `git` in order to create signed tags
 - pypi credentials for use with `twine` (e.g. a token in `~/.pypirc`) valid for
   publishing `globus-compute-sdk` and `globus-compute-endpoint`
+- Globus VPN access
+
+⚠️ The Jenkins build pages need to be accessed via VPN.
 
 ## Alpha releases
 
@@ -44,6 +47,14 @@ You will also need the following credentials:
 1. Run `./release.sh` from the repo root. This script creates a signed tag named after
    the current version and pushes it to GitHub, then uses the `tox` release command
    to push each package to PyPi.
+
+1. Navigate to the [Build with Parameters](https://builds.globus.org/jenkins/job/BuildGlobusComputeAgentPackages/build?delay=0sec) Jenkins page.
+
+1. Enter the name of the release branch (eg, `v4.8.0`) into the `BRANCH_OR_TAG` field. (Leave `BUILD_FOR_STABLE` unchecked.)
+
+1. Click the Build button.
+
+1. Wait 15-30 minutes and confirm that the [build is green](https://builds.globus.org/jenkins/job/BuildGlobusComputeAgentPackages/).
 
 ### Alpha release bugfixes
 
@@ -114,28 +125,28 @@ You will also need the following credentials:
 1. Create a GitHub release from the tag. See [GitHub documentation](https://docs.github.com/en/repositories/releasing-projects-on-github/managing-releases-in-a-repository#creating-a-release)
    for instructions.
 
-### DEB/RPM Packaging Workflow
+1. Navigate to the [Build with Parameters](https://builds.globus.org/jenkins/job/BuildGlobusComputeAgentPackages/build?delay=0sec) Jenkins page.
 
-#### Pre-requisites
+1. Enter the name of the release branch (eg, `v4.8.0`) into the `BRANCH_OR_TAG` field, and ensure `BUILD_FOR_STABLE` is checked.
 
-Before building the packages:
+1. Click the Build button.
 
-- ensure that the release itself, either the alpha or prod versions, is published on PyPI.
-- ⚠️ The Jenkins build pages need to be accessed via VPN.
+1. Wait 15-30 minutes and confirm that the [build is green](https://builds.globus.org/jenkins/job/BuildGlobusComputeAgentPackages/).
 
-#### Build Process
+1. Depending on whether GCS is also releasing:
+   - If GCS deploys after Compute on release day, the new packages will be pushed to the public repos as part of their deploy, so no action is needed.
+   - If GCS is not doing a release the same week, or if they finish their deploy before we finish building our packages, we need to manually run the downloads sync Jenkins script:
+     - https://builds.globus.org/jenkins/view/all/job/Synchronize%20GCSv5%20Stable/build?delay=0sec
+       - Leave `SYNC_WHEELS_ONLY` unchecked
 
-To build the DEB/RPM packages after the alpha/prod PyPI is released, specify the alpha or prod
-tag names as detailed below and then click the green **Build** button.
-
-##### Notes
+## DEB/RPM Packaging Notes
 
 Our alpha builds will go to the `unstable` repo, and production packages goes to both
 the `testing` and `stable` repos.
 
 After this build process for production, the testing and stable packages will reside
 in an internal globus 'holding' repo. GCS manages the infrastructure so we need to
-run another Jenkins build to push it to live if GCS is not doing a release the same week which also pushes our packages. See last pipeline step below.
+run another Jenkins build to push it to live if GCS is not doing a release the same week which also pushes our packages. See last pipeline step above.
 
 - Example of unstable repo:
   - https://downloads.globus.org/globus-connect-server/unstable/rpm/el/9/x86_64/
@@ -147,17 +158,3 @@ run another Jenkins build to push it to live if GCS is not doing a release the s
   - After GCS push during deploy day (or if we ping them to do so), the public images will be located at:
     - https://downloads.globus.org/globus-connect-server/stable/rpm/el/9/x86_64/
       [publishResults.groovy line 85](https://github.com/globusonline/gcs-build-scripts/blob/168617a0ccbb0aee7b3bee04ee67940bbe2a80f6/vars/publishResults.groovy#L85)
-
-1. (Access on VPN) For each release, confirm that the Pipeline -> SCM -> Branch Specifier is `${BRANCH_OR_TAG}` in [Build Configuration](https://builds.globus.org/jenkins/job/BuildGlobusComputeAgentPackages/configure). (This may become an unnecessary step over time.)
-
-1. Enter the alpha or prod release name e.g. v3.14.0a0 or v3.14.0 in the input textbox of the [Build with Parameters](https://builds.globus.org/jenkins/job/BuildGlobusComputeAgentPackages/build?delay=0sec) page.
-
-1. Check the `BUILD_FOR_STABLE` box if building for production, leave it unchecked otherwise
-
-1. Wait 15-30 minutes and confirm that the [build is green](https://builds.globus.org/jenkins/job/BuildGlobusComputeAgentPackages/)
-
-1. For production release cycles where there is also a GCS release, if we push our packages before they do, skip the following (also not necessary for alpha releases)
-   - If there isn't a concurrent GCS release, or if GCS finishes their deploy before we finish building our packages, we need to manually run the downloads sync Jenkins script:
-
-   - https://builds.globus.org/jenkins/view/all/job/Synchronize%20GCSv5%20Stable/build?delay=0sec
-     - Leave `SYNC_WHEELS_ONLY` unchecked
