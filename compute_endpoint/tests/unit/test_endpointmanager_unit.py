@@ -338,6 +338,12 @@ def command_payload(ident):
             "name": "some_ep_name",
             "user_opts": {"heartbeat": 10},
             "amqp_creds": {},
+            "user_runtime": {
+                "python": {
+                    "version": "3.4.2",
+                },
+                "globus_compute_sdk_version": "2.90.2",
+            },
         },
     }
 
@@ -578,7 +584,7 @@ def test_records_user_ep_as_running(successful_exec_from_mocked_root):
 
 
 def test_caches_start_cmd_args_if_ep_already_running(
-    successful_exec_from_mocked_root, mocker
+    mocker, successful_exec_from_mocked_root, command_payload
 ):
     *_, em = successful_exec_from_mocked_root
     child_pid = random.randrange(1, 32768 + 1)
@@ -592,10 +598,9 @@ def test_caches_start_cmd_args_if_ep_already_running(
     cached_args = em._cached_cmd_start_args.pop(child_pid)
     assert cached_args is not None
     mpi, args, kwargs = cached_args
-    exp_kw = {"name": "some_ep_name", "user_opts": {"heartbeat": 10}, "amqp_creds": {}}
     assert mpi.local_user_record == _mock_localuser_rec
     assert args == []
-    assert kwargs == exp_kw
+    assert kwargs == command_payload["kwargs"]
 
 
 def test_writes_endpoint_uuid(epmanager_as_root):
@@ -1686,6 +1691,22 @@ def test_environment_default_path_set_if_not_specified(
     a, k = mock_os.execvpe.call_args
     env = k["env"]
     assert "PATH" in env, "Expected PATH is always set"
+
+
+def test_environment_includes_user_versions(
+    command_payload, successful_exec_from_mocked_root
+):
+    mock_os, conf_dir, *_, em = successful_exec_from_mocked_root
+
+    urun = command_payload["kwargs"]["user_runtime"]
+    with pytest.raises(SystemExit) as pyexc:
+        em._event_loop()
+
+    assert pyexc.value.code == _GOOD_EC, "Q&D: verify we exec'ed, based on '+= 1'"
+    _, k = mock_os.execvpe.call_args
+    env = k["env"]
+    assert urun["python"]["version"] == env["GC_USER_PYTHON_VERSION"]
+    assert urun["globus_compute_sdk_version"] == env["GC_USER_SDK_VERSION"]
 
 
 def test_warns_if_executable_not_found(
