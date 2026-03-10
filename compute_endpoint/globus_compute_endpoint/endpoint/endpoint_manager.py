@@ -1175,6 +1175,12 @@ class EndpointManager:
                 user_opts,
                 user_runtime,
             )
+
+            if py_version := user_runtime.get("python", {}).get("version"):
+                env.setdefault("GC_USER_PYTHON_VERSION", py_version)
+            if gce_version := user_runtime.get("globus_compute_sdk_version"):
+                env.setdefault("GC_USER_SDK_VERSION", gce_version)
+
             exit_code += 1
             _conf = yaml.safe_load(user_config)
 

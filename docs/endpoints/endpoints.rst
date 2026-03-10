@@ -715,6 +715,18 @@ and writing a custom ``globus-compute-endpoint`` wrapper:
 
 (The use of ``exec`` is not critical, but keeps the process tree tidy.)
 
+The manager endpoint process exports the following two environment variables that
+shim‑authors may use to fine‑tune customizations:
+
+- ``GC_USER_PYTHON_VERSION`` - A dotted-decimal Python version (e.g., ``3.13.7``) that
+  specifies which version of Python was used to submit tasks to this endpoint
+
+- ``GC_USER_SDK_VERSION`` - A dotted-decimal ``globus-compute-sdk`` version (e.g.,
+  ``4.8.0``) that specifies what version of the `Globus Compute SDK`_ the submission
+  used
+
+.. _Globus Compute SDK: https://pypi.org/project/globus-compute-sdk/
+
 
 Debugging
 =========
