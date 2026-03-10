@@ -27,7 +27,7 @@ You will also need the following credentials:
    $ git checkout -b v1.1.0 main
    ```
 
-1. Bump the version of both packages to a new alpha release (e.g., `1.0.0` -> `1.1.0a0`):
+1. Bump the version of both packages, and the endpoint's SDK dependency, to a new alpha release (e.g., `1.0.0` -> `1.1.0a0`):
 
    ```console
    $ $EDITOR compute_sdk/globus_compute_sdk/version.py compute_endpoint/setup.py compute_endpoint/globus_compute_endpoint/version.py
@@ -82,7 +82,7 @@ You will also need the following credentials:
    $ git checkout v1.1.0
    ```
 
-1. Remove the alpha version designation for both packages (e.g., `1.1.0a1` -> `1.1.0`):
+1. Remove the alpha version designation for both packages and the endpoint's SDK dependency (e.g., `1.1.0a1` -> `1.1.0`):
 
    ```console
    $ $EDITOR compute_sdk/globus_compute_sdk/version.py compute_endpoint/setup.py compute_endpoint/globus_compute_endpoint/version.py
