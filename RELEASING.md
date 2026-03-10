@@ -17,7 +17,7 @@ You will also need the following credentials:
 
 - a configured GPG key in `git` in order to create signed tags
 - pypi credentials for use with `twine` (e.g. a token in `~/.pypirc`) valid for
-    publishing `globus-compute-sdk` and `globus-compute-endpoint`
+  publishing `globus-compute-sdk` and `globus-compute-endpoint`
 
 ## Alpha releases
 
@@ -120,8 +120,8 @@ You will also need the following credentials:
 
 Before building the packages:
 
-* ensure that the release itself, either the alpha or prod versions, is published on PyPI.
-* ⚠️ The Jenkins build pages need to be accessed via VPN.
+- ensure that the release itself, either the alpha or prod versions, is published on PyPI.
+- ⚠️ The Jenkins build pages need to be accessed via VPN.
 
 #### Build Process
 
@@ -134,21 +134,21 @@ Our alpha builds will go to the `unstable` repo, and production packages goes to
 the `testing` and `stable` repos.
 
 After this build process for production, the testing and stable packages will reside
-in an internal globus 'holding' repo.  GCS manages the infrastructure so we need to
-run another Jenkins build to push it to live if GCS is not doing a release the same week which also pushes our packages.  See last pipeline step below.
+in an internal globus 'holding' repo. GCS manages the infrastructure so we need to
+run another Jenkins build to push it to live if GCS is not doing a release the same week which also pushes our packages. See last pipeline step below.
 
-* Example of unstable repo:
-    * https://downloads.globus.org/globus-connect-server/unstable/rpm/el/9/x86_64/
-* Directory of testing images:
-    * https://builds.globus.org/downloads.globus.org/globus-connect-server/testing/rpm/el/8/x86_64/
-* Stable repo:
-    * The images will be in the below build directory after we finish our build process, but not public:
-        * https://builds.globus.org/downloads.globus.org/globus-connect-server/stable/rpm/el/8/x86_64/
-    * After GCS push during deploy day (or if we ping them to do so), the public images will be located at:
-        * https://downloads.globus.org/globus-connect-server/stable/rpm/el/9/x86_64/
+- Example of unstable repo:
+  - https://downloads.globus.org/globus-connect-server/unstable/rpm/el/9/x86_64/
+- Directory of testing images:
+  - https://builds.globus.org/downloads.globus.org/globus-connect-server/testing/rpm/el/8/x86_64/
+- Stable repo:
+  - The images will be in the below build directory after we finish our build process, but not public:
+    - https://builds.globus.org/downloads.globus.org/globus-connect-server/stable/rpm/el/8/x86_64/
+  - After GCS push during deploy day (or if we ping them to do so), the public images will be located at:
+    - https://downloads.globus.org/globus-connect-server/stable/rpm/el/9/x86_64/
       [publishResults.groovy line 85](https://github.com/globusonline/gcs-build-scripts/blob/168617a0ccbb0aee7b3bee04ee67940bbe2a80f6/vars/publishResults.groovy#L85)
 
-1. (Access on VPN) For each release, confirm that the Pipeline -> SCM -> Branch Specifier is `${BRANCH_OR_TAG}` in [Build Configuration](https://builds.globus.org/jenkins/job/BuildGlobusComputeAgentPackages/configure).  (This may become an unnecessary step over time.)
+1. (Access on VPN) For each release, confirm that the Pipeline -> SCM -> Branch Specifier is `${BRANCH_OR_TAG}` in [Build Configuration](https://builds.globus.org/jenkins/job/BuildGlobusComputeAgentPackages/configure). (This may become an unnecessary step over time.)
 
 1. Enter the alpha or prod release name e.g. v3.14.0a0 or v3.14.0 in the input textbox of the [Build with Parameters](https://builds.globus.org/jenkins/job/BuildGlobusComputeAgentPackages/build?delay=0sec) page.
 
@@ -157,11 +157,10 @@ run another Jenkins build to push it to live if GCS is not doing a release the s
 1. Wait 15-30 minutes and confirm that the [build is green](https://builds.globus.org/jenkins/job/BuildGlobusComputeAgentPackages/)
 
 1. For production release cycles where there is also a GCS release, if we push our packages before they do, skip the following (also not necessary for alpha releases)
+   - If there isn't a concurrent GCS release, or if GCS finishes their deploy before we finish building our packages, we need to manually run the downloads sync Jenkins script:
 
-    * If there isn't a concurrent GCS release, or if GCS finishes their deploy before we finish building our packages, we need to manually run the downloads sync Jenkins script:
-
-    * https://builds.globus.org/jenkins/view/all/job/Synchronize%20GCSv5%20Stable/build?delay=0sec
-        * Leave `SYNC_WHEELS_ONLY` unchecked
+   - https://builds.globus.org/jenkins/view/all/job/Synchronize%20GCSv5%20Stable/build?delay=0sec
+     - Leave `SYNC_WHEELS_ONLY` unchecked
 
 #### Old Build Instructions
 
@@ -169,25 +168,23 @@ run another Jenkins build to push it to live if GCS is not doing a release the s
 env variables in our [JenkinsFile](https://github.com/globus/globus-compute/blob/743fa1e398fd40a00efb5880c55e3fa6e47392fc/compute_endpoint/packaging/JenkinsFile#L24) before triggering the build, as detailed below.
 
 1. Notes
+   - Example of unstable repo:
+     - https://downloads.globus.org/globus-connect-server/unstable/rpm/el/9/x86_64/
 
-    * Example of unstable repo:
-        * https://downloads.globus.org/globus-connect-server/unstable/rpm/el/9/x86_64/
+   - Directory of testing images:
+     - https://builds.globus.org/downloads.globus.org/globus-connect-server/testing/rpm/el/8/x86_64/
 
-    * Directory of testing images:
-        * https://builds.globus.org/downloads.globus.org/globus-connect-server/testing/rpm/el/8/x86_64/
+   - Stable repo:
+     - The images will be in the below build directory after we finish our build process, but not public:
+       - https://builds.globus.org/downloads.globus.org/globus-connect-server/stable/rpm/el/8/x86_64/
 
-    * Stable repo:
-        * The images will be in the below build directory after we finish our build process, but not public:
-            * https://builds.globus.org/downloads.globus.org/globus-connect-server/stable/rpm/el/8/x86_64/
-
-        * After GCS push during deploy day (or if we ping them to do so), the public images will be located at:
-            * https://downloads.globus.org/globus-connect-server/stable/rpm/el/9/x86_64/
-      [publishResults.groovy line 85](https://github.com/globusonline/gcs-build-scripts/blob/168617a0ccbb0aee7b3bee04ee67940bbe2a80f6/vars/publishResults.groovy#L85)
+     - After GCS push during deploy day (or if we ping them to do so), the public images will be located at: \* https://downloads.globus.org/globus-connect-server/stable/rpm/el/9/x86_64/
+       [publishResults.groovy line 85](https://github.com/globusonline/gcs-build-scripts/blob/168617a0ccbb0aee7b3bee04ee67940bbe2a80f6/vars/publishResults.groovy#L85)
 
 1. (Access on VPN) Click the [build button here](https://builds.globus.org/jenkins/job/BuildGlobusComputeAgentPackages/build?delay=0sec)
 
 1. Wait 20-30 minutes and confirm that the [build is green](https://builds.globus.org/jenkins/job/BuildGlobusComputeAgentPackages/)
 
 1. For production release, we will have finished the build before the GCS
-   team, and can notify them that our build is complete.  They then will
+   team, and can notify them that our build is complete. They then will
    publish all packages when they finish their builds, which includes ours.
