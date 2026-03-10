@@ -202,6 +202,17 @@ def mock_pim(request):
         yield mock_pim
 
 
+@pytest.fixture(autouse=True)
+def shutil_which(request):
+    if "no_mock_shutil" in request.keywords:
+        yield
+        return
+
+    with mock.patch("shutil.which") as m:
+        m.return_value = "/some/path"
+        yield m
+
+
 @pytest.fixture
 def mock_props():
     yield pika.BasicProperties(
@@ -1709,6 +1720,7 @@ def test_environment_includes_user_versions(
     assert urun["globus_compute_sdk_version"] == env["GC_USER_SDK_VERSION"]
 
 
+@pytest.mark.no_mock_shutil
 def test_warns_if_executable_not_found(
     mock_log, successful_exec_from_mocked_root, randomstring
 ):
