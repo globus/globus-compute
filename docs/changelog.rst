@@ -3,6 +3,28 @@ Changelog
 
 .. scriv-insert-here
 
+.. _changelog-4.8.0:
+
+globus-compute-sdk & globus-compute-endpoint v4.8.0
+---------------------------------------------------
+
+New Functionality
+^^^^^^^^^^^^^^^^^
+
+- Added ``gce`` as an alias to the ``globus-compute-endpoint`` command for reduced
+  finger stress.
+
+- Upgraded ``parsl`` to 2026.2.23, which includes some GPU options for ``SlurmProvider``.
+
+Bug Fixes
+^^^^^^^^^
+
+- The environment variables passthrough feature for non-``root`` users
+  (introduced in :ref:`4.5.0 <changelog-4.5.0>`) incorrectly handled
+  the ``PATH`` variable.  The behavior is corrected in line with all other
+  variables (a variable is now only set if it is not already present in the
+  environment).
+
 .. _changelog-4.7.0:
 
 globus-compute-sdk & globus-compute-endpoint v4.7.0
