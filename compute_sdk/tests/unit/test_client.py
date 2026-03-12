@@ -19,13 +19,13 @@ from conftest import randomstring_impl
 from globus_compute_sdk import __version__
 from globus_compute_sdk.errors import TaskExecutionFailed
 from globus_compute_sdk.sdk.auth.auth_client import ComputeAuthClient
-from globus_compute_sdk.sdk.client import _client_gares_handler, _ComputeWebClient
-from globus_compute_sdk.sdk.login_manager import LoginManager
-from globus_compute_sdk.sdk.utils import get_env_details
-from globus_compute_sdk.sdk.web_client import (
+from globus_compute_sdk.sdk.client import (
     FunctionRegistrationData,
     FunctionRegistrationMetadata,
+    _client_gares_handler,
+    _ComputeWebClient,
 )
+from globus_compute_sdk.sdk.utils import get_env_details
 from globus_compute_sdk.serialize import (
     ComputeSerializer,
     DillCode,
@@ -79,7 +79,6 @@ def _clear_sdk_env(monkeypatch):
 def gcc():
     _gcc = gc.Client(
         do_version_check=False,
-        login_manager=mock.Mock(spec=LoginManager),
     )
     _gcc._compute_web_client = mock.Mock(
         spec=_ComputeWebClient,
@@ -131,7 +130,6 @@ def test_client_warns_on_unknown_kwargs(kwargs, mocker: MockerFixture):
         "do_version_check",
         "code_serialization_strategy",
         "data_serialization_strategy",
-        "login_manager",
         "app",
     ]
     unknown_kwargs = [k for k in kwargs if k not in known_kwargs]
@@ -782,19 +780,14 @@ def test_version_mismatch_only_warns_once_per_ep(mocker, gcc, mock_response, ep_
     assert mock_warn.warn.call_count == len(set(ep_ids))
 
 
-@pytest.mark.parametrize("null_key", ("app", "authorizer", "login_manager"))
-def test_client_mutually_exclusive_auth_method(null_key: str):
+def test_client_mutually_exclusive_auth_method():
     k = {
         "app": mock.Mock(spec=UserApp),
-        "login_manager": mock.Mock(spec=LoginManager),
         "authorizer": mock.Mock(spec=GlobusAuthorizer),
     }
-    k[null_key] = None
     with pytest.raises(ValueError) as exc_info:
         gc.Client(do_version_check=False, **k)
-    assert "'app', 'authorizer' and 'login_manager' are mutually exclusive" in str(
-        exc_info.value
-    )
+    assert "'app' and 'authorizer' are mutually exclusive" in str(exc_info.value)
 
 
 @pytest.mark.parametrize("custom_app", [True, False])
@@ -847,14 +840,6 @@ def test_client_handles_authorizer(mocker: MockerFixture):
     )
 
 
-def test_client_handles_login_manager():
-    mock_lm = mock.Mock(spec=LoginManager)
-    client = gc.Client(do_version_check=False, login_manager=mock_lm)
-    assert client.login_manager is mock_lm
-    assert mock_lm.get_web_client.call_count == 1
-    assert mock_lm.get_web_client.call_args[1] == {}
-
-
 def test_client_logout_with_app(mocker):
     mocker.patch(f"{_MOCK_BASE}ComputeAuthClient")
     mocker.patch(f"{_MOCK_BASE}_ComputeWebClient")
@@ -862,13 +847,6 @@ def test_client_logout_with_app(mocker):
     client = gc.Client(do_version_check=False, app=mock_app)
     client.logout()
     assert mock_app.logout.called
-
-
-def test_client_logout_with_login_manager():
-    mock_lm = mock.Mock(spec=LoginManager)
-    client = gc.Client(do_version_check=False, login_manager=mock_lm)
-    client.logout()
-    assert mock_lm.logout.called
 
 
 def test_client_logout_with_authorizer_warning(mocker):
@@ -889,15 +867,6 @@ def test_auth_client_deprecated():
     assert any(msg in str(r.message) for r in record)
 
 
-def test_login_manager_deprecated(gcc):
-    with pytest.warns(UserWarning) as record:
-        assert (
-            gcc.login_manager
-        ), "Client.login_manager needed for backward compatibility"
-    msg = "'Client.login_manager' attribute is deprecated"
-    assert any(msg in str(r.message) for r in record)
-
-
 def test_known_gare_handled_methods(gare):
     # +1 ==> starts *inside* the decorator function
     wrapped_lineno = _client_gares_handler.__code__.co_firstlineno + 1
@@ -914,17 +883,19 @@ def test_known_gare_handled_methods(gare):
 
 
 def test_gare_wrapper(gcc, gare):
+    gcc.app = mock.Mock(spec=UserApp)  # need an app to attempt login
+
     meth_name = "get_task"  # an arbitrary, known-gare-wrapped method
     get_task_method = getattr(gc.Client, meth_name)
     assert get_task_method in known_gare_wrapped, "Verify below test is valid"
 
-    assert not gcc.login_manager.run_login_flow.called, "Verify test setup"
+    assert not gcc.app.login.called, "Verify test setup"
     with mock.patch.object(gcc._compute_web_client.v2, meth_name) as mock_get:
         mock_get.side_effect = gare
         with pytest.raises(GlobusAPIError) as pyt_e:
             get_task_method(gcc, "some task id")
     assert gare.errors[0].code in str(pyt_e.value), "Verify test setup"
-    assert gcc.login_manager.run_login_flow.called, "Expect auth error induces login"
+    assert gcc.app.login.called, "Expect auth error induces login"
     assert mock_get.call_count == 2, "Expect two reqs, one after induced login"
 
 
@@ -933,7 +904,7 @@ def test_gare_no_login_available(gare, gcc):
     get_task_method = getattr(gc.Client, meth_name)
     assert get_task_method in known_gare_wrapped, "Verify below test is valid"
 
-    gcc._login_manager = None
+    gcc.app = None  # no login available, so should not attempt to login
     with mock.patch.object(gcc._compute_web_client.v2, meth_name) as mock_get:
         mock_get.side_effect = gare
         with pytest.raises(GlobusAPIError) as pyt_e:
@@ -1024,7 +995,7 @@ def test_ha_register_and_submit_warning_deduplication(gcc, mocker):
     gcc._compute_web_client.v3.submit.return_value = types.SimpleNamespace(
         data={"task_group_id": str(uuid.uuid4()), "ha_warning": arbitrary_hatext}
     )
-    gcc._login_manager = None
+    gcc.app = None
 
     with pytest.warns(UserWarning) as record:
         gcc.register_function(funk)

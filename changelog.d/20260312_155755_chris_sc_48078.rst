@@ -1,0 +1,10 @@
+Removed
+^^^^^^^
+
+- Removed the deprecated ``login_manager`` module. Instead, use a |globus_sdk.GlobusApp|_.
+- Removed the deprecated ``WebClient`` class. Instead, use |globus_sdk.ComputeClientV3|_.
+
+.. |globus_sdk.GlobusApp| replace:: ``globus_sdk.GlobusApp``
+.. _globus_sdk.GlobusApp: https://globus-sdk-python.readthedocs.io/en/stable/authorization/globus_app/apps.html
+.. |globus_sdk.ComputeClientV3| replace:: ``globus_sdk.ComputeClientV3``
+.. _globus_sdk.ComputeClientV3: https://globus-sdk-python.readthedocs.io/en/stable/services/compute.html

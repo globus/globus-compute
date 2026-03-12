@@ -18,7 +18,6 @@ import responses
 from globus_compute_endpoint import engines
 from globus_compute_endpoint.endpoint import config
 from globus_compute_endpoint.engines.base import GlobusComputeEngineBase
-from globus_compute_sdk.sdk.web_client import WebClient
 from globus_compute_sdk.serialize import ComputeSerializer
 from parsl.launchers import SimpleLauncher
 from parsl.providers import LocalProvider
@@ -120,21 +119,6 @@ def mock_quiesce():
     yield m
 
 
-class FakeLoginManager:
-    def ensure_logged_in(self) -> None: ...
-
-    def logout(self) -> bool: ...
-
-    def get_auth_client(self) -> globus_sdk.AuthClient:
-        return globus_sdk.AuthClient(authorizer=globus_sdk.NullAuthorizer())
-
-    def get_web_client(self, *, base_url: str | None = None) -> WebClient:
-        return WebClient(
-            base_url="https://compute.api.globus.org",
-            authorizer=globus_sdk.NullAuthorizer(),
-        )
-
-
 @pytest.fixture
 def get_standard_compute_client():
     responses.add(
@@ -146,7 +130,7 @@ def get_standard_compute_client():
 
     def func():
         return gc.Client(
-            login_manager=FakeLoginManager(),
+            authorizer=globus_sdk.NullAuthorizer(),
             do_version_check=False,
         )
 

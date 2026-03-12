@@ -8,9 +8,8 @@ import typing as t
 
 import pytest
 from globus_compute_sdk import Client
-from globus_compute_sdk.sdk.web_client import WebClient
 from globus_compute_sdk.serialize.concretes import DillCodeSource
-from globus_sdk import AccessTokenAuthorizer, AuthClient, ConfidentialAppAuthClient
+from globus_sdk import ClientApp
 
 # the non-tutorial endpoint will be required, with the following priority order for
 # finding the ID:
@@ -120,45 +119,6 @@ def compute_test_config_name(pytestconfig):
     return pytestconfig.getoption("--compute-config")
 
 
-def _add_args_for_client_creds_login(api_client_id, api_client_secret, client_args):
-    auth_client = ConfidentialAppAuthClient(api_client_id, api_client_secret)
-    scopes = [
-        "https://auth.globus.org/scopes/facd7ccc-c5f4-42aa-916b-a0e270e2c2a9/all",
-        AuthClient.scopes.openid,
-    ]
-    tokens = auth_client.oauth2_client_credentials_tokens(
-        requested_scopes=scopes
-    ).by_resource_server
-
-    funcx_token = tokens["funcx_service"]["access_token"]
-    auth_token = tokens[AuthClient.resource_server]["access_token"]
-
-    funcx_authorizer = AccessTokenAuthorizer(funcx_token)
-    auth_authorizer = AccessTokenAuthorizer(auth_token)
-
-    from globus_compute_sdk.sdk.login_manager import LoginManagerProtocol
-
-    class TestsuiteLoginManager:
-        def ensure_logged_in(self) -> None:
-            pass
-
-        def logout(self) -> None:
-            pass
-
-        def get_auth_client(self) -> AuthClient:
-            return AuthClient(authorizer=auth_authorizer)
-
-        def get_web_client(self, *, base_url: str | None = None) -> WebClient:
-            return WebClient(base_url=base_url, authorizer=funcx_authorizer)
-
-    login_manager = TestsuiteLoginManager()
-
-    # check runtime-checkable protocol
-    assert isinstance(login_manager, LoginManagerProtocol)
-
-    client_args["login_manager"] = login_manager
-
-
 @pytest.fixture(scope="session")
 def compute_test_config(pytestconfig, compute_test_config_name):
     # start with basic config load
@@ -191,7 +151,11 @@ def compute_test_config(pytestconfig, compute_test_config_name):
         os.environ["GLOBUS_SDK_ENVIRONMENT"] = sdk_env
 
     if api_client_id and api_client_secret:
-        _add_args_for_client_creds_login(api_client_id, api_client_secret, client_args)
+        client_args["app"] = ClientApp(
+            "compute_smoke_tests",
+            client_id=api_client_id,
+            client_secret=api_client_secret,
+        )
 
     client_args["code_serialization_strategy"] = DillCodeSource()
 

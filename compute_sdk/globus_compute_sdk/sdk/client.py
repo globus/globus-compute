@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import functools
+import inspect
 import json
 import logging
 import os
@@ -19,45 +20,121 @@ from globus_compute_sdk.errors import (
 from globus_compute_sdk.sdk._environments import get_web_service_url
 from globus_compute_sdk.sdk.hardware_report import run_hardware_report
 from globus_compute_sdk.sdk.utils import check_version
-from globus_compute_sdk.sdk.utils.gare import GareLogin, gare_handler
+from globus_compute_sdk.sdk.utils.gare import gare_handler
 from globus_compute_sdk.sdk.utils.uuid_like import UUID_LIKE_T
-from globus_compute_sdk.sdk.web_client import (
-    FunctionRegistrationData,
-    FunctionRegistrationMetadata,
-)
 from globus_compute_sdk.serialize import (
     ComputeSerializer,
     PureSourceTextInspect,
     SerializationStrategy,
 )
 from globus_compute_sdk.version import __version__, compare_versions
-from globus_sdk.gare import GlobusAuthorizationParameters
 
 from .auth.auth_client import ComputeAuthClient
 from .auth.globus_app import get_globus_app
 from .batch import Batch, create_user_runtime
-from .login_manager import LoginManagerProtocol
 
 logger = logging.getLogger(__name__)
+
+
+class FunctionRegistrationMetadata:
+    def __init__(self, python_version: str, sdk_version: str, serde_identifier: str):
+        self.python_version = python_version
+        self.sdk_version = sdk_version
+        self.serde_identifier = serde_identifier
+
+    def to_dict(self):
+        return {
+            "python_version": self.python_version,
+            "sdk_version": self.sdk_version,
+            "serde_identifier": self.serde_identifier,
+        }
+
+    def __repr__(self) -> str:
+        args = ", ".join(f"{k}={v!r}" for k, v in self.__dict__.items())
+        return f"FunctionRegistrationMetadata({args})"
+
+
+class FunctionRegistrationData:
+    def __init__(
+        self,
+        *,
+        function: t.Optional[t.Callable] = None,
+        function_name: t.Optional[str] = None,
+        function_code: t.Optional[str] = None,
+        description: t.Optional[str] = None,
+        metadata: t.Optional[FunctionRegistrationMetadata] = None,
+        public: bool = False,
+        group: t.Optional[UUID_LIKE_T] = None,
+        serializer: t.Optional[ComputeSerializer] = None,
+        ha_endpoint_id: t.Optional[UUID_LIKE_T] = None,
+    ):
+        if function is not None:
+            if any((function_name, function_code, metadata)):
+                raise ValueError(
+                    "`function` specified; cannot also specify `function_code`,"
+                    " `function_name`, or `metadata`"
+                )
+
+            serializer = serializer if serializer else ComputeSerializer()
+            function_name = function.__name__
+            function_code = serializer.pack_buffers([serializer.serialize(function)])
+            if description is None:
+                description = inspect.getdoc(function)
+            metadata = FunctionRegistrationMetadata(
+                python_version=platform.python_version(),
+                sdk_version=__version__,
+                serde_identifier=serializer.code_serializer.identifier.strip(),
+            )
+
+        elif None in (function_name, function_code, metadata):
+            raise ValueError(
+                "Either `function` must be provided, or all three of `function_name`,"
+                " `function_code`, and `metadata`."
+            )
+
+        if ha_endpoint_id and (public or group):
+            raise ValueError(
+                "`ha_endpoint_id` is mutually exclusive with `public` and `group`"
+            )
+
+        self.function_name = function_name
+        self.function_code = function_code
+        self.description = description
+        self.metadata = metadata
+        self.public = public
+        self.group = group
+        self.ha_endpoint_id = ha_endpoint_id
+
+    def to_dict(self):
+        data = {
+            "function_name": self.function_name,
+            "function_code": self.function_code,
+            "meta": self.metadata.to_dict() if self.metadata else None,
+        }
+        if self.description:
+            data["description"] = self.description
+        if self.public:
+            data["public"] = True
+        if self.group:
+            data["group"] = self.group
+        if self.ha_endpoint_id:
+            data["ha_endpoint_id"] = self.ha_endpoint_id
+        return data
+
+    def __repr__(self) -> str:
+        args = ", ".join(f"{k}={v!r}" for k, v in self.__dict__.items())
+        return f"FunctionRegistrationData({args})"
 
 
 def _client_gares_handler(f: t.Callable):
     @functools.wraps(f)
     def _wrapper(self: Client, *args, **kwargs):
-        _login: GareLogin | None = None
-        if self.app:
-            _login = self.app.login
-        elif self._login_manager:
+        if not self.app:
+            # Perhaps an authorizer is in use; there is no way to relogin so if an error
+            # happens, then just let the naked exception raise
+            return f(self, *args, **kwargs)
 
-            def _login(auth_params: GlobusAuthorizationParameters):
-                self.login_manager.run_login_flow(auth_params=auth_params)
-
-        if _login:
-            return gare_handler(_login, f, self, *args, **kwargs)
-
-        # Perhaps an authorizer is in use; there is no way to relogin so if an error
-        # happens, then just let the naked exception raise
-        return f(self, *args, **kwargs)
+        return gare_handler(self.app.login, f, self, *args, **kwargs)
 
     return _wrapper
 
@@ -96,7 +173,6 @@ class Client:
         *,
         code_serialization_strategy: SerializationStrategy | None = None,
         data_serialization_strategy: SerializationStrategy | None = None,
-        login_manager: LoginManagerProtocol | None = None,
         app: globus_sdk.GlobusApp | None = None,
         authorizer: globus_sdk.authorizers.GlobusAuthorizer | None = None,
         **kwargs,
@@ -125,21 +201,14 @@ class Client:
             Strategy to use when serializing function arguments. If None,
             globus_compute_sdk.serialize.DEFAULT_STRATEGY_DATA will be used.
 
-        login_manager: LoginManagerProtocol [Deprecated]
-            Allows login logic to be overridden for specific use cases. If None,
-            a ``GlobusApp`` will be used. Mutually exclusive with ``app`` and
-            ``authorizer``.
-
-            This argument is deprecated; use ``app`` or ``authorizer`` instead.
-
         app: GlobusApp
             A ``GlobusApp`` that will handle authorization and storing and validating
             tokens. If None, a standard ``GlobusApp`` will be used. Mutually exclusive
-            with ``authorizer`` and ``login_manager``.
+            with ``authorizer``.
 
         authorizer: GlobusAuthorizer
             A ``GlobusAuthorizer`` that will generate authorization headers. Mutually
-            exclusive with ``app`` and ``login_manager``.
+            exclusive with ``app``.
         """
         for arg_name in kwargs:
             msg = (
@@ -156,24 +225,15 @@ class Client:
 
         self.app: globus_sdk.GlobusApp | None = None
         self.authorizer: globus_sdk.authorizers.GlobusAuthorizer | None = None
-        self._login_manager: LoginManagerProtocol | None = None
         self._auth_client: globus_sdk.AuthClient | None = None
         self._request_lock = threading.Lock()
 
-        if sum(bool(x) for x in (app, authorizer, login_manager)) > 1:
-            raise ValueError(
-                "'app', 'authorizer' and 'login_manager' are mutually exclusive."
-            )
+        if app and authorizer:
+            raise ValueError("'app' and 'authorizer' are mutually exclusive.")
         elif authorizer:
             self.authorizer = authorizer
             self._compute_web_client = _ComputeWebClient(
                 base_url=self.web_service_address, authorizer=self.authorizer
-            )
-        elif login_manager:
-            self.login_manager = login_manager
-            self._compute_web_client = _ComputeWebClient(
-                base_url=self.web_service_address,
-                authorizer=self.login_manager.get_web_client().authorizer,
             )
         else:
             self.app = app if app else get_globus_app(environment=environment)
@@ -192,20 +252,6 @@ class Client:
             self.version_check()
 
     @property
-    def login_manager(self):
-        warnings.warn(
-            "The 'Client.login_manager' attribute is deprecated;"
-            " use 'Client.app' or 'Client.authorizer' instead.",
-            UserWarning,
-            stacklevel=2,
-        )
-        return self._login_manager
-
-    @login_manager.setter
-    def login_manager(self, val: LoginManagerProtocol):
-        self._login_manager = val
-
-    @property
     def auth_client(self):
         warnings.warn(
             "The 'Client.auth_client' attribute is deprecated.",
@@ -214,8 +260,6 @@ class Client:
         )
         if self._auth_client:
             return self._auth_client
-        elif self.login_manager:
-            self._auth_client = self.login_manager.get_auth_client()
         else:
             self._auth_client = ComputeAuthClient(app=self.app)
         return self._auth_client
@@ -250,9 +294,8 @@ class Client:
             )
             return
 
-        auth_obj = self.app or self.login_manager
-        if auth_obj:
-            auth_obj.logout()
+        if self.app:
+            self.app.logout()
 
     def _log_version_mismatch(self, worker_details: dict | None) -> None:
         """
