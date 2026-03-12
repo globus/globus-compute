@@ -6,8 +6,6 @@ import shutil
 import uuid
 from unittest import mock
 
-import globus_compute_sdk.sdk.client
-import globus_compute_sdk.sdk.login_manager
 import pytest
 import requests
 import responses
@@ -15,6 +13,7 @@ from click.testing import CliRunner
 from globus_compute_endpoint.cli import _do_stop_endpoint, app
 from globus_compute_endpoint.endpoint import endpoint
 from globus_compute_endpoint.endpoint.config import UserEndpointConfig
+from globus_compute_sdk import Client
 from globus_compute_sdk.sdk.client import _ComputeWebClient
 from globus_sdk import GlobusAPIError, UserApp
 from pytest_mock import MockFixture
@@ -53,10 +52,7 @@ def patch_compute_client(mocker: MockFixture):
         status=200,
     )
 
-    gcc = globus_compute_sdk.Client(
-        do_version_check=False,
-        login_manager=mock.Mock(),
-    )
+    gcc = Client(do_version_check=False)
     gcc.web_service_address = _SVC_ADDY
     gcc._compute_web_client = _ComputeWebClient(base_url=_SVC_ADDY)
     gcc._compute_web_client.v2.transport.max_retries = 0

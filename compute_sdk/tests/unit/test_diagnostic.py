@@ -17,7 +17,6 @@ from globus_compute_sdk.sdk.hardware_report import (
     python_runtime_host_info,
     swap_info,
 )
-from globus_compute_sdk.sdk.web_client import WebClient
 from pytest_mock import MockFixture
 
 MOCK_DIAG_BASE = "globus_compute_sdk.sdk.diagnostic"
@@ -117,8 +116,6 @@ def mock_connection_tests_only(mocker):
     hl.return_value = []
     gl = mocker.patch(f"{MOCK_DIAG_BASE}.general_commands_list")
     gl.return_value = []
-
-    mocker.patch.object(WebClient, "get_version")
 
 
 @pytest.fixture

@@ -22,7 +22,6 @@ from globus_compute_sdk.sdk.executor import (
     _TaskSubmissionInfo,
 )
 from globus_compute_sdk.sdk.utils import chunk_by
-from globus_compute_sdk.sdk.web_client import WebClient
 from globus_compute_sdk.serialize.concretes import JSONData
 from globus_compute_sdk.serialize.facade import ComputeSerializer, validate_strategylike
 from globus_sdk import ComputeClientV2, ComputeClientV3
@@ -49,7 +48,6 @@ class MockedExecutor(Executor):
     def __init__(self, *args, **kwargs):
         mock_client = mock.Mock(
             spec=Client,
-            web_client=mock.Mock(spec=WebClient),
             _compute_web_client=mock.Mock(
                 spec=_ComputeWebClient,
                 v2=mock.Mock(ComputeClientV2),
