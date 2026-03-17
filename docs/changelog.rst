@@ -11,17 +11,19 @@ globus-compute-sdk & globus-compute-endpoint v4.8.0
 New Functionality
 ^^^^^^^^^^^^^^^^^
 
-- Added ``gce`` as an alias to the ``globus-compute-endpoint`` command for reduced
-  finger stress.
+- Added ``gce`` as an alias to the ``globus-compute-endpoint`` command for
+  reduced finger stress.
 
-- Upgraded ``parsl`` to 2026.2.23, which includes some GPU options for ``SlurmProvider``.
+- Upgraded ``parsl`` dependency version from `2026.1.5`_ to `2026.2.23`_, which
+  includes some GPU options for |SlurmProvider|_.
+
 
 Bug Fixes
 ^^^^^^^^^
 
 - The environment variables passthrough feature for non-``root`` users
-  (introduced in :ref:`4.5.0 <changelog-4.5.0>`) incorrectly handled
-  the ``PATH`` variable.  The behavior is corrected in line with all other
+  (introduced in :ref:`4.5.0 <changelog-4.5.0>`) incorrectly handled the
+  ``PATH`` variable.  The behavior is corrected in line with all other
   variables (a variable is now only set if it is not already present in the
   environment).
 
@@ -33,15 +35,17 @@ globus-compute-sdk & globus-compute-endpoint v4.7.0
 Bug Fixes
 ^^^^^^^^^
 
-- Fixed an issue where endpoints would not detach properly inside a Docker container
-  using ``docker run``.
+- Fixed an issue where endpoints would not detach properly inside a Docker
+  container using ``docker run``.
 
 Changed
 ^^^^^^^
 
-- Globus Compute is now compatible with the latest globus-sdk (4.4.0 as of this compute release)
+- Globus Compute is now compatible with the latest globus-sdk (4.4.0 as of this
+  compute release)
 
-- When starting an endpoint, expired tokens will redirect users to the auth flow instead of merely displaying the 'invalid_grant' error.
+- When starting an endpoint, expired tokens will redirect users to the auth
+  flow instead of merely displaying the 'invalid_grant' error.
 
 .. _changelog-4.6.0:
 
@@ -64,18 +68,22 @@ Removed
 
 - The following deprecated features were removed:
 
-    - The ``executors`` config option (use ``engine`` instead)
-    - Support for environment variables prefixed with ``FUNCX_``, namely
-      ``FUNCX_SDK_CLIENT_ID``, ``FUNCX_SDK_CLIENT_SECRET``, and ``FUNCX_SCOPE``
-      (use ``GLOBUS_COMPUTE_``-prefixed environment variables instead)
-    - The ``globus-compute-endpoint self-diagnostic`` command (use
-      ``globus-compute-diagnostic`` instead)
-    - Legacy function-level container features (configure containers on the
-      endpoint instead)
-    - The ``function_name`` argument to ``Client.register_function`` (use the
-      ``__name__`` attribute of the function instead)
-    - The non-functional ``searchable`` argument to
-      ``Client.register_function``
+  - The ``executors`` config option (use ``engine`` instead)
+
+  - Support for environment variables prefixed with ``FUNCX_``, namely
+    ``FUNCX_SDK_CLIENT_ID``, ``FUNCX_SDK_CLIENT_SECRET``, and ``FUNCX_SCOPE``
+    (use ``GLOBUS_COMPUTE_``-prefixed environment variables instead)
+
+  - The ``globus-compute-endpoint self-diagnostic`` command (use
+    ``globus-compute-diagnostic`` instead)
+
+  - Legacy function-level container features (configure containers on the
+    endpoint instead)
+
+  - The ``function_name`` argument to ``Client.register_function`` (use the
+    ``__name__`` attribute of the function instead)
+
+  - The non-functional ``searchable`` argument to ``Client.register_function``
 
 Deprecated
 ^^^^^^^^^^
@@ -104,9 +112,9 @@ globus-compute-sdk & globus-compute-endpoint v4.5.0
 New Functionality
 ^^^^^^^^^^^^^^^^^
 
-- When running an endpoint under a non-root user, environment variables from the parent
-  process are now passed to the user endpoint process. (Endpoints run as root still
-  start with a clean environment.)
+- When running an endpoint under a non-root user, environment variables from
+  the parent process are now passed to the user endpoint process. (Endpoints
+  run as root still start with a clean environment.)
 
 .. _changelog-4.4.0:
 
@@ -116,22 +124,22 @@ globus-compute-sdk & globus-compute-endpoint v4.4.0
 New Functionality
 ^^^^^^^^^^^^^^^^^
 
-- Added two options to ``globus-compute-endpoint configure``, ``--manager-config``
-  and ``--template-config``, which allow specifying alternate configuration files
-  to be copied into the new endpoint directory during configuration.
+- Added two options to ``globus-compute-endpoint configure``,
+  ``--manager-config`` and ``--template-config``, which allow specifying
+  alternate configuration files to be copied into the new endpoint directory
+  during configuration.
 
 Deprecated
 ^^^^^^^^^^
 
-- Deprecated the ``--endpoint-config`` option of ``globus-compute-endpoint configure``,
-  in favor of the new ``--manager-config`` and ``--template-config`` options.
+- Deprecated the ``--endpoint-config`` option of ``globus-compute-endpoint
+  configure``, in favor of the new ``--manager-config`` and
+  ``--template-config`` options.
 
 Changed
 ^^^^^^^
 
-- Bumped ``parsl`` dependency version from `2025.12.01
-  <https://pypi.org/project/parsl/2025.12.01/>`_ to `2026.1.5
-  <https://pypi.org/project/parsl/2026.1.5/>`_.
+- Bumped ``parsl`` dependency version from `2025.12.1`_ to `2026.1.5`_
 
 .. _changelog-4.3.0:
 
@@ -141,20 +149,21 @@ globus-compute-sdk & globus-compute-endpoint v4.3.0
 New Functionality
 ^^^^^^^^^^^^^^^^^
 
-- Added the ``render-user-config`` command to the endpoint CLI, which renders a given
-    endpoint's user config template to stdout. This allows admins to validate
-    configuration templates without needing to restart or interact with running
-    endpoint processes.
+- Added the ``render-user-config`` command to the endpoint CLI, which renders a
+  given endpoint's user config template to stdout. This allows admins to
+  validate configuration templates without needing to restart or interact with
+  running endpoint processes.
 
-- Add ``-l/--endpoint-log-dirs`` and ``-r/--recent-endpoints`` options to ``globus-compute-diagnostic``
-  such that only the specified endpoint(s) or the most recent N endpoint config/log snippets
-  are included in the diagnostic output.  See ``globus-compute-diagnostic --help`` for details.
+- Add ``-l/--endpoint-log-dirs`` and ``-r/--recent-endpoints`` options to
+  ``globus-compute-diagnostic`` such that only the specified endpoint(s) or the
+  most recent N endpoint config/log snippets are included in the diagnostic
+  output.  See ``globus-compute-diagnostic --help`` for details.
 
 Bug Fixes
 ^^^^^^^^^
 
-- Fixed an issue where endpoints could not be started or configured on systems without
-  PAM installed.
+- Fixed an issue where endpoints could not be started or configured on systems
+  without PAM installed.
 
 Removed
 ^^^^^^^
@@ -166,9 +175,7 @@ Removed
 Changed
 ^^^^^^^
 
-- Bumped ``parsl`` dependency version from `2025.9.15
-  <https://pypi.org/project/parsl/2025.9.15/>`_ to `2025.12.01
-  <https://pypi.org/project/parsl/2025.12.01/>`_
+- Bumped ``parsl`` dependency version from `2025.9.15`_ to `2025.12.1`_
 
 - Update binary packages (DEB/RPM) to build against Python 3.13.  This will
   create a new virtual environment directory in ``/opt/globus-compute-agent/``.
@@ -196,24 +203,27 @@ New Functionality
   "Single-User Endpoint" dichotomy to a unified model where every endpoint
   supports configuration templates.
 
-- Existing endpoints that do not support configuration templates can be migrated using
-  the new ``migrate-to-template-capable`` command in the ``globus-compute-endpoint``
-  CLI.
+- Existing endpoints that do not support configuration templates can be
+  migrated using the new ``migrate-to-template-capable`` command in the
+  ``globus-compute-endpoint`` CLI.
 
-- Created the :class:`~globus_compute_sdk.serialize.AllCodeStrategies` serialization
-  strategy to replace :class:`~globus_compute_sdk.serialize.CombinedCode`. This new
-  combination strategy attempts each sub-strategy on a given Python function in a
-  specific order to minimize deserialization issues.
+- Created the :class:`~globus_compute_sdk.serialize.AllCodeStrategies`
+  serialization strategy to replace
+  :class:`~globus_compute_sdk.serialize.CombinedCode`. This new combination
+  strategy attempts each sub-strategy on a given Python function in a specific
+  order to minimize deserialization issues.
 
-- Created the :class:`~globus_compute_sdk.serialize.AllDataStrategies` serialization
-  strategy to serialize Python objects by attempting multiple strategies in sequence.
-  As with :class:`~globus_compute_sdk.serialize.AllCodeStrategies`, it tries the
+- Created the :class:`~globus_compute_sdk.serialize.AllDataStrategies`
+  serialization strategy to serialize Python objects by attempting multiple
+  strategies in sequence.  As with
+  :class:`~globus_compute_sdk.serialize.AllCodeStrategies`, it tries the
   simpler strategy (:class:`~globus_compute_sdk.serialize.JSONData`) first.
 
-- Added a ``return_dict`` argument to the :class:`~globus_compute_sdk.ShellFunction`
-  class constructor that indicates whether to return a JSON-serializable dict
-  (``True``) or a :class:`~globus_compute_sdk.ShellResult` object (``False``).
-  The default is ``False``.
+- Added a ``return_dict`` argument to the
+  :class:`~globus_compute_sdk.ShellFunction` class constructor that indicates
+  whether to return a JSON-serializable dict (``True``) or a
+  :class:`~globus_compute_sdk.ShellResult` object (``False``).  The default is
+  ``False``.
 
   Example:
 
@@ -230,8 +240,9 @@ New Functionality
             assert isinstance(res, dict)
             assert msg in res["stdout"]
 
-- The ``globus-compute-diagnostic`` command now also include a summary of disk usage
-  for each endpoint in the Globus Compute home directory (default ``~/.globus_compute``)
+- The ``globus-compute-diagnostic`` command now also include a summary of disk
+  usage for each endpoint in the Globus Compute home directory (default
+  ``~/.globus_compute``)
 
 Bug Fixes
 ^^^^^^^^^
@@ -247,33 +258,32 @@ Bug Fixes
 Deprecated
 ^^^^^^^^^^
 
-- As all endpoints are now template capable, the ``multi_user`` config option is now
-  deprecated.
+- As all endpoints are now template capable, the ``multi_user`` config option
+  is now deprecated.
 
-- The ``force_mu_allow_same_user`` config is now deprecated; instead, privileged
-  endpoints have the option of switching to non-privileged or disabling ID
-  mapping entirely.
+- The ``force_mu_allow_same_user`` config is now deprecated; instead,
+  privileged endpoints have the option of switching to non-privileged or
+  disabling ID mapping entirely.
 
 - Marked the following serialization strategies as deprecated:
 
-  - :class:`~globus_compute_sdk.serialize.DillCodeSource` - Identical to
-    :class:`~globus_compute_sdk.serialize.PureSourceDill`, but unnecessarily runs
+  - |DillCodeSource| - Identical to |PureSourceDill|, but unnecessarily runs
     ``dill.dumps()`` on the source code string.
   - :class:`~globus_compute_sdk.serialize.DillCodeTextInspect` - Identical to
-    :class:`~globus_compute_sdk.serialize.PureSourceTextInspect`, but unnecessarily runs
-    ``dill.dumps()`` on the source code string.
-  - :class:`~globus_compute_sdk.serialize.CombinedCode` - Replaced by
-    :class:`~globus_compute_sdk.serialize.AllCodeStrategies`, which does not include
-    the deprecated strategies above.
+    |PureSourceTextInspect|, but unnecessarily runs ``dill.dumps()`` on the
+    source code string.
+  - |CombinedCode| - Replaced by
+    :class:`~globus_compute_sdk.serialize.AllCodeStrategies`, which does not
+    include the deprecated strategies above.
 
 Changed
 ^^^^^^^
 
-- When configuring an endpoint, the command line automatically decides whether to
-  initialize identity mapping based on whether or not the running user is privileged.
-  This can be overridden with the ``--multi-user`` flag -- set to ``true`` to force
-  multi-user support, or ``false`` to disable it.  (Note that the running user must
-  still be privileged for multi-user support.)
+- When configuring an endpoint, the command line automatically decides whether
+  to initialize identity mapping based on whether or not the running user is
+  privileged.  This can be overridden with the ``--multi-user`` flag -- set to
+  ``true`` to force multi-user support, or ``false`` to disable it.  (Note that
+  the running user must still be privileged for multi-user support.)
 
 .. _changelog-3.16.1:
 
@@ -283,8 +293,8 @@ globus-compute-sdk & globus-compute-endpoint v3.16.1
 Bug Fixes
 ^^^^^^^^^
 
-- Reverted changes to multiple serialization strategies that caused backward compatibility
-  issues with endpoints running versions prior to `3.16.0
+- Reverted changes to multiple serialization strategies that caused backward
+  compatibility issues with endpoints running versions prior to `3.16.0
   <https://github.com/globus/globus-compute/releases/tag/3.16.0>`_.
 
 .. _changelog-3.16.0:
@@ -295,17 +305,17 @@ globus-compute-sdk & globus-compute-endpoint v3.16.0
 New Functionality
 ^^^^^^^^^^^^^^^^^
 
-- Added new ``Client`` and ``Executor`` methods to enable registering arbitrary Python
-  source code:
+- Added new |Client| and |Executor| methods to enable registering arbitrary
+  Python source code:
 
   - :meth:`Client.register_source_code <globus_compute_sdk.Client.register_source_code>`
   - :meth:`Executor.register_source_code <globus_compute_sdk.Executor.register_source_code>`
 
-  The standard ``.register_function()`` methods expect callable function objects,
-  which they then serialize using the specified code serialization strategy. In
-  contrast, the ``.register_source_code()`` methods enable the user to directly
-  provide an arbitrary source code string and entrypoint function name, which are
-  then serialized using the :class:`globus_compute_sdk.serialize.PureSourceTextInspect`
+  The standard ``.register_function()`` methods expect callable function
+  objects, which they then serialize using the specified code serialization
+  strategy. In contrast, the ``.register_source_code()`` methods enable the
+  user to directly provide an arbitrary source code string and entrypoint
+  function name, which are then serialized using the |PureSourceTextInspect|
   strategy:
 
   .. code-block:: python
@@ -326,18 +336,16 @@ New Functionality
 Bug Fixes
 ^^^^^^^^^
 
-- Fixed deserialization bug in ``CombinedCode`` strategy when utilizing pure source
-  code sub-strategies
-  (i.e., :class:`~globus_compute_sdk.serialize.PureSourceTextInspect` and
-  :class:`~globus_compute_sdk.serialize.PureSourceDill`).
+- Fixed deserialization bug in ``CombinedCode`` strategy when utilizing pure
+  source code sub-strategies (i.e., |PureSourceTextInspect| and
+  |PureSourceDill|).
 
 Changed
 ^^^^^^^
 
-- :class:`~globus_compute_sdk.serialize.PureSourceTextInspect` and
-  :class:`~globus_compute_sdk.serialize.PureSourceDill`  strategies now encode function
-  source code text using base64 encoding. Existing registered functions remain fully
-  compatible and will deserialize properly.
+- |PureSourceTextInspect| and |PureSourceDill| strategies now encode function
+  source code text using base64 encoding. Existing registered functions remain
+  fully compatible and will deserialize properly.
 
 .. _changelog-3.15.0:
 
@@ -357,8 +365,7 @@ Bug Fixes
 Changed
 ^^^^^^^
 
-- Bumped ``parsl`` dependency  from `2025.3.31 <https://pypi.org/project/parsl/2025.3.31/>`_
-  to `2025.9.15 <https://pypi.org/project/parsl/2025.9.15/>`_
+- Bumped ``parsl`` dependency  from `2025.3.31`_ to `2025.9.15`_
 
 .. _changelog-3.14.0:
 
@@ -368,9 +375,9 @@ globus-compute-sdk & globus-compute-endpoint v3.14.0
 New Functionality
 ^^^^^^^^^^^^^^^^^
 
-- We've deprecated the ``user_runtime.python_version`` reserved template variable in favor
-  of more granular variables to facilitate leveraging Python installation information in
-  the configuration template:
+- We've deprecated the ``user_runtime.python_version`` reserved template
+  variable in favor of more granular variables to facilitate leveraging Python
+  installation information in the configuration template:
 
   - ``user_runtime.python.version``: Python version string (e.g., ``"3.13.7"``)
   - ``user_runtime.python.version_tuple``: Python version as a tuple (e.g., ``(3, 13, 7)``)
@@ -380,11 +387,12 @@ New Functionality
   - ``user_runtime.python.implementation``: String identifying the compiler used for compiling
     Python (e.g., ``"Clang 14.0.6"``)
 
-  The ``user_runtime.python_version`` variable provides the complete ``sys.version`` string,
-  which contains useful information but is hard to utilize in the template.
+  The ``user_runtime.python_version`` variable provides the complete
+  ``sys.version`` string, which contains useful information but is hard to
+  utilize in the template.
 
-- Added reserved template variables containing general platform information from the user's
-  installation:
+- Added reserved template variables containing general platform information
+  from the user's installation:
 
   - ``user_runtime.platform.architecture``: Host architecture tuple (e.g., ``("64bit", "ELF")``)
   - ``user_runtime.platform.machine``: Host machine type (e.g., ``"x86_64"``)
@@ -447,8 +455,9 @@ globus-compute-sdk & globus-compute-endpoint v3.10.0
 Bug Fixes
 ^^^^^^^^^
 
-- Fixed the ``Client.stop_endpoint`` method to work with multi-user endpoints
-  in addition to single-user endpoints.
+- Fixed the :meth:`Client.stop_endpoint
+  <globus_compute_sdk.Client.stop_endpoint>` method to work with multi-user
+  endpoints in addition to single-user endpoints.
 
 Changed
 ^^^^^^^
@@ -463,9 +472,10 @@ globus-compute-sdk & globus-compute-endpoint v3.9.0
 New Functionality
 ^^^^^^^^^^^^^^^^^
 
-- Endpoint administrators now have access to information about the user's mapped
-  identity in the user configuration template (``user_config_template.yaml.j2``)
-  via the ``mapped_identity`` variable. The following fields are available:
+- Endpoint administrators now have access to information about the user's
+  mapped identity in the user configuration template
+  (``user_config_template.yaml.j2``) via the ``mapped_identity`` variable. The
+  following fields are available:
 
   - ``mapped_identity.local.uname``: Local user's username
   - ``mapped_identity.local.uid``: Local user's ID
@@ -479,7 +489,8 @@ New Functionality
 Bug Fixes
 ^^^^^^^^^
 
-- Starting a multi-user endpoint no longer prompts the user to complete multiple login flows.
+- Starting a multi-user endpoint no longer prompts the user to complete
+  multiple login flows.
 
 Changed
 ^^^^^^^
@@ -500,16 +511,18 @@ globus-compute-sdk & globus-compute-endpoint v3.8.0
 New Functionality
 ^^^^^^^^^^^^^^^^^
 
-- ``globus-compute-endpoint`` CLI commands involved in the creation of Auth Policies
-  now prompt for re-login if a `Globus Auth Requirements Error <https://globus-sdk-python.readthedocs.io/en/stable/authorization/gare.html>`_
+- ``globus-compute-endpoint`` CLI commands involved in the creation of Auth
+  Policies now prompt for re-login if a `Globus Auth Requirements Error
+  <https://globus-sdk-python.readthedocs.io/en/stable/authorization/gare.html>`_
   is returned from the Auth API.
 
-- Updated version bound for the Globus SDK to at least `3.56.0 <https://github.com/globus/globus-sdk-python/releases/tag/3.56.0>`_
-  to take advantage of improved GARE handling
+- Updated version bound for the Globus SDK to at least `3.56.0
+  <https://github.com/globus/globus-sdk-python/releases/tag/3.56.0>`_ to take
+  advantage of improved GARE handling
 
-- Added support for specifying multiple Globus Auth identity IDs with administrative access
-  to an endpoint, in addition to the owner. This requires an active Globus subscription
-  (i.e., ``subscription_id``).
+- Added support for specifying multiple Globus Auth identity IDs with
+  administrative access to an endpoint, in addition to the owner. This requires
+  an active Globus subscription (i.e., ``subscription_id``).
 
   Example:
 
@@ -538,8 +551,8 @@ Bug Fixes
 Removed
 ^^^^^^^
 
-- Removed legacy ``Client.get_containers`` method, which is no longer supported by the
-  Globus Compute web service.
+- Removed legacy ``Client.get_containers`` method, which is no longer supported
+  by the Globus Compute web service.
 
 Deprecated
 ^^^^^^^^^^
@@ -566,7 +579,8 @@ globus-compute-sdk & globus-compute-endpoint v3.7.0
 New Functionality
 ^^^^^^^^^^^^^^^^^
 
-- Added support for podman-hpc in :class:`~globus_compute_endpoint.engines.globus_compute.GlobusComputeEngine` as a supported container type
+- Added support for podman-hpc in |GlobusComputeEngine| as a supported
+  container type
 
 Security
 ^^^^^^^^
@@ -584,9 +598,8 @@ globus-compute-sdk & globus-compute-endpoint v3.6.0
 New Functionality
 ^^^^^^^^^^^^^^^^^
 
-- When using the :class:`~globus_compute_sdk.Executor`, users can now specify what
-  serialization strategies they would like their results to be serialized with.
-  For example:
+- When using the |Executor|, users can now specify what serialization
+  strategies they would like their results to be serialized with.  For example:
 
   .. code-block:: python
 
@@ -601,18 +614,16 @@ New Functionality
 - Enabled support for registering a function to a specific HA endpoint via the
   ``ha_endpoint_id`` argument in the following methods:
 
-  - :meth:`globus_compute_sdk.Client.register_function`
-  - :meth:`globus_compute_sdk.Executor.register_function`
+  - :meth:`Client.register_function <globus_compute_sdk.Client.register_function>`
+  - :meth:`Executor.register_function <globus_compute_sdk.Executor.register_function>`
 
-  Since HA functions cannot be shared, this argument is mutually exclusive with the
-  ``group`` and ``public`` arguments.
+  Since HA functions cannot be shared, this argument is mutually exclusive with
+  the ``group`` and ``public`` arguments.
 
 Changed
 ^^^^^^^
 
-- Update ``parsl`` dependency from `2025.3.17
-  <https://pypi.org/project/parsl/2025.3.17/>`_ to `2025.3.31
-  <https://pypi.org/project/parsl/2025.3.31/>`_
+- Update ``parsl`` dependency from `2025.3.17`_ to `2025.3.31`_
 
 .. _changelog-3.5.0:
 
@@ -622,13 +633,12 @@ globus-compute-sdk & globus-compute-endpoint v3.5.0
 New Functionality
 ^^^^^^^^^^^^^^^^^
 
-- The :class:`~globus_compute_sdk.serialize.ComputeSerializer` constructor now accepts
-  a wider range of inputs for ``strategy_code``, ``strategy_data``, and
-  ``allowed_deserializers``. See the class documentation for details.
+- The |ComputeSerializer| constructor now accepts a wider range of inputs for
+  ``strategy_code``, ``strategy_data``, and ``allowed_deserializers``.  See the
+  class documentation for details.
 
-- Added :class:`~globus_compute_sdk.serialize.PureSourceDill` and
-  :class:`~globus_compute_sdk.serialize.PureSourceTextInspect` as sub-strategies to
-  :class:`~globus_compute_sdk.serialize.CombinedCode`.
+- Added |PureSourceDill| and |PureSourceTextInspect| as sub-strategies to
+  |CombinedCode|
 
 .. _changelog-3.4.0:
 
@@ -638,9 +648,8 @@ globus-compute-sdk & globus-compute-endpoint v3.4.0
 New Functionality
 ^^^^^^^^^^^^^^^^^
 
-- The :class:`~globus_compute_sdk.Executor` can now access the underlying
-  :class:`~globus_compute_sdk.serialize.ComputeSerializer` directly through the
-  ``serializer`` constructor argument and property. Eg:
+- The |Executor| can now access the underlying |ComputeSerializer| directly
+  through the ``serializer`` constructor argument and property. Eg:
 
   .. code-block:: python
 
@@ -669,13 +678,12 @@ Changed
   construct the serialized function code, this will necessitate also now
   specifying the function metadata, including the new serializer identifier.
 
-- Update ``parsl`` dependency from `2025.2.17
-  <https://pypi.org/project/parsl/2025.2.17/>`_ to `2025.3.17
-  <https://pypi.org/project/parsl/2025.3.17/>`_
+- Update ``parsl`` dependency from `2025.2.17`_ to `2025.3.17`_
 
-- |ShellFunction| and |MPIFunction| erroneously used the full ``cmd`` string as a function name.
-  These classes now default the function name to the class name. User may customize the function
-  name using the ``name`` keyword argument:
+- |ShellFunction| and |MPIFunction| erroneously used the full ``cmd`` string as
+  a function name.  These classes now default the function name to the class
+  name. User may customize the function name using the ``name`` keyword
+  argument:
 
   .. code-block:: python
 
@@ -685,7 +693,9 @@ Changed
 Bug Fixes
 ^^^^^^^^^
 
-- Refresh tokens were not being requested properly since 2.28.0 when going through login flow.  Now they are requested as expected.  This previously prevented auto refreshing of access tokens upon expiry.
+- Refresh tokens were not being requested properly since 2.28.0 when going
+  through login flow.  Now they are requested as expected.  This previously
+  prevented auto refreshing of access tokens upon expiry.
 
 
 .. _changelog-3.3.1:
@@ -696,9 +706,9 @@ globus-compute-sdk & globus-compute-endpoint v3.3.1
 Bug Fixes
 ^^^^^^^^^
 
-- The ``deb`` / ``rpm`` packages for the 3.3.0 release contained some code that was
-  not ready for prime time. This release (3.3.1) brings those in sync with the PyPI
-  packages.
+- The ``deb`` / ``rpm`` packages for the 3.3.0 release contained some code that
+  was not ready for prime time. This release (3.3.1) brings those in sync with
+  the PyPI packages.
 
 .. _changelog-3.3.0:
 
@@ -708,13 +718,12 @@ globus-compute-sdk & globus-compute-endpoint v3.3.0
 New Functionality
 ^^^^^^^^^^^^^^^^^
 
-- The ``globus-compute-sdk`` and ``globus-compute-endpoint`` packages now support
-  Python version 3.13.
+- The ``globus-compute-sdk`` and ``globus-compute-endpoint`` packages now
+  support Python version 3.13.
 
-- Added two new serialization strategies,
-  :class:`~globus_compute_sdk.serialize.PureSourceTextInspect` and
-  :class:`~globus_compute_sdk.serialize.PureSourceDill`, which serialize functions as
-  raw source code strings (avoiding ``dill`` bytecode serialization entirely).
+- Added two new serialization strategies, |PureSourceTextInspect| and
+  |PureSourceDill|, which serialize functions as raw source code strings
+  (avoiding ``dill`` bytecode serialization entirely).
 
 - Multi-user endpoint administrators can now specify custom user configuration
   template and schema paths with the ``user_config_template_path`` and
@@ -726,9 +735,9 @@ New Functionality
      user_config_template_path: /path/to/my_template.yaml.j2
      user_config_schema_path: /path/to/my_schema.json
 
--  Administrators can now combine multiple user configuration templates with the
-   ``extends``, ``include``, and ``import`` Jinja tags. However, since the templates
-   are rendered in user space, the administrator must:
+- Administrators can now combine multiple user configuration templates with
+  the ``extends``, ``include``, and ``import`` Jinja tags. However, since the
+  templates are rendered in user space, the administrator must:
 
    1. Move the template files to a directory that every mapped local user account has
       read access to.
@@ -742,8 +751,8 @@ Bug Fixes
 
 - Address a shutdown time race condition where an endpoint could receive a task
   just as it was shutting down, effectively losing the task.  Implement a check
-  after receiving tasks; if the endpoint is shutting down, do not
-  ``ACK`` nowledge the task so that the AMQP service will retain it for a later
+  after receiving tasks; if the endpoint is shutting down, do not ``ACK``
+  nowledge the task so that the AMQP service will retain it for a later
   endpoint instance.
 
 .. _changelog-3.2.0:
@@ -754,15 +763,16 @@ globus-compute-sdk & globus-compute-endpoint v3.2.0
 New Functionality
 ^^^^^^^^^^^^^^^^^
 
-- Added an optional ``authorizer`` parameter to the ``Client`` initializer to support
-  using a ``GlobusAuthorizer`` for authentication. This parameter is mutually exclusive
-  with ``app``.
+- Added an optional ``authorizer`` parameter to the ``Client`` initializer to
+  support using a ``GlobusAuthorizer`` for authentication. This parameter is
+  mutually exclusive with ``app``.
 
 Deprecated
 ^^^^^^^^^^
 
-- The ``LoginManager`` and ``AuthorizerLoginManager`` classes are now deprecated. Use
-  `GlobusApp <https://globus-compute.readthedocs.io/en/stable/sdk.html#globusapps>`_
+- The ``LoginManager`` and ``AuthorizerLoginManager`` classes are now
+  deprecated. Use `GlobusApp
+  <https://globus-compute.readthedocs.io/en/stable/sdk.html#globusapps>`_
   objects from the Globus SDK instead.
 
 - The ``Client.login_manager`` attribute is now deprecated.
@@ -770,7 +780,7 @@ Deprecated
 Changed
 ^^^^^^^
 
-- Bumped ``parsl`` dependency to `2025.2.17 <https://pypi.org/project/parsl/2025.2.17/>`_.
+- Bumped ``parsl`` dependency from `2025.1.20`_ to `2025.2.17`_.
 
 .. _changelog-3.1.1:
 
@@ -792,22 +802,25 @@ globus-compute-sdk & globus-compute-endpoint v3.1.0
 Bug Fixes
 ^^^^^^^^^
 
-- The default engine is now ``GlobusComputeEngine`` when the engine ``type`` field is not specified.
-  Previously, the default was ``HighThroughputEngine``, which was removed in version ``3.0.0``.
+- The default engine is now |GlobusComputeEngine| when the engine ``type``
+  field is not specified.  Previously, the default was
+  ``HighThroughputEngine``, which was removed in version ``3.0.0``.
 
 Removed
 ^^^^^^^
 
 - Removed obsolete rebrand upgrade command.  The project rebranded from funcX
-  to Globus Compute at :ref:`v2.0.0 <changelog-2.0.0>`, in April, 2023, and this
-  command helped with the upgrade process for previously created endpoints.
+  to Globus Compute at :ref:`v2.0.0 <changelog-2.0.0>`, in April, 2023, and
+  this command helped with the upgrade process for previously created
+  endpoints.
 
 Deprecated
 ^^^^^^^^^^
 
-- The ``WebClient`` class and ``Client.web_client`` attribute have been deprecated.
-  Please use the ``ComputeClient``, ``ComputeClientV2``, and ``ComputeClientV3``
-  classes from the `Globus Python SDK <https://globus-sdk-python.readthedocs.io/en/stable/services/compute.html>`_
+- The ``WebClient`` class and ``Client.web_client`` attribute have been
+  deprecated.  Please use the ``ComputeClient``, ``ComputeClientV2``, and
+  ``ComputeClientV3`` classes from the `Globus Python SDK
+  <https://globus-sdk-python.readthedocs.io/en/stable/services/compute.html>`_
   to interact directly with the Globus Compute API.
 
 - The ``Client.auth_client`` attribute is now deprecated.
@@ -817,9 +830,9 @@ Changed
 
 - Bump ``globus-sdk`` dependency version to at least ``3.50.0``.
 
-- Bumped ``parsl`` dependency version to `2025.1.20 <https://pypi.org/project/parsl/2025.1.20/>`_.
-  This version bump avoids dependency version mismatch when using Parsl's newly added optional extra
-  `GlobusComputeExecutor <https://parsl.readthedocs.io/en/stable/stubs/parsl.executors.GlobusComputeExecutor.html>`_
+- Bumped ``parsl`` dependency version from `2025.1.6`_ to `2025.1.20`_.  This
+  version bump avoids dependency version mismatch when using Parsl's newly
+  added optional extra |GlobusComputeExecutor|_
 
 .. _changelog-3.0.1:
 
@@ -829,15 +842,18 @@ globus-compute-sdk & globus-compute-endpoint v3.0.1
 Bug Fixes
 ^^^^^^^^^
 
-- Removed the ``globus-compute-interchange``, ``globus-compute-manager`` and ``globus-compute-worker``
-  CLI commands, which attempt to call modules that were removed in ``v3.0.0``.
+- Removed the ``globus-compute-interchange``, ``globus-compute-manager`` and
+  ``globus-compute-worker`` CLI commands, which attempt to call modules that
+  were removed in ``v3.0.0``.
 
 Deprecated
 ^^^^^^^^^^
 
-- Removed modules that were utilized exclusively by the ``HighThroughputEngine``, which were removed
-  in ``v3.0.0``:
+- Removed modules that were utilized exclusively by the
+  ``HighThroughputEngine``, which were removed in ``v3.0.0``:
+
   - ``globus_compute_endpoint.providers``
+
   - ``globus_compute_endpoint.strategies``
 
 .. _changelog-3.0.0:
@@ -848,8 +864,8 @@ globus-compute-sdk & globus-compute-endpoint v3.0.0
 New Functionality
 ^^^^^^^^^^^^^^^^^
 
-- The ``ComputeSerializer`` can now be told to only deserialize payloads that were
-  serialized with specific serialization strategies. For example:
+- The |ComputeSerializer| can now be told to only deserialize payloads that
+  were serialized with specific serialization strategies. For example:
 
   .. code-block:: python
 
@@ -876,9 +892,9 @@ New Functionality
     #
     #   (Hint: reserialize the arguments with JSONData and try again.)
 
-- Compute Endpoints can be configured to only deserialize and execute submissions that
-  were serialized with specific serialization strategies. For example, with the
-  following config:
+- Compute Endpoints can be configured to only deserialize and execute
+  submissions that were serialized with specific serialization strategies. For
+  example, with the following config:
 
   .. code-block:: yaml
 
@@ -890,8 +906,8 @@ New Functionality
         type: ThreadPoolEngine
 
   any submissions that used the default serialization strategies (``DillCode``,
-  ``DillDataBase64``) would be rejected, and users would be informed to use one of the
-  allowed strategies.
+  ``DillDataBase64``) would be rejected, and users would be informed to use one
+  of the allowed strategies.
 
 Removed
 ^^^^^^^
@@ -903,11 +919,10 @@ Removed
 Changed
 ^^^^^^^
 
-- Update Parsl to `2025.1.6 <https://pypi.org/project/parsl/2025.1.6/>`_.  Note
-  that Parsl's Channels were deprecated in Aug, 2024, and now completely
-  removed (see `Parsl Issue #3515
-  <https://github.com/Parsl/parsl/issues/3515>`_); consequently, this will be a
-  breaking change for those using Parsl's Channels.
+- Update Parsl from `2024.11.25`_ to `2025.1.6`_.  Note that Parsl's Channels
+  were deprecated in Aug, 2024, and now completely removed (see `Parsl Issue
+  #3515 <https://github.com/Parsl/parsl/issues/3515>`_); consequently, this
+  will be a breaking change for those using Parsl's Channels.
 
 .. _changelog-2.33.0:
 
@@ -930,8 +945,8 @@ New Functionality
 
   As authentication is implemented via Globus Auth and identity mapping, the
   Globus Compute Endpoint does not implement the authorization or password
-  management phases of PAM.  It implements account
-  (|pam_acct_mgmt(3)|_) and session (|pam_open_session(3)|) management.
+  management phases of PAM.  It implements account (|pam_acct_mgmt(3)|_) and
+  session (|pam_open_session(3)|) management.
 
   For more information, consult :ref:`the PAM section <pam>` of the
   documentation.
@@ -965,31 +980,34 @@ globus-compute-sdk & globus-compute-endpoint v2.32.0
 New Functionality
 ^^^^^^^^^^^^^^^^^
 
-- Added ipv6 support for GlobusComputeEngine by upgrading Parsl to 2024.11.25
+- Added ipv6 support for |GlobusComputeEngine| by upgrading Parsl to
+  `2024.11.25`_
 
 Bug Fixes
 ^^^^^^^^^
 
-- ``Client.logout()`` no longer raises an ``AttributeError``.
+- :meth:`Client.logout() <globus_compute_sdk.Client.logout>` no longer raises
+  an ``AttributeError``.
 
 Changed
 ^^^^^^^
 
-- Bumped dependency on ``globus-sdk-python`` to at least `version 3.47.0 <https://github.com/globus/globus-sdk-python/releases/tag/3.47.0>`_.
-  This version includes changes to detect ``EOFErrors`` when logging in with the command
-  line, obviating the need for existing ``globus-compute-sdk`` code that checks if a
-  user is in an interactive terminal before logging in. The old Compute code raised a
-  ``RuntimeError`` in that scenario; the new code raises a
-  ``globus_sdk.login_flows.CommandLineLoginFlowEOFError`` if Python's ``input``
-  function raises an ``EOFError`` - which, in Compute, can happen if a previously
-  command-line-authenticated endpoint tries to re-authenticate but no longer has access
-  to a STDIN.
+- Bumped dependency on ``globus-sdk-python`` to at least `version 3.47.0
+  <https://github.com/globus/globus-sdk-python/releases/tag/3.47.0>`_.  This
+  version includes changes to detect ``EOFErrors`` when logging in with the
+  command line, obviating the need for existing ``globus-compute-sdk`` code
+  that checks if a user is in an interactive terminal before logging in. The
+  old Compute code raised a ``RuntimeError`` in that scenario; the new code
+  raises a ``globus_sdk.login_flows.CommandLineLoginFlowEOFError`` if Python's
+  ``input`` function raises an ``EOFError`` - which, in Compute, can happen if
+  a previously command-line-authenticated endpoint tries to re-authenticate but
+  no longer has access to a STDIN.
 
 - Bumped ``jsonschema`` version to at least 4.21, but relax the upper bound to
   version 5 so as to allow other projects to coexist in the same virtual
   environment more easily.
 
-- Bumped ``parsl`` dependency version to `2024.11.25 <https://pypi.org/project/parsl/2024.11.25/>`_.
+- Bumped ``parsl`` dependency version from `2024.10.21`_ to `2024.11.25`_
 
 .. _changelog-2.31.0:
 
@@ -999,11 +1017,11 @@ globus-compute-sdk & globus-compute-endpoint v2.31.0
 New Functionality
 ^^^^^^^^^^^^^^^^^
 
-- ``GlobusComputeEngine``, ``ThreadPoolEngine``, and ``ProcessPoolEngine`` can
-  now be configured with ``working_dir`` to specify the tasks working directory.
-  If a relative path is specified, it is set in relation to the endpoint
-  run directory (usually ``~/.globus_compute/<endpoint_name>``). Here's an example
-  config file:
+- |GlobusComputeEngine|, |ThreadPoolEngine|, and |ProcessPoolEngine| can
+  now be configured with ``working_dir`` to specify the tasks working
+  directory.  If a relative path is specified, it is set in relation to the
+  endpoint run directory (usually ``~/.globus_compute/<endpoint_name>``).
+  Here's an example config file:
 
   .. code-block:: yaml
 
@@ -1011,27 +1029,31 @@ New Functionality
       type: GlobusComputeEngine
       working_dir: /absolute/path/to/tasks_working_dir
 
-- Function docstrings are now read and used as the description for the function when it
-  is uploaded. This will support future UI changes to the webapp.
+- Function docstrings are now read and used as the description for the function
+  when it is uploaded. This will support future UI changes to the webapp.
 
-- The ``globus-compute-sdk`` and ``globus-compute-endpoint`` packages now support
-  Python version 3.12.
+- The ``globus-compute-sdk`` and ``globus-compute-endpoint`` packages now
+  support Python version 3.12.
 
-- Added a new runtime check to ``globus_compute_endpoint.engines`` that will raise a `RuntimeError`
-  if a task is submitted before ``engine.start()`` was called.
+- Added a new runtime check to ``globus_compute_endpoint.engines`` that will
+  raise a `RuntimeError` if a task is submitted before ``engine.start()`` was
+  called.
 
 Bug Fixes
 ^^^^^^^^^
 
- - Fixed a bug where functions run with ``ThreadPoolEngine`` and ``ProcessPoolEngine``
-   create and switch into the ``tasks_working_dir`` creating endless nesting.
+ - Fixed a bug where functions run with |ThreadPoolEngine| and
+   |ProcessPoolEngine| create and switch into the ``tasks_working_dir``
+   creating endless nesting.
 
 Deprecated
 ^^^^^^^^^^
 
-- Before this version, the ``function_name`` argument to ``Client.register_function``
-  was not used, so it has now been deprecated. As before, function names are
-  determined by the function's ``__name__`` and cannot be manually specified.
+- Before this version, the ``function_name`` argument to
+  :meth:`Client.register_function
+  <globus_compute_sdk.Client.register_function>` was not used, so it has now
+  been deprecated. As before, function names are determined by the function's
+  ``__name__`` and cannot be manually specified.
 
 .. _changelog-2.30.1:
 
@@ -1058,16 +1080,16 @@ New Functionality
 Bug Fixes
 ^^^^^^^^^
 
-- Fixed a ``KeyError`` that occurred when using an ``AuthorizerLoginManager`` with
-  a ``Client``, or when calling the ``AuthorizerLoginManager.get_auth_client()``
-  method directly.
+- Fixed a ``KeyError`` that occurred when using an ``AuthorizerLoginManager``
+  with a ``Client``, or when calling the
+  ``AuthorizerLoginManager.get_auth_client()`` method directly.
 
 Changed
 ^^^^^^^
 
 - Bumped ``globus-sdk`` dependency to at least 3.46.0.
 
-- Bumped ``parsl`` dependency version to `2024.10.21 <https://pypi.org/project/parsl/2024.10.21/>`_.
+- Bumped ``parsl`` dependency version from `2024.9.9`_ to `2024.10.21`_
 
 - Drop support for Python 3.8, which entered the end-of-life phase on
   10-07-2024 (https://peps.python.org/pep-0569/).
@@ -1098,8 +1120,8 @@ Changed
   For more information, see ``globus-compute-diagnostic --help``.
 
   Note that the new diagnostic command creates a gzipped file by default,
-  whereas previously it printed the output to console by default and
-  only created the compressed file if the -z argument is provided.
+  whereas previously it printed the output to console by default and only
+  created the compressed file if the -z argument is provided.
 
 - The Executor now implements a bursty rate-limit in the background submission
   thread.  The Executor is designed to coalesce up to ``.batch_size`` of tasks
@@ -1114,9 +1136,9 @@ Changed
   - If the Executor is able to completely fill the batch of tasks sent to the
     API, that call is not counted toward the burst limit
 
-- Prevent unintended hogging of resources (e.g., login nodes) by setting the default
-  endpoint configuration (which uses |LocalProvider|_) to only use a single worker
-  (``max_workers_per_node=1``).
+- Prevent unintended hogging of resources (e.g., login nodes) by setting the
+  default endpoint configuration (which uses |LocalProvider|_) to only use a
+  single worker (``max_workers_per_node=1``).
 
 .. _changelog-2.28.0:
 
@@ -1131,17 +1153,20 @@ New Functionality
   easier to identity implementation missteps that affect the early UEP boot
   process, before the UEP's logging is bootstrapped.
 
-- The SDK ``Client`` and ``WebClient`` now support using a ``GlobusApp`` for authentication.
-  For standard interactive login flows, users can leave the ``app`` argument blank when
-  initializing the ``Client``, or pass in a custom ``UserApp``. For client authentication,
-  users can leave the ``app`` argument blank and set the ``GLOBUS_COMPUTE_CLIENT_ID`` and
-  ``GLOBUS_COMPUTE_CLIENT_SECRET`` environment variables, or pass in a custom ``ClientApp``.
+- The SDK ``Client`` and ``WebClient`` now support using a ``GlobusApp`` for
+  authentication.  For standard interactive login flows, users can leave the
+  ``app`` argument blank when initializing the ``Client``, or pass in a custom
+  ``UserApp``. For client authentication, users can leave the ``app`` argument
+  blank and set the ``GLOBUS_COMPUTE_CLIENT_ID`` and
+  ``GLOBUS_COMPUTE_CLIENT_SECRET`` environment variables, or pass in a custom
+  ``ClientApp``.
 
-  For more information on how to use a ``GlobusApp``, see the `Globus SDK documentation
+  For more information on how to use a ``GlobusApp``, see the `Globus SDK
+  documentation
   <https://globus-sdk-python.readthedocs.io/en/stable/authorization/globus_app/apps.html>`_.
 
-  Users can still pass in a custom ``LoginManager`` to the ``login_manager`` argument, but
-  this is mutually exclusive with the ``app`` argument.
+  Users can still pass in a custom ``LoginManager`` to the ``login_manager``
+  argument, but this is mutually exclusive with the ``app`` argument.
 
   E.g.,
 
@@ -1156,8 +1181,8 @@ New Functionality
      my_app = UserApp("my-app", client_id="...")
      gcc = Client(app=my_app)
 
-- Added a new data serialization strategy, ``JSONData``, which serializes/deserializes
-  function args and kwargs via JSON. Usage example:
+- Added a new data serialization strategy, ``JSONData``, which
+  serializes/deserializes function args and kwargs via JSON. Usage example:
 
   .. code-block:: python
 
@@ -1174,9 +1199,10 @@ New Functionality
 Bug Fixes
 ^^^^^^^^^
 
-- We no longer raise an exception if a user defines the ``GLOBUS_COMPUTE_CLIENT_ID``
-  environment variable without defining ``GLOBUS_COMPUTE_SECRET_KEY``. The reverse,
-  however, will still raise an exception.
+- We no longer raise an exception if a user defines the
+  ``GLOBUS_COMPUTE_CLIENT_ID`` environment variable without defining
+  ``GLOBUS_COMPUTE_SECRET_KEY``.  The reverse, however, will still raise an
+  exception.
 
 Removed
 ^^^^^^^
@@ -1189,13 +1215,13 @@ Deprecated
 ^^^^^^^^^^
 
 - The ``WebClient.user_app_name`` attribute has been marked for deprecation and
-  will be removed in a future release. Please directly use ``WebClient.app_name``
-  instead.
+  will be removed in a future release.  Please directly use
+  ``WebClient.app_name`` instead.
 
 Changed
 ^^^^^^^
 
-- Bumped ``parsl`` dependency version to `2024.9.9 <https://pypi.org/project/parsl/2024.9.9/>`_.
+- Bumped ``parsl`` dependency version from `2024.8.12`_ to `2024.9.9`_.
 
 .. _changelog-2.27.1:
 
@@ -1205,7 +1231,8 @@ globus-compute-sdk & globus-compute-endpoint v2.27.1
 Bug Fixes
 ^^^^^^^^^
 
-- Set upper bound for ``pyzmq`` dependency to ``v26.1.0`` to avoid bug with ``libzmq`` installation.
+- Set upper bound for ``pyzmq`` dependency to ``v26.1.0`` to avoid bug with
+  ``libzmq`` installation.
 
 .. _changelog-2.27.0:
 
@@ -1215,16 +1242,16 @@ globus-compute-sdk & globus-compute-endpoint v2.27.0
 New Functionality
 ^^^^^^^^^^^^^^^^^
 
-- Added ``Client.get_allowed_functions`` for retrieving the list of functions that are
-  allowed to be executed on an endpoint.
+- Added ``Client.get_allowed_functions`` for retrieving the list of functions
+  that are allowed to be executed on an endpoint.
 
 Removed
 ^^^^^^^
 
-- The ``add_to_whitelist``, ``delete_from_whitelist``, and ``get_whitelist`` functions
-  have been removed from the ``Client``. Use the ``allowed_functions`` endpoint config
-  option instead of the add/remove functions, and ``Client.get_allowed_functions``
-  instead of ``get_whitelist``.
+- The ``add_to_whitelist``, ``delete_from_whitelist``, and ``get_whitelist``
+  functions have been removed from the ``Client``. Use the
+  ``allowed_functions`` endpoint config option instead of the add/remove
+  functions, and ``Client.get_allowed_functions`` instead of ``get_whitelist``.
 
 - Remove forgotten ``webockets`` dependency from setup requirements; the SDK
   does not use the websockets library as of :ref:`v2.3.0 <changelog-2.3.0>`.
@@ -1232,11 +1259,12 @@ Removed
 Deprecated
 ^^^^^^^^^^
 
-- The ``HighThroughputEngine`` is now marked for deprecation. All users should migrate to
-  |GlobusComputeEngine|.
+- The ``HighThroughputEngine`` is now marked for deprecation. All users should
+  migrate to |GlobusComputeEngine|.
 
-  To help with migration, we suggest checking out our many :doc:`endpoint configuration
-  examples <endpoints/endpoint_examples>`, all of which use |GlobusComputeEngine|.
+  To help with migration, we suggest checking out our many :doc:`endpoint
+  configuration examples <endpoints/endpoint_examples>`, all of which use
+  |GlobusComputeEngine|.
 
 .. _changelog-2.26.0:
 
@@ -1246,15 +1274,15 @@ globus-compute-sdk & globus-compute-endpoint v2.26.0
 Bug Fixes
 ^^^^^^^^^
 
-- The endpoint CLI will now raise an error if the endpoint configuration includes
-  both the ``container_uri`` field and a provider that manages containers internally
-  (``AWSProvider``, ``GoogleCloudProvider``, or ``KubernetesProvider``). This prevents
-  conflicts in container management.
+- The endpoint CLI will now raise an error if the endpoint configuration
+  includes both the ``container_uri`` field and a provider that manages
+  containers internally (``AWSProvider``, ``GoogleCloudProvider``, or
+  ``KubernetesProvider``). This prevents conflicts in container management.
 
 Changed
 ^^^^^^^
 
-- Bumped ``parsl`` dependency version to 2024.8.12.
+- Bumped ``parsl`` dependency version to `2024.8.12`_.
 
 .. _changelog-2.25.0:
 
@@ -1264,7 +1292,8 @@ globus-compute-sdk & globus-compute-endpoint v2.25.0
 New Functionality
 ^^^^^^^^^^^^^^^^^
 
-- Added a new |ShellFunction| class to support remote execution of commandline strings.
+- Added a new |ShellFunction| class to support remote execution of commandline
+  strings.
 
   .. code:: python
 
@@ -1277,8 +1306,8 @@ New Functionality
       print(shell_result.stderr)      # Snippet of stderr captured
 
 - Adding |GlobusMPIEngine| with better support for MPI applications.
-  |GlobusMPIEngine| uses Parsl's |MPIExecutor|_ under the hood to dynamically partition
-  a single batch job to schedule MPI tasks.
+  |GlobusMPIEngine| uses Parsl's |MPIExecutor|_ under the hood to dynamically
+  partition a single batch job to schedule MPI tasks.
 
   Here's an example endpoint configuration that uses |GlobusMPIEngine|
 
@@ -1292,11 +1321,11 @@ New Functionality
       provider:
          ...
 
-- Added a new |MPIFunction| class to support MPI applications.
-  |MPIFunction| extends |ShellFunction| to use an MPI launcher to use a
-  subset of nodes within a batch job to run MPI applications. To partition a
-  batch job, |MPIFunction| must be sent to an endpoint configured with
-  |GlobusMPIEngine|.  Here is a usage example:
+- Added a new |MPIFunction| class to support MPI applications.  |MPIFunction|
+  extends |ShellFunction| to use an MPI launcher to use a subset of nodes
+  within a batch job to run MPI applications. To partition a batch job,
+  |MPIFunction| must be sent to an endpoint configured with |GlobusMPIEngine|.
+  Here is a usage example:
 
   .. code-block:: python
 
@@ -1342,19 +1371,22 @@ globus-compute-sdk & globus-compute-endpoint v2.24.0
 New Functionality
 ^^^^^^^^^^^^^^^^^
 
-- The engine that renders user endpoint config files now receives information about
-  the runtime environment used to submit tasks, such as Python environment and Globus
-  Compute SDK version, via the ``user_runtime`` variable. For a complete list of the
-  fields that are sent, please reference the |UserRuntime| class documentation.
+- The engine that renders user endpoint config files now receives information
+  about the runtime environment used to submit tasks, such as Python
+  environment and Globus Compute SDK version, via the ``user_runtime``
+  variable. For a complete list of the fields that are sent, please reference
+  the |UserRuntime| class documentation.
 
-- Added the ``globus-compute-endpoint python-exec`` command to run Python modules as scripts
-  from the Globus Compute endpoint CLI. The primary use case is to launch Parsl processes
-  without requiring additional commands in the user's ``PATH`` (e.g., ``process_worker_pool.py``).
+- Added the ``globus-compute-endpoint python-exec`` command to run Python
+  modules as scripts from the Globus Compute endpoint CLI. The primary use case
+  is to launch Parsl processes without requiring additional commands in the
+  user's ``PATH`` (e.g., ``process_worker_pool.py``).
 
 Changed
 ^^^^^^^
 
-- Worker nodes no longer need to resolve the ``process_worker_pool.py`` command.
+- Worker nodes no longer need to resolve the ``process_worker_pool.py``
+  command.
 
 - Unless manually specified, all |Executor| objects in the same process will
   share the same task group ID.
@@ -1372,19 +1404,21 @@ New Functionality
   that without the ``--force`` option the command may exit early if the
   endpoint is currently running or local config files are corrupted.
 
-- Included the paths to the ``globus-compute-endpoint`` and ``process_worker_pool.py``
-  executables in the ``self-diagnostic`` command output.
+- Included the paths to the ``globus-compute-endpoint`` and
+  ``process_worker_pool.py`` executables in the ``self-diagnostic`` command
+  output.
 
 Bug Fixes
 ^^^^^^^^^
 
-- We no longer raise an exception when using the |GlobusComputeEngine| with Parsl
-  providers that do not utilize ``Channel`` objects (e.g., ``KubernetesProvider``).
+- We no longer raise an exception when using the |GlobusComputeEngine| with
+  Parsl providers that do not utilize ``Channel`` objects (e.g.,
+  ``KubernetesProvider``).
 
 Changed
 ^^^^^^^
 
-- Bumped ``parsl`` dependency version to 2024.6.10.
+- Bumped ``parsl`` dependency version to `2024.6.10`_.
 
 - ``GlobusComputeEngine.working_dir`` now defaults to ``tasks_working_dir``
    * When ``working_dir=relative_path``, tasks run in a path relative to the endpoint.run_dir.
@@ -1399,10 +1433,13 @@ globus-compute-sdk & globus-compute-endpoint v2.22.0
 New Functionality
 ^^^^^^^^^^^^^^^^^
 
-- |GlobusComputeEngine| now supports a ``working_dir`` keyword argument that sets the directory in which
-  all functions will be executed. Relative paths, if set, will be considered relative to the endpoint directory
-  (``~/.globus_compute/<endpoint_name>``). If this option is not set, |GlobusComputeEngine| will use the
-  endpoint directory as the working directory. Set this option using ``working_dir: <working_dir_path>``
+- |GlobusComputeEngine| now supports a ``working_dir`` keyword argument that
+  sets the directory in which all functions will be executed. Relative paths,
+  if set, will be considered relative to the endpoint directory
+  (``~/.globus_compute/<endpoint_name>``). If this option is not set,
+  |GlobusComputeEngine| will use the endpoint directory as the working
+  directory. Set this option using ``working_dir: <working_dir_path>``
+
   Example config:
 
   .. code-block:: yaml
@@ -1413,10 +1450,13 @@ New Functionality
       # Run functions in ~/.globus_compute/<EP_NAME>/TASKS
       working_dir: TASKS
 
-- |GlobusComputeEngine| now supports function sandboxing, where each function is executed within a
-  sandbox directory for better isolation. When this option is enabled by setting ``run_in_sandbox: True``
-  a new directory with the function UUID as the name is created in the working directory (configurable with
-  the ``working_dir`` kwarg). Example config:
+- |GlobusComputeEngine| now supports function sandboxing, where each function
+  is executed within a sandbox directory for better isolation. When this option
+  is enabled by setting ``run_in_sandbox: True`` a new directory with the
+  function UUID as the name is created in the working directory (configurable
+  with the ``working_dir`` kwarg).
+
+  Example config:
 
   .. code-block:: yaml
 
@@ -1428,26 +1468,27 @@ New Functionality
       # Enable sandboxing to have functions run under /projects/MY_PROJ/<function_uuid>/
       run_in_sandbox: True
 
-- Implement ``debug`` as a top-level config boolean for a Compute Endpoint.  This flag
-  determines whether debug-level logs are emitted |nbsp| --- |nbsp| the same
-  functionality as the ``--debug`` command line argument to the
+- Implement ``debug`` as a top-level config boolean for a Compute Endpoint.
+  This flag determines whether debug-level logs are emitted |nbsp| --- |nbsp|
+  the same functionality as the ``--debug`` command line argument to the
   ``globus-compute-endpoint`` executable.  Note: if this flag is set to
   ``False`` when the ``--debug`` CLI flag is specified, the CLI wins.
 
 Bug Fixes
 ^^^^^^^^^
 
-- Fixed bug where |GlobusComputeEngine| set the current working directory to the directory
-  from which the endpoint was started. Now, |GlobusComputeEngine| will set the working directory
-  to the endpoint directory (``~/.globus_compute/<endpoint_name>``) by default. This can be configured
+- Fixed bug where |GlobusComputeEngine| set the current working directory to
+  the directory from which the endpoint was started. Now, |GlobusComputeEngine|
+  will set the working directory to the endpoint directory
+  (``~/.globus_compute/<endpoint_name>``) by default. This can be configured
   via the endpoint config.
 
 Changed
 ^^^^^^^
 
-- Updated the Compute hosted services to use AMQP over port 443 by default, instead of
-  the standard 5671. This can still be overridden in both the SDK and the Endpoint via
-  ``amqp_port``.
+- Updated the Compute hosted services to use AMQP over port 443 by default,
+  instead of the standard 5671. This can still be overridden in both the SDK
+  and the Endpoint via ``amqp_port``.
 
 .. _changelog-2.21.0:
 
@@ -1457,11 +1498,12 @@ globus-compute-sdk & globus-compute-endpoint v2.21.0
 New Functionality
 ^^^^^^^^^^^^^^^^^
 
-- MEPs now pass their configuration to UEP config templates via the ``parent_config``
-  variable.  Please reference the :ref:`user configuration template
-  <user-config-template-yaml-j2>` for more information.
+- MEPs now pass their configuration to UEP config templates via the
+  ``parent_config`` variable.  Please reference the :ref:`user configuration
+  template <user-config-template-yaml-j2>` for more information.
 
-- Added multi-user endpoint related files to the ``self-diagnostic`` command output.
+- Added multi-user endpoint related files to the ``self-diagnostic`` command
+  output.
 
 Bug Fixes
 ^^^^^^^^^
@@ -1472,9 +1514,10 @@ Bug Fixes
 Changed
 ^^^^^^^
 
-- The default user configuration template filename will use a ``.j2`` file extension to
-  clarify that we will treat the file as a Jinja template. Both ``user_config_template.yaml``
-  and ``user_config_template.yaml.j2`` are now valid, but the latter will take precedence.
+- The default user configuration template filename will use a ``.j2`` file
+  extension to clarify that we will treat the file as a Jinja template. Both
+  ``user_config_template.yaml`` and ``user_config_template.yaml.j2`` are now
+  valid, but the latter will take precedence.
 
 .. _changelog-2.20.0:
 
@@ -1485,8 +1528,8 @@ New Functionality
 ^^^^^^^^^^^^^^^^^
 
 - Added ``enable-on-boot`` and ``disable-on-boot`` commands to the
-  ``globus-compute-endpoint`` CLI, which contain packaged commands and configuration
-  for managing systemd units for Compute endpoints.
+  ``globus-compute-endpoint`` CLI, which contain packaged commands and
+  configuration for managing systemd units for Compute endpoints.
 
 Bug Fixes
 ^^^^^^^^^
@@ -1515,14 +1558,16 @@ globus-compute-sdk & globus-compute-endpoint v2.19.0
 New Functionality
 ^^^^^^^^^^^^^^^^^
 
-- Expanded support for ``pyzmq`` dependency to include versions up to ``26.x.x``.
+- Expanded support for ``pyzmq`` dependency to include versions up to
+  ``26.x.x``.
 
 Bug Fixes
 ^^^^^^^^^
 
-- We now raise an informative error when a user sets the ``strategy`` configuration field
-  to an incorrect value type for a given engine. For example, the |GlobusComputeEngine|
-  expects ``strategy`` to be a string or null, not an object.
+- We now raise an informative error when a user sets the ``strategy``
+  configuration field to an incorrect value type for a given engine. For
+  example, the |GlobusComputeEngine| expects ``strategy`` to be a string or
+  null, not an object.
 
 .. _changelog-2.18.1:
 
@@ -1532,8 +1577,8 @@ globus-compute-sdk & globus-compute-endpoint v2.18.1
 Bug Fixes
 ^^^^^^^^^
 
-- Fixed a bug that caused endpoints using the old ``HighThroughputExecutor`` to fail
-  silently.
+- Fixed a bug that caused endpoints using the old ``HighThroughputExecutor`` to
+  fail silently.
 
 .. _changelog-2.18.0:
 
@@ -1543,35 +1588,35 @@ globus-compute-sdk & globus-compute-endpoint v2.18.0
 New Functionality
 ^^^^^^^^^^^^^^^^^
 
-- Added ``GLOBUS_COMPUTE_CLIENT_ID`` and ``GLOBUS_COMPUTE_CLIENT_SECRET`` environment
-  variables to configure client logins.
+- Added ``GLOBUS_COMPUTE_CLIENT_ID`` and ``GLOBUS_COMPUTE_CLIENT_SECRET``
+  environment variables to configure client logins.
 
 Bug Fixes
 ^^^^^^^^^
 
-- Fixed a bug in |GlobusComputeEngine| where a faulty endpoint-config could result in
-  the endpoint repeatedly submitting jobs to the batch scheduler.  The endpoint will
-  not shut down, reporting the root cause in ``endpoint.log``
+- Fixed a bug in |GlobusComputeEngine| where a faulty endpoint-config could
+  result in the endpoint repeatedly submitting jobs to the batch scheduler.
+  The endpoint will not shut down, reporting the root cause in ``endpoint.log``
 
-- Fixed bug where |GlobusComputeEngine| lost track of submitted jobs that failed to
-  have workers connect back. The endpoint will now report a fault if multiple jobs
-  have failed to connect back and shutdown, tasks submitted to the endpoint will
-  return an exception.
+- Fixed bug where |GlobusComputeEngine| lost track of submitted jobs that
+  failed to have workers connect back. The endpoint will now report a fault if
+  multiple jobs have failed to connect back and shutdown, tasks submitted to
+  the endpoint will return an exception.
 
 Deprecated
 ^^^^^^^^^^
 
-- ``FUNCX_SDK_CLIENT_ID`` and ``FUNCX_SDK_CLIENT_SECRET`` have been deprecated in favor
-  of their ``GLOBUS_COMPUTE_*`` cousins.
+- ``FUNCX_SDK_CLIENT_ID`` and ``FUNCX_SDK_CLIENT_SECRET`` have been deprecated
+  in favor of their ``GLOBUS_COMPUTE_*`` cousins.
 
 Changed
 ^^^^^^^
 
-- |GlobusComputeEngine|'s ``strategy`` kwarg now only accepts ``str``, valid options are
-  ``{'none', 'simple'}`` where ``simple`` is the default.
-- The maximum duration that workers are allowed to idle when using |GlobusComputeEngine|
-  can now be configured with the new kwarg ``max_idletime`` which accepts a float and defaults
-  to 120s.
+- |GlobusComputeEngine|'s ``strategy`` kwarg now only accepts ``str``, valid
+  options are ``{'none', 'simple'}`` where ``simple`` is the default.
+- The maximum duration that workers are allowed to idle when using
+  |GlobusComputeEngine| can now be configured with the new kwarg
+  ``max_idletime`` which accepts a float and defaults to 120s.
 
 .. _changelog-2.17.0:
 
@@ -1616,12 +1661,14 @@ globus-compute-sdk & globus-compute-endpoint v2.16.0
 New Functionality
 ^^^^^^^^^^^^^^^^^
 
-- Added ``login`` command to ``globus-compute-endpoint`` CLI. This command triggers the
-  existing login flow that is automatically triggered when starting an endpoint.
+- Added ``login`` command to ``globus-compute-endpoint`` CLI. This command
+  triggers the existing login flow that is automatically triggered when
+  starting an endpoint.
 
-- Added the following arguments to ``globus-compute-endpoint configure``, which allow
-  on-the-fly creation of Globus authentication policies while configuring Compute
-  endpoints. See ``globus-compute-endpoint configure --help`` for more details.
+- Added the following arguments to ``globus-compute-endpoint configure``, which
+  allow on-the-fly creation of Globus authentication policies while configuring
+  Compute endpoints. See ``globus-compute-endpoint configure --help`` for more
+  details.
 
   - ``--auth-policy-project-id``
   - ``--auth-policy-display-name``
@@ -1633,13 +1680,13 @@ New Functionality
 Changed
 ^^^^^^^
 
-- Endpoint ``LoginManager`` s now request the ``AuthScopes.manage_projects`` scope, in
-  order to create auth projects during the auth policy creation flow.
+- Endpoint ``LoginManager`` s now request the ``AuthScopes.manage_projects``
+  scope, in order to create auth projects during the auth policy creation flow.
 
-- The minimum version of ``globus-sdk`` that is compatible with ``globus-compute-sdk``
-  and ``globus-compute-endpoint`` is now 3.35.0.
+- The minimum version of ``globus-sdk`` that is compatible with
+  ``globus-compute-sdk`` and ``globus-compute-endpoint`` is now 3.35.0.
 
-- Update Parsl from ``2024.3.4`` to ``2024.3.18``
+- Update Parsl from `2024.3.4`_ to `2024.3.18`_
 
 .. _changelog-2.15.0:
 
@@ -1661,7 +1708,7 @@ Changed
 
 - Update ``globus-sdk`` dependency to at least 3.28.0
 
-- Bumped parsl pinned version from ``2024.02.05`` to ``2024.3.4``
+- Bumped parsl pinned version from `2024.2.5`_ to `2024.3.4`_
   This version bump brings in following fixes:
 
   - HTEX to support ``max_workers_per_node`` as a keyword argument
@@ -1682,10 +1729,10 @@ globus-compute-sdk & globus-compute-endpoint v2.14.0
 New Functionality
 ^^^^^^^^^^^^^^^^^
 
-- Added support for the new Globus subscription management service. An endpoint can be
-  associated with a subscription group via the ``--subscription-id`` flag to
-  ``globus-compute-endpoint configure``, or via the ``subscription_id`` option in
-  ``config.yaml``:
+- Added support for the new Globus subscription management service. An endpoint
+  can be associated with a subscription group via the ``--subscription-id``
+  flag to ``globus-compute-endpoint configure``, or via the ``subscription_id``
+  option in ``config.yaml``:
 
   .. code-block:: yaml
 
@@ -1702,12 +1749,13 @@ globus-compute-sdk & globus-compute-endpoint v2.13.0
 New Functionality
 ^^^^^^^^^^^^^^^^^
 
-- Upgraded Parsl to version ``2024.02.05`` to enable encryption for the |GlobusComputeEngine|.
-  Under the hood, Parsl uses CurveZMQ to encrypt all communication channels between the engine
-  and related nodes.
+- Upgraded Parsl from `2024.1.22`_ to version `2024.2.5`_ to enable encryption
+  for the |GlobusComputeEngine|.  Under the hood, Parsl uses CurveZMQ to
+  encrypt all communication channels between the engine and related nodes.
 
-  We enable encryption by default, but users can disable it by setting the ``encrypted``
-  configuration variable under the ``engine`` stanza to ``false``.
+  We enable encryption by default, but users can disable it by setting the
+  ``encrypted`` configuration variable under the ``engine`` stanza to
+  ``false``.
 
   E.g.,
 
@@ -1717,9 +1765,10 @@ New Functionality
       type: GlobusComputeEngine
       encrypted: false
 
-  Depending on the installation, encryption might noticeably degrade throughput performance.
-  If this is an issue for your workflow, please refer to `Parsl's documentation on encryption
-  performance <https://parsl.readthedocs.io/en/stable/userguide/execution.html#encryption-performance>`_
+  Depending on the installation, encryption might noticeably degrade throughput
+  performance.  If this is an issue for your workflow, please refer to `Parsl's
+  documentation on encryption performance
+  <https://parsl.readthedocs.io/en/stable/userguide/execution.html#encryption-performance>`_
   before disabling encryption.
 
 Bug Fixes
@@ -1727,8 +1776,8 @@ Bug Fixes
 
 - Improved handling of unexpected errors in the ``HighThroughputEngine``.
 
-- Fixed ``Skipping analyzing "globus_compute_sdk"`` error when running ``mypy`` on
-  code dependent on ``globus_compute_sdk``
+- Fixed ``Skipping analyzing "globus_compute_sdk"`` error when running ``mypy``
+  on code dependent on ``globus_compute_sdk``
 
 .. _changelog-2.12.0:
 
@@ -1738,10 +1787,10 @@ globus-compute-sdk & globus-compute-endpoint v2.12.0
 New Functionality
 ^^^^^^^^^^^^^^^^^
 
-- Implement ability to launch workers in containerized environments, with support for
-  Docker, Singularity, and Apptainer.  Use by setting ``container_type``, ``container_uri``
-  and  additional options may be specified via ``container_cmd_options``.
-  Sample configuration:
+- Implement ability to launch workers in containerized environments, with
+  support for Docker, Singularity, and Apptainer.  Use by setting
+  ``container_type``, ``container_uri`` and  additional options may be
+  specified via ``container_cmd_options``.  Sample configuration:
 
   .. code-block:: yaml
 
@@ -1764,7 +1813,7 @@ Changed
 - Changed the default engine type for new endpoints to |GlobusComputeEngine|, which
   utilizes the Parsl |HighThroughputExecutor|_ under the hood.
 
-- Pin Parsl version requirement to ``2024.01.22``.
+- Pin Parsl version requirement from `2023.12.18`_ to `2024.1.22`_.
 
 .. _changelog-2.11.0:
 
@@ -1800,7 +1849,7 @@ Bug Fixes
 Changed
 ^^^^^^^
 
-- Pin Parsl version requirement to ``2023.12.18``.
+- Pin Parsl version requirement to `2023.12.18`_.
 
 Development
 ^^^^^^^^^^^
@@ -1838,7 +1887,7 @@ Deprecated
 Changed
 ^^^^^^^
 
-- Parsl version requirements updated from ``2023.7.3`` to ``2023.12.4``
+- Parsl version requirements updated from `2023.7.3`_ to `2023.12.4`_
 
 .. _changelog-2.7.0:
 
@@ -1885,7 +1934,7 @@ New Functionality
 Bug Fixes
 ^^^^^^^^^
 
-- The |GlobusComputeEngine|, ``ProcessPoolEngine``, and ``ThreadPoolEngine``
+- The |GlobusComputeEngine|, |ProcessPoolEngine|, and |ThreadPoolEngine|
   now respect the ``heartbeat_period`` variable, as defined in ``config.yaml``.
 
 - The |GlobusComputeEngine| has been updated to fully support the
@@ -1895,12 +1944,12 @@ Changed
 ^^^^^^^
 
 - Renamed the ``heartbeat_period_s`` attribute to ``heartbeat_period`` for
-  |GlobusComputeEngine|, ``ProcessPoolEngine``, and ``ThreadPoolEngine``
+  |GlobusComputeEngine|, |ProcessPoolEngine|, and |ThreadPoolEngine|
   to maintain parity with the ``HighThroughputEngine`` and Parsl's
   |HighThroughputExecutor|_.
 
 - Changed ``heartbeat_period`` type from float to int for |GlobusComputeEngine|,
-  ``ProcessPoolEngine``, and ``ThreadPoolEngine`` to maintain parity with the
+  |ProcessPoolEngine|, and |ThreadPoolEngine| to maintain parity with the
   ``HighThroughputEngine`` and Parsl's |HighThroughputExecutor|_.
 
 .. _changelog-2.5.0:
@@ -2149,23 +2198,24 @@ New Functionality
         ),
     )
 
-- Reimplemented ``ProcessPoolEngine``, which wraps ``concurrent.futures.ProcessPoolExecutor``,
-  for concurrent local execution. We temporarily removed the former implementation because of a
-  critical bug.
+- Reimplemented |ProcessPoolEngine|, which wraps |ProcessPoolExecutor|_, for
+  concurrent local execution. We temporarily removed the former implementation
+  because of a critical bug.
 
-- Added support for deleting functions via the ``Client.delete_function`` method.
+- Added support for deleting functions via the :meth:`Client.delete_function
+  <globus_compute_sdk.Client.delete_function>` method.
 
 Bug Fixes
 ^^^^^^^^^
 
 - The ``provider`` field was required in the endpoint YAML configuration but is
-  not accepted by the ``ThreadPoolEngine``, rendering it unusable. The ``provider``
+  not accepted by the |ThreadPoolEngine|, rendering it unusable. The ``provider``
   field is now optional.
 
 Changed
 ^^^^^^^
 
-- Update Parsl requirement to version ``2023.7.3``
+- Update Parsl requirement to version `2023.7.3`_
 
 - As part of Parsl upgrade, drop support for Python 3.7.  Supported versions
   are now 3.8, 3.9, 3.10, and 3.11
@@ -2191,7 +2241,7 @@ Deprecated
 
 - The ``HighThroughputExecutor`` is now marked for deprecation.
   Importing and using this class will raise a warning.
-  Upgrade to the ``globus_compute_endpoint.engines.GlobusComputeEngine`` which
+  Upgrade to the |GlobusComputeEngine| which
   supersedes the ``HighThroughputExecutor``.
 
   Please note that the |GlobusComputeEngine| has the following limitations:
@@ -2241,13 +2291,13 @@ New Functionality
   ``Client`` level via constructor arguments (``code_serialization_strategy`` and
   ``data_serialization_strategy``)
 
-  - For example, to use ``DillCodeSource`` when serializing functions:
+  - For example, to use |DillCodeSource| when serializing functions:
     ``client = Client(code_serialization_strategy=DillCodeSource())``
 
   - This functionality is available to the ``Executor`` by passing a custom client.
     Using the client above: ``executor = Executor(funcx_client=client)``
 
-- Added ``check_strategies`` method to ``ComputeSerializer`` for determining whether
+- Added ``check_strategies`` method to |ComputeSerializer| for determining whether
   serialization strategies are compatible with a given use-case
 
 Removed
@@ -2275,12 +2325,10 @@ New Functionality
 
 - Support for 3 new execution ``Engines``, designed to replace the ``HighThroughputExecutor``
 
-  - |GlobusComputeEngine|: Wraps Parsl's ``HighThroughputExecutor`` to match the current
+  - |GlobusComputeEngine|: Wraps Parsl's |HighThroughputExecutor| to match the current
     default executor (globus-computes' fork of ``HighThroughputExecutor``)
-  - ``ProcessPoolEngine``: Wraps ``concurrent.futures.ProcessPoolExecutor`` for concurrent
-    local execution
-  - ``ThreadPoolEngine``: Wraps ``concurrent.futures.ThreadPoolEngine`` for concurrent
-    local execution on MacOS.
+  - |ProcessPoolEngine|: Wraps |ProcessPoolExecutor|_ for concurrent local execution
+  - |ThreadPoolEngine|: Wraps |ThreadPoolExecutor|_ for concurrent local execution
 
 Bug Fixes
 ^^^^^^^^^
@@ -2306,7 +2354,7 @@ Removed
 ^^^^^^^
 
 - Removed the ``check`` method from ``globus_compute_sdk.serialize.base.BaseSerializer``,
-  and consequently also from ``globus_compute_sdk.serialize.ComputeSerializer``
+  and consequently also from |ComputeSerializer|
 
 Bug Fixes
 ^^^^^^^^^
@@ -2497,7 +2545,7 @@ Changed
 
 - Initiate shutdown of any currently running FuncXExecutor objects when the main
   thread ends (a.k.a., "end of script").  This follows the same behavior as
-  both ``ThreadPoolExecutor`` and ``ProcessPoolExecutor``.
+  both |ThreadPoolExecutor|_ and |ProcessPoolExecutor|_.
 
 .. _changelog-1.0.8:
 
@@ -2762,7 +2810,7 @@ Bug Fixes
 - Fixed issue with `quiesce` event not getting set from the SIGINT handler,
   resulting in cleaner shutdowns
 
-- DillCodeSource updated to use dill's lstrip option to serialize
+- |DillCodeSource| updated to use dill's lstrip option to serialize
   function definitions in nested contexts.
 
 Removed
@@ -2774,7 +2822,7 @@ Removed
 Changed
 ^^^^^^^
 
-- DillCodeSource will now be used ahead of DillCode
+- |DillCodeSource| will now be used ahead of DillCode
 
 funcx & funcx-endpoint v1.0.1
 -----------------------------
@@ -3575,23 +3623,63 @@ New Functionality
 .. |nbsp| unicode:: 0xA0
    :trim:
 
-.. |Batch| replace:: :class:`Batch <globus_compute_sdk.sdk.batch.Batch>`
-.. |Executor| replace:: :class:`Executor <globus_compute_sdk.sdk.executor.Executor>`
-.. |MPIFunction| replace:: :class:`MPIFunction <globus_compute_sdk.sdk.mpi_function.MPIFunction>`
-.. |ShellFunction| replace:: :class:`ShellFunction <globus_compute_sdk.sdk.shell_function.ShellFunction>`
-.. |UserRuntime| replace:: :class:`UserRuntime <globus_compute_sdk.sdk.batch.UserRuntime>`
+.. |ProcessPoolExecutor| replace:: ``concurrent.futures.ProcessPoolExecutor``
+.. _ProcessPoolExecutor: https://docs.python.org/3/library/concurrent.futures.html#processpoolexecutor
+.. |ThreadPoolExecutor| replace:: ``concurrent.futures.ThreadPoolExecutor``
+.. _ThreadPoolExecutor: https://docs.python.org/3/library/concurrent.futures.html#threadpoolexecutor
+
+.. |Batch| replace:: :class:`~globus_compute_sdk.sdk.batch.Batch`
+.. |Client| replace:: :class:`~globus_compute_sdk.Client`
+.. |CombinedCode| replace:: :class:`~globus_compute_sdk.serialize.CombinedCode`
+.. |ComputeSerializer| replace:: :class:`~globus_compute_sdk.serialize.ComputeSerializer`
+.. |Executor| replace:: :class:`Executor <globus_compute_sdk.Executor>`
+.. |MPIFunction| replace:: :class:`~globus_compute_sdk.sdk.mpi_function.MPIFunction`
+.. |PureSourceDill| replace:: :class:`~globus_compute_sdk.serialize.PureSourceDill`
+.. |PureSourceTextInspect| replace:: :class:`~globus_compute_sdk.serialize.PureSourceTextInspect`
+.. |ShellFunction| replace:: :class:`~globus_compute_sdk.sdk.shell_function.ShellFunction`
+.. |UserRuntime| replace:: :class:`~globus_compute_sdk.sdk.batch.UserRuntime`
+
+.. |DillCodeSource| replace:: :class:`~globus_compute_sdk.serialize.DillCodeSource`
 
 .. |audit_log_path| replace:: :class:`audit_log_path <globus_compute_endpoint.endpoint.config.config.ManagerEndpointConfig>`
 .. |detach_endpoint| replace:: :class:`detach_endpoint <globus_compute_endpoint.endpoint.config.config.UserEndpointConfig>`
-.. |GlobusComputeEngine| replace:: :class:`GlobusComputeEngine <globus_compute_endpoint.engines.globus_compute.GlobusComputeEngine>`
-.. |GlobusMPIEngine| replace:: :class:`GlobusMPIEngine <globus_compute_endpoint.engines.globus_mpi.GlobusMPIEngine>`
+.. |GlobusComputeEngine| replace:: :class:`~globus_compute_endpoint.engines.GlobusComputeEngine`
+.. |ThreadPoolEngine| replace:: :class:`~globus_compute_endpoint.engines.thread_pool.ThreadPoolEngine`
+.. |ProcessPoolEngine| replace:: :class:`~globus_compute_endpoint.engines.ProcessPoolEngine`
+.. |GlobusMPIEngine| replace:: :class:`~globus_compute_endpoint.engines.GlobusMPIEngine`
 
 .. |MPIExecutor| replace:: ``MPIExecutor``
 .. _MPIExecutor: https://parsl.readthedocs.io/en/stable/stubs/parsl.executors.MPIExecutor.html
+.. |GlobusComputeExecutor| replace:: ``GlobusComputeExecutor``
+.. _GlobusComputeExecutor: https://parsl.readthedocs.io/en/stable/stubs/parsl.executors.GlobusComputeExecutor.html
 .. |HighThroughputExecutor| replace:: ``HighThroughputExecutor``
 .. _HighThroughputExecutor: https://parsl.readthedocs.io/en/stable/stubs/parsl.executors.HighThroughputExecutor.html
 .. |LocalProvider| replace:: ``LocalProvider``
 .. _LocalProvider: https://parsl.readthedocs.io/en/stable/stubs/parsl.providers.LocalProvider.html
+.. |SlurmProvider| replace:: ``SlurmProvider``
+.. _SlurmProvider: https://parsl.readthedocs.io/en/stable/stubs/parsl.providers.SlurmProvider.html
+
+.. _2026.2.23: https://pypi.org/project/parsl/2026.2.23/
+.. _2026.1.5: https://pypi.org/project/parsl/2026.1.5/
+.. _2025.12.1: https://pypi.org/project/parsl/2025.12.1/
+.. _2025.9.15: https://pypi.org/project/parsl/2025.9.15/
+.. _2025.3.31: https://pypi.org/project/parsl/2025.3.31/
+.. _2025.3.17: https://pypi.org/project/parsl/2025.3.17/
+.. _2025.2.17: https://pypi.org/project/parsl/2025.2.17/
+.. _2025.1.20: https://pypi.org/project/parsl/2025.1.20/
+.. _2025.1.6: https://pypi.org/project/parsl/2025.1.6/
+.. _2024.11.25: https://pypi.org/project/parsl/2024.11.25/
+.. _2024.10.21: https://pypi.org/project/parsl/2024.10.21/
+.. _2024.9.9: https://pypi.org/project/parsl/2024.9.9/
+.. _2024.8.12: https://pypi.org/project/parsl/2024.8.12/
+.. _2024.6.10: https://pypi.org/project/parsl/2024.6.10/
+.. _2024.3.18: https://pypi.org/project/parsl/2024.3.18/
+.. _2024.3.4: https://pypi.org/project/parsl/2024.3.4/
+.. _2024.2.5: https://pypi.org/project/parsl/2024.2.5/
+.. _2024.1.22: https://pypi.org/project/parsl/2024.1.22/
+.. _2023.12.18: https://pypi.org/project/parsl/2023.12.18/
+.. _2023.12.4: https://pypi.org/project/parsl/2023.12.4/
+.. _2023.7.3: https://pypi.org/project/parsl/2023.7.3/
 
 .. |/v3/functions| replace:: ``/v3/functions``
 .. _/v3/functions: https://compute.api.globus.org/redoc#tag/Functions/operation/register_function_v3_functions_post
