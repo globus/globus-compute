@@ -53,53 +53,18 @@ jobs:
         with:
             enable-cache: true
 
-      - name: "Collect Canary metadata cache"
-        id: restore_metadata
-        if: inputs.pd_test == ''
-        uses: actions/cache@v5
-        with:
-          path: canary_metadata.json
-          key: canary-cache-metadata
-
       - name: "Calculate Canary Cache Key"
         if: inputs.pd_test == ''
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-            hour_ago=$(date -u -d'1 hour ago' +'%Y-%m-%dT%H:%M:%SZ')
-            gh api /repos/globus/globus-compute/actions/workflows/compute_canary.yml/runs?per_page=50\&status=completed\&created=">$hour_ago" > ./recent_runs.json
-            latest_canary=$(jq '.workflow_runs | map(select(.name == "Canary")) | map({status, conclusion, updated_at}) | max_by(.updated_at)' recent_runs.json)
-            rm recent_runs.json
-            conclusion=$(jq -r '.conclusion' <<< "$latest_canary")
-            last_run=$(jq -r '.updated_at' <<< "$latest_canary")
-
-            jq -C <<< "$latest_canary"
-
-            echo "Last Canary Run: $conclusion at $last_run"
-            if [[ $conclusion = failure ]]; then
-                # An existing incident exists; operate on that cache key/incident
-                [[ -f canary_metadata.json ]] && CANARY_CACHE_KEY=$(jq -r '.CANARY_CACHE_KEY' canary_metadata.json)
-            fi
-
-            if [[ -z "$CANARY_CACHE_KEY" || $CANARY_CACHE_KEY = null ]]; then
-                ts=$(date -u +'%Y%m%d%H%M')
-                CANARY_CACHE_KEY="canary_incident_${ts}"
-            fi
+            CANARY_CACHE_KEY="canary_incident_${{ github.event.inputs.environment }}"
 
             echo "Computed CANARY_CACHE_KEY=${CANARY_CACHE_KEY}"
-            # save for next workflow run
-            echo "{\"CANARY_CACHE_KEY\":\"${CANARY_CACHE_KEY}\"}" > canary_metadata.json
 
             # export for later steps
             echo "CANARY_CACHE_KEY=${CANARY_CACHE_KEY}" >> "$GITHUB_ENV"
             echo "CANARY_CACHE_KEY=${CANARY_CACHE_KEY}" >> "$GITHUB_OUTPUT"
-
-      - name: "Save Canary metadata cache"
-        if: inputs.pd_test == ''
-        uses: actions/cache@v5
-        with:
-          path: canary_metadata.json
-          key: canary-cache-metadata
 
       - name: "Install Globus Compute SDK"
         if: inputs.pd_test == ''
