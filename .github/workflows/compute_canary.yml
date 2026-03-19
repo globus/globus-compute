@@ -45,18 +45,7 @@ jobs:
         run: |
             gh run cancel --repo globus/globus-compute ${{ github.run_id }}
 
-      - uses: actions/checkout@v6
-        with:
-          ref: main
-
-      - uses: astral-sh/setup-uv@v2
-        with:
-            enable-cache: true
-
       - name: "Calculate Canary Cache Key"
-        if: inputs.pd_test == ''
-        env:
-          GH_TOKEN: ${{ github.token }}
         run: |
             CANARY_CACHE_KEY="canary_incident_${{ github.event.inputs.environment }}"
 
@@ -65,6 +54,22 @@ jobs:
             # export for later steps
             echo "CANARY_CACHE_KEY=${CANARY_CACHE_KEY}" >> "$GITHUB_ENV"
             echo "CANARY_CACHE_KEY=${CANARY_CACHE_KEY}" >> "$GITHUB_OUTPUT"
+
+      - name: "PD Signaling Test"
+        if: inputs.pd_test != ''
+        run: |
+          [[ "signal failure" = "${{ inputs.pd_test }}" ]] && exit 1
+          exit 0
+
+      - uses: actions/checkout@v6
+        if: inputs.pd_test == ''
+        with:
+          ref: main
+
+      - uses: astral-sh/setup-uv@v2
+        if: inputs.pd_test == ''
+        with:
+            enable-cache: true
 
       - name: "Install Globus Compute SDK"
         if: inputs.pd_test == ''
@@ -75,32 +80,32 @@ jobs:
 
       - name: "Test Kernel: Executor.submit() a task"
         if: inputs.pd_test == ''
+        uses: nick-fields/retry@v3
         env:
           GLOBUS_COMPUTE_CLIENT_ID: ${{ secrets.API_CLIENT_ID }}
           GLOBUS_COMPUTE_CLIENT_SECRET: ${{ secrets.API_CLIENT_SECRET }}
-        run: |
-          uv run python << 'EOF'
-          # Python script; submit task to tutorial endpoint via Executor
-          import random
-          from globus_compute_sdk import Executor
+        with:
+          timeout_minutes: 1
+          max_attempts: 3
+          retry_on: error
+          retry_wait_seconds: 15
+          command: |
+            uv run python << 'EOF'
+            # Python script; submit task to tutorial endpoint via Executor
+            import random
+            from globus_compute_sdk import Executor
 
-          def double(x: float | int) -> float | int:
-              return 2 * x
+            def double(x: float | int) -> float | int:
+                return 2 * x
 
-          tut_endpoint_id = "4b116d3c-1703-4f8f-9f6f-39921e5864df"
-          inp_value = random.randint(-2**30, 2**30)
-          exp_value = 2 * inp_value
-          with Executor(tut_endpoint_id) as ex:
-              f = ex.submit(double, inp_value)
-              res = f.result(timeout=60)
-              assert res == exp_value
-          EOF
-
-      - name: "PD Signaling Test"
-        if: inputs.pd_test != ''
-        run: |
-          [[ "signal failure" = "${{ inputs.pd_test }}" ]] && exit 1
-          exit 0
+            tut_endpoint_id = "4b116d3c-1703-4f8f-9f6f-39921e5864df"
+            inp_value = random.randint(-2**30, 2**30)
+            exp_value = 2 * inp_value
+            with Executor(tut_endpoint_id) as ex:
+                f = ex.submit(double, inp_value)
+                res = f.result(timeout=60)
+                assert res == exp_value
+            EOF
 
       - name: "Notify PagerDuty"
         if: ${{ !cancelled() }}
