@@ -3,6 +3,35 @@ Changelog
 
 .. scriv-insert-here
 
+.. _changelog-4.9.0:
+
+globus-compute-sdk & globus-compute-endpoint v4.9.0
+---------------------------------------------------
+
+New Functionality
+^^^^^^^^^^^^^^^^^
+
+- To aid potential :ref:`UEP instance customization
+  <advanced_environment_customization>`, export ``GC_USER_PYTHON_VERSION`` and
+  ``GC_USER_SDK_VERSION`` (if available from the :ref:`user_runtime
+  <reserved-template-variables>` structure)
+
+- Added ``python.version_description`` to the ``user_runtime`` :ref:`reserved
+  template variable <reserved-template-variables>`.  This contains the full
+  version string from ``sys.version``, and replaces the deprecated
+  ``user_runtime.python`` field.
+
+Removed
+^^^^^^^
+
+- Removed the deprecated ``login_manager`` module. Instead, use a |globus_sdk.GlobusApp|_.
+- Removed the deprecated ``WebClient`` class. Instead, use |globus_sdk.ComputeClientV3|_.
+
+.. |globus_sdk.GlobusApp| replace:: ``globus_sdk.GlobusApp``
+.. _globus_sdk.GlobusApp: https://globus-sdk-python.readthedocs.io/en/stable/authorization/globus_app/apps.html
+.. |globus_sdk.ComputeClientV3| replace:: ``globus_sdk.ComputeClientV3``
+.. _globus_sdk.ComputeClientV3: https://globus-sdk-python.readthedocs.io/en/stable/services/compute.html
+
 .. _changelog-4.8.0:
 
 globus-compute-sdk & globus-compute-endpoint v4.8.0

@@ -665,6 +665,8 @@ Two stub configs follow, for the PBS and Slurm schedulers respectively. See
           type: SimpleLauncher
 
 
+.. _advanced_environment_customization:
+
 Advanced Environment Customization
 ==================================
 
