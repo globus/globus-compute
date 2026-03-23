@@ -54,7 +54,7 @@ from globus_compute_sdk import Client
 from globus_compute_sdk.sdk.auth.auth_client import ComputeAuthClient
 from globus_compute_sdk.sdk.auth.whoami import print_whoami_info
 from globus_compute_sdk.sdk.batch import create_user_runtime
-from globus_compute_sdk.sdk.compute_dir import ensure_compute_dir
+from globus_compute_sdk.sdk.compute_dir import ensure_compute_dir, get_compute_dir
 from globus_compute_sdk.sdk.utils.gare import gare_handler
 from globus_sdk import MISSING, AuthClient, GlobusAPIError, MissingType, NetworkError
 
@@ -91,7 +91,6 @@ _AUTH_POLICY_DEFAULT_DESC = "This policy was created automatically by Globus Com
 
 class CommandState:
     def __init__(self):
-        self.endpoint_config_dir: pathlib.Path = init_config_dir()
         self.debug = False
         self.no_color = False
         self.log_to_console = False
@@ -104,16 +103,13 @@ class CommandState:
         return click.get_current_context().ensure_object(CommandState)
 
 
-def init_config_dir() -> pathlib.Path:
+def config_dir_callback(ctx, param, value) -> pathlib.Path:
     try:
+        if value:
+            os.environ["GLOBUS_COMPUTE_USER_DIR"] = value
         return ensure_compute_dir()
     except (FileExistsError, PermissionError) as e:
         raise ClickException(str(e))
-
-
-def get_config_dir() -> pathlib.Path:
-    state = CommandState.ensure()
-    return state.endpoint_config_dir
 
 
 def get_cli_endpoint(conf: UserEndpointConfig) -> Endpoint:
@@ -206,7 +202,7 @@ def get_ep_dir_by_name_or_uuid(ctx, param, value, require_local: bool = True):
         ctx.params["ep_dir"] = None
         return
 
-    conf_dir = get_config_dir()
+    conf_dir = get_compute_dir()
     try:
         uuid.UUID(value)
     except ValueError:
@@ -292,23 +288,16 @@ def name_arg(f):
     )(f)
 
 
-def config_dir_callback(ctx, param, value):
-    if value is None or ctx.resilient_parsing:
-        return
-    state = CommandState.ensure()
-    state.endpoint_config_dir = pathlib.Path(value)
-
-
 @click.group("globus-compute-endpoint")
 @click.option(
     "-c",
     "--config-dir",
-    default=None,
+    type=str,
     help="override default config dir",
     callback=config_dir_callback,
     expose_value=False,
 )
-def app():
+def app(*, config_dir: str | None = None):
     # the main command group body runs on every command, so the block below will always
     # execute
     setup_logging()  # Until we parse the CLI flags, just setup default logging
@@ -563,7 +552,7 @@ def configure_endpoint(
             require_mfa=auth_policy_mfa_required or MISSING,
         )
 
-    compute_dir = get_config_dir()
+    compute_dir = get_compute_dir()
     ep_dir = compute_dir / name
     Endpoint.configure_endpoint(
         conf_dir=ep_dir,
@@ -658,7 +647,7 @@ def _do_login(force: bool) -> None:
 
 def _do_logout_endpoints(force: bool) -> None:
     """Logout from all endpoints and remove cached authentication credentials"""
-    compute_dir = get_config_dir()
+    compute_dir = get_compute_dir()
     running_endpoints = Endpoint.get_running_endpoints(compute_dir)
 
     if running_endpoints and not force:
@@ -1000,7 +989,7 @@ def restart_endpoint(*, ep_dir: pathlib.Path, **_kwargs):
 @common_options
 def list_endpoints():
     """List all available endpoints"""
-    compute_dir = get_config_dir()
+    compute_dir = get_compute_dir()
     Endpoint.print_endpoint_table(compute_dir)
 
 
