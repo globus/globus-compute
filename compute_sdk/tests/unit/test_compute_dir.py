@@ -9,28 +9,43 @@ from pyfakefs.fake_filesystem import FakeFilesystem
 
 
 @pytest.mark.parametrize("dir_exists", [True, False])
-@pytest.mark.parametrize("user_dir", ["/my/dir", None, ""])
+@pytest.mark.parametrize("env_dir", ["/my/dir", "", None])
+@pytest.mark.parametrize("config_dir", ["/my/dir", " ", None])
 def test_ensure_compute_dir(
     dir_exists: bool,
-    user_dir: str | None,
+    env_dir: str | None,
+    config_dir: str | None,
     fs: FakeFilesystem,
     monkeypatch: pytest.MonkeyPatch,
 ):
     home = pathlib.Path.home()
 
-    dirname = home / ".globus_compute"
+    expected_dirname = home / ".globus_compute"
 
     if dir_exists:
-        fs.create_dir(dirname)
+        fs.create_dir(expected_dirname)
 
-    if user_dir is not None:
-        dirname = pathlib.Path(user_dir)
+    if env_dir is not None:
+        # Override ~/.globus_compute if env var is set
+        dirname = pathlib.Path(env_dir)
         monkeypatch.setenv("GLOBUS_COMPUTE_USER_DIR", str(dirname))
+        expected_dirname = pathlib.Path(env_dir)
+    else:
+        monkeypatch.delenv("GLOBUS_COMPUTE_USER_DIR", raising=False)
 
-    compute_dirname = ensure_compute_dir()
+    if config_dir is not None:
+        # Override everything else if the config_dir argument is specified
+        expected_dirname = pathlib.Path(config_dir)
 
-    assert compute_dirname.is_dir()
-    assert compute_dirname == dirname
+    if isinstance(config_dir, str) and not config_dir.strip():
+        # Intentionally providing an empty str for config_dir is not allowed
+        with pytest.raises(ValueError):
+            ensure_compute_dir(config_dir)
+    else:
+        actual_compute_dir = ensure_compute_dir(config_dir)
+
+        assert actual_compute_dir.is_dir()
+        assert actual_compute_dir.resolve() == expected_dirname.resolve()
 
 
 @pytest.mark.parametrize("user_dir_defined", [True, False])
@@ -43,6 +58,8 @@ def test_conflicting_compute_file(
     with pytest.raises(FileExistsError) as exc:
         if user_dir_defined:
             monkeypatch.setenv("GLOBUS_COMPUTE_USER_DIR", str(filename))
+        else:
+            monkeypatch.delenv("GLOBUS_COMPUTE_USER_DIR", raising=False)
         ensure_compute_dir()
 
     assert "Error creating directory" in str(exc)

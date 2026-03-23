@@ -61,8 +61,18 @@ def reset_umask():
 
 
 @pytest.fixture
-def gc_dir(tmp_path):
-    yield tmp_path / ".globus_compute"
+def mock_user_dir_env(tmp_path):
+    with mock.patch.dict(
+        os.environ, {"GLOBUS_COMPUTE_USER_DIR": str(tmp_path.resolve())}
+    ):
+        yield tmp_path
+
+
+@pytest.fixture
+def gc_dir(mock_user_dir_env):
+    with mock.patch("globus_compute_sdk.sdk.compute_dir.get_compute_dir") as m:
+        m.return_value = pathlib.Path(mock_user_dir_env)
+        yield m.return_value
 
 
 @pytest.fixture
@@ -89,7 +99,6 @@ def mock_auth_client(mock_app):
 def mock_command_ensure(gc_dir):
     with mock.patch(f"{_MOCK_BASE}CommandState.ensure") as m:
         m.return_value = m
-        m.endpoint_config_dir = gc_dir
         m.detach = False  # since a Mock would be truthy
 
         yield m
@@ -148,9 +157,9 @@ def mock_daemon():
 
 
 @pytest.fixture
-def make_endpoint_dir(mock_command_ensure, ep_name):
+def make_endpoint_dir(gc_dir, ep_name):
     def func(name=ep_name, ep_uuid=None):
-        ep_dir = mock_command_ensure.endpoint_config_dir / name
+        ep_dir = gc_dir / name
         ep_dir.mkdir(parents=True, exist_ok=True)
         if ep_uuid is not None:
             ep_json = ep_dir / "endpoint.json"
@@ -167,9 +176,9 @@ engine:
 
 
 @pytest.fixture
-def make_manager_endpoint_dir(mock_command_ensure, ep_name):
+def make_manager_endpoint_dir(gc_dir, ep_name):
     def func(name=ep_name, ep_uuid=None):
-        ep_dir = mock_command_ensure.endpoint_config_dir / name
+        ep_dir = gc_dir / name
         ep_dir.mkdir(parents=True, exist_ok=True)
         if ep_uuid is not None:
             ep_json = ep_dir / "endpoint.json"
@@ -251,9 +260,9 @@ def test_init_config_dir(fs, dir_exists, user_dir):
         with mock.patch.dict(
             os.environ, {"GLOBUS_COMPUTE_USER_DIR": str(config_dirname)}
         ):
-            dirname = init_config_dir()
+            dirname = ensure_compute_dir()
     else:
-        dirname = init_config_dir()
+        dirname = ensure_compute_dir()
 
     assert dirname == config_dirname
 
@@ -279,7 +288,7 @@ def test_init_config_dir_permission_error(fs):
         with mock.patch.dict(
             os.environ, {"GLOBUS_COMPUTE_USER_DIR": str(config_dirname)}
         ):
-            init_config_dir()
+            init_config_dir(str(config_dirname))
 
     assert "Permission denied" in str(exc)
 
@@ -292,15 +301,24 @@ def test_start_endpoint_no_such_ep(run_line, mock_ep, ep_name):
 
 
 def test_start_endpoint_existing_ep(
-    run_line, mock_ep, make_endpoint_dir, ep_name, mock_client
+    run_line,
+    mock_ep,
+    make_endpoint_dir,
+    ep_name,
+    mock_client,
 ):
-    make_endpoint_dir()
+    make_endpoint_dir(ep_name)
     run_line(f"start {ep_name}")
     mock_ep.start_endpoint.assert_called_once()
 
 
 def test_start_endpoint_already_running(
-    make_endpoint_dir, mock_client, ep_name, mock_send_endpoint_startup_failure_to_amqp
+    mock_command_ensure,
+    gc_dir,
+    make_endpoint_dir,
+    mock_client,
+    ep_name,
+    mock_send_endpoint_startup_failure_to_amqp,
 ):
     """Check to ensure endpoint already active message prints to console"""
     ep_dir = make_endpoint_dir()
@@ -319,7 +337,9 @@ def test_start_endpoint_already_running(
     assert "remove the PID file" in serr, "Expect suggested action conveyed"
 
 
-def test_start_endpoint_stale(mock_ep, make_endpoint_dir, ep_name, mock_client):
+def test_start_endpoint_stale(
+    mock_ep, mock_command_ensure, make_endpoint_dir, ep_name, mock_client
+):
     ep_dir = make_endpoint_dir()
     pid_path = Endpoint.pid_path(ep_dir)
     pid_path.write_text("12345")
@@ -337,7 +357,7 @@ def test_start_endpoint_stale(mock_ep, make_endpoint_dir, ep_name, mock_client):
 
 @pytest.mark.parametrize("is_uep", (False, True))
 def test_start_non_template_emits_upgrade_message(
-    mock_ep, make_endpoint_dir, is_uep, mock_client
+    mock_ep, mock_command_ensure, gc_dir, make_endpoint_dir, is_uep, mock_client
 ):
     ep_dir = make_endpoint_dir()
     f = io.StringIO()
@@ -625,10 +645,10 @@ def test__do_register_endpoint_handles_network_error_scriptably(
 
 @mock.patch(f"{_MOCK_BASE}setup_logging")
 def test_debug_configurable(
-    mock_setup_log, run_line, mock_ep, mock_command_ensure, ep_name
+    mock_setup_log, run_line, mock_ep, mock_command_ensure, gc_dir, ep_name
 ):
     mock_command_ensure.debug = False
-    ep_dir = mock_command_ensure.endpoint_config_dir / ep_name
+    ep_dir = gc_dir / ep_name
     ep_dir.mkdir(parents=True)
     config = {"debug": False, "engine": {"type": "ThreadPoolEngine"}}
     data = {"config": yaml.safe_dump(config)}
@@ -654,10 +674,10 @@ def test_debug_configurable(
 
 @mock.patch(f"{_MOCK_BASE}setup_logging")
 def test_cli_debug_overrides_config(
-    mock_setup_log, run_line, mock_ep, mock_command_ensure, ep_name
+    mock_setup_log, run_line, mock_ep, mock_command_ensure, ep_name, gc_dir
 ):
     mock_command_ensure.debug = True
-    ep_dir = mock_command_ensure.endpoint_config_dir / ep_name
+    ep_dir = gc_dir / ep_name
     ep_dir.mkdir(parents=True)
     config = {"debug": False, "engine": {"type": "ThreadPoolEngine"}}
     data = {"config": yaml.safe_dump(config)}
@@ -670,9 +690,8 @@ def test_cli_debug_overrides_config(
     assert k["debug"] is True, "Expect --debug flag overrides config"
 
 
-def test_configure_validates_name(mock_command_ensure, run_line):
-    compute_dir = mock_command_ensure.endpoint_config_dir
-    compute_dir.mkdir(parents=True, exist_ok=True)
+def test_configure_validates_name(mock_command_ensure, run_line, gc_dir):
+    gc_dir.mkdir(parents=True, exist_ok=True)
 
     run_line("configure ValidName")
     run_line("configure 'Invalid name with spaces'", assert_exit_code=1)
@@ -687,16 +706,18 @@ def test_configure_validates_name(mock_command_ensure, run_line):
     ],
 )
 def test_start_ep_display_name_in_config(
-    run_line, mock_command_ensure, make_endpoint_dir, display_test
+    run_line, gc_dir, make_endpoint_dir, display_test
 ):
     dir_name, display_name = display_test
 
-    conf = mock_command_ensure.endpoint_config_dir / dir_name / "config.yaml"
+    conf = gc_dir / dir_name / "config.yaml"
+    open("/tmp/err.txt", "a").write(f"XXX {conf=}\n")
     configure_arg = ""
     if display_name is not None:
         configure_arg = f" --display-name '{display_name}'"
     run_line(f"configure {dir_name}{configure_arg}")
 
+    open("/tmp/err.txt", "a").write(f"YYY {dir_name=} {conf=}")
     with open(conf) as f:
         conf_dict = yaml.safe_load(f)
 
@@ -712,9 +733,9 @@ def test_start_ep_display_name_in_config(
     ),
 )
 def test_start_ep_high_assurance_in_config(
-    run_line, mock_command_ensure, make_endpoint_dir, ep_name, set_ha
+    run_line, gc_dir, make_endpoint_dir, ep_name, set_ha
 ):
-    conf = mock_command_ensure.endpoint_config_dir / ep_name / "config.yaml"
+    conf = gc_dir / ep_name / "config.yaml"
     configure_arg = ""
     auth_policy = str(uuid.uuid4())
     sub_id = str(uuid.uuid4())
@@ -734,12 +755,10 @@ def test_start_ep_high_assurance_in_config(
         assert conf_dict.get("high_assurance", False) is False
 
 
-def test_configure_ep_auth_policy_in_config(
-    run_line, mock_command_ensure, make_endpoint_dir
-):
+def test_configure_ep_auth_policy_in_config(run_line, gc_dir, make_endpoint_dir):
     ep_name = "my-ep"
     auth_policy = str(uuid.uuid4())
-    conf = mock_command_ensure.endpoint_config_dir / ep_name / "config.yaml"
+    conf = gc_dir / ep_name / "config.yaml"
 
     run_line(f"configure {ep_name} --auth-policy {auth_policy}")
 
@@ -749,12 +768,10 @@ def test_configure_ep_auth_policy_in_config(
     assert conf_dict["authentication_policy"] == auth_policy
 
 
-def test_configure_ep_subscription_id_in_config(
-    run_line, mock_command_ensure, make_endpoint_dir
-):
+def test_configure_ep_subscription_id_in_config(run_line, gc_dir, make_endpoint_dir):
     ep_name = "my-ep"
     subscription_id = str(uuid.uuid4())
-    conf = mock_command_ensure.endpoint_config_dir / ep_name / "config.yaml"
+    conf = gc_dir / ep_name / "config.yaml"
 
     run_line(f"configure {ep_name} --subscription-id {subscription_id}")
 
@@ -866,10 +883,10 @@ def test_configure_ep_errors_on_id_mapping_config_without_multiuser(
 
 
 @pytest.mark.parametrize("display_name", [None, "None"])
-def test_config_yaml_display_none(run_line, mock_command_ensure, display_name):
+def test_config_yaml_display_none(run_line, gc_dir, display_name):
     ep_name = "test_display_none"
 
-    conf = mock_command_ensure.endpoint_config_dir / ep_name / "config.yaml"
+    conf = gc_dir / ep_name / "config.yaml"
 
     config_cmd = f"configure {ep_name}"
     if display_name is not None:
@@ -1082,7 +1099,7 @@ def test_name_or_uuid_decorator(tmp_path, mocker, run_line, name, uuid):
 def test_get_endpoint_by_name_or_uuid_error_message(tmp_path, run_line, data):
     value, error = data
 
-    with mock.patch(f"{_MOCK_BASE}get_config_dir", return_value=tmp_path):
+    with mock.patch(f"{_MOCK_BASE}get_compute_dir", return_value=tmp_path):
         result = run_line(f"start {value}", assert_exit_code=1)
 
     assert error in result.stderr
@@ -1600,6 +1617,8 @@ def test_delete_endpoint_no_local_config(
 def test_render_user_config_happy_path(
     run_line,
     mock_render_config_user_template,
+    gc_dir,
+    mock_command_ensure,
     make_manager_endpoint_dir,
     ep_name,
     randomstring,
