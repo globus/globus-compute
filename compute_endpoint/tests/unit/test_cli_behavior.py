@@ -251,9 +251,9 @@ def test_init_config_dir(fs, dir_exists, user_dir):
         with mock.patch.dict(
             os.environ, {"GLOBUS_COMPUTE_USER_DIR": str(config_dirname)}
         ):
-            dirname = init_config_dir()
+            dirname = ensure_compute_dir()
     else:
-        dirname = init_config_dir()
+        dirname = ensure_compute_dir()
 
     assert dirname == config_dirname
 
@@ -279,7 +279,7 @@ def test_init_config_dir_permission_error(fs):
         with mock.patch.dict(
             os.environ, {"GLOBUS_COMPUTE_USER_DIR": str(config_dirname)}
         ):
-            init_config_dir()
+            init_config_dir(config_dirname)
 
     assert "Permission denied" in str(exc)
 
@@ -1082,7 +1082,7 @@ def test_name_or_uuid_decorator(tmp_path, mocker, run_line, name, uuid):
 def test_get_endpoint_by_name_or_uuid_error_message(tmp_path, run_line, data):
     value, error = data
 
-    with mock.patch(f"{_MOCK_BASE}get_config_dir", return_value=tmp_path):
+    with mock.patch(f"{_MOCK_BASE}get_compute_dir", return_value=tmp_path):
         result = run_line(f"start {value}", assert_exit_code=1)
 
     assert error in result.stderr
