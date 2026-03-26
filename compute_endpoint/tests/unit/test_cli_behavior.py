@@ -281,7 +281,7 @@ def test_init_config_dir_permission_error(fs):
         with mock.patch.dict(
             os.environ, {"GLOBUS_COMPUTE_USER_DIR": str(config_dirname)}
         ):
-            init_config_dir(config_dirname)
+            init_config_dir(str(config_dirname))
 
     assert "Permission denied" in str(exc)
 

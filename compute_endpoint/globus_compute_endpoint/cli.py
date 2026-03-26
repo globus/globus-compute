@@ -956,7 +956,6 @@ def _do_start_endpoint(
                 )
 
             print(f"{get_cli_endpoint(ep_config)}")
-            raise ValueError("xyz")
             get_cli_endpoint(ep_config).start_endpoint(
                 ep_dir,
                 endpoint_uuid,
