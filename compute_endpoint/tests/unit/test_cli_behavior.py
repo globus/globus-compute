@@ -62,7 +62,9 @@ def reset_umask():
 
 @pytest.fixture
 def gc_dir(tmp_path):
-    yield tmp_path / ".globus_compute"
+    with mock.patch(f"globus_compute_sdk.sdk.compute_dir.get_compute_dir") as m:
+        m.return_value = pathlib.Path(tmp_path)
+        yield m
 
 
 @pytest.fixture
@@ -89,7 +91,7 @@ def mock_auth_client(mock_app):
 def mock_command_ensure(gc_dir):
     with mock.patch(f"{_MOCK_BASE}CommandState.ensure") as m:
         m.return_value = m
-        m.endpoint_config_dir = gc_dir
+        m.endpoint_config_dir = gc_dir.return_value
         m.detach = False  # since a Mock would be truthy
 
         yield m
@@ -292,9 +294,9 @@ def test_start_endpoint_no_such_ep(run_line, mock_ep, ep_name):
 
 
 def test_start_endpoint_existing_ep(
-    run_line, mock_ep, make_endpoint_dir, ep_name, mock_client
+    run_line, mock_ep, make_endpoint_dir, ep_name, mock_client,
 ):
-    make_endpoint_dir()
+    make_endpoint_dir(ep_name)
     run_line(f"start {ep_name}")
     mock_ep.start_endpoint.assert_called_once()
 

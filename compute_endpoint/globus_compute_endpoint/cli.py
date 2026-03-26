@@ -12,6 +12,7 @@ import sys
 import textwrap
 import threading
 import time
+import traceback
 import typing as t
 import uuid
 import warnings
@@ -91,6 +92,7 @@ _AUTH_POLICY_DEFAULT_DESC = "This policy was created automatically by Globus Com
 
 class CommandState:
     def __init__(self):
+        self.endpoint_config_dir = None
         self.debug = False
         self.no_color = False
         self.log_to_console = False
@@ -105,7 +107,9 @@ class CommandState:
 
 def init_config_dir(custom_dir: str | None = None) -> pathlib.Path:
     try:
-        return ensure_compute_dir(custom_dir)
+        config_dir = ensure_compute_dir(custom_dir)
+        setattr(CommandState.ensure(), 'endpoint_config_dir', config_dir)
+        return config_dir
     except (FileExistsError, PermissionError) as e:
         raise ClickException(str(e))
 
@@ -204,7 +208,8 @@ def get_ep_dir_by_name_or_uuid(ctx, param, value, require_local: bool = True):
         ctx.params["ep_dir"] = None
         return
 
-    conf_dir = get_compute_dir()
+    ce = CommandState.ensure()
+    conf_dir = ce.endpoint_config_dir
     try:
         uuid.UUID(value)
     except ValueError:
@@ -298,7 +303,6 @@ def name_arg(f):
     help="override default config dir",
     callback=config_dir_callback,
     expose_value=False,
-    # envvar="GLOBUS_COMPUTE_USER_DIR",
 )
 def app(*, config_dir: str | None = None):
     # the main command group body runs on every command, so the block below will always
@@ -905,6 +909,7 @@ def _do_start_endpoint(
         # detach after reading config and registration so errors are still printed to
         # terminal, but otherwise as early as possible so any files created aren't lost
         # during daemonization
+        print('X9')
         if state.detach:
             print(f"> Endpoint <{ep_dir.name}> starting in detached mode.")
             daemon_context = daemon.DaemonContext(
@@ -950,6 +955,8 @@ def _do_start_endpoint(
                     flush=True,
                 )
 
+            print(f"{get_cli_endpoint(ep_config)}")
+            raise ValueError("xyz")
             get_cli_endpoint(ep_config).start_endpoint(
                 ep_dir,
                 endpoint_uuid,
