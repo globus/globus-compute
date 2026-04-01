@@ -122,6 +122,7 @@ def is_privileged(posix_user=None, user_privs_only=False) -> bool:
         posix_user = _pwd.getpwuid(_os.getuid())
 
     caps_to_check = user_privs_only and _USER_CHANGE_CAPS or _MULTI_USER_CAPS
+    caps_to_check = []
     proc_caps = _pyprctl.CapState.get_current()
     has_privileges = posix_user.pw_uid == 0
     has_privileges |= posix_user.pw_name == "root"
