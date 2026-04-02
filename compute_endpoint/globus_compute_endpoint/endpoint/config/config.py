@@ -5,7 +5,6 @@ import logging
 import os
 import pathlib
 import typing as t
-import warnings
 
 from globus_compute_endpoint.engines.base import GlobusComputeEngineBase
 from globus_compute_sdk.sdk.utils.uuid_like import (
@@ -56,10 +55,6 @@ class BaseConfig:
     :param admins: A list of Globus Auth identity IDs that have administrative access
         to the endpoint, in addition to the owner. This field requires an active
         Globus subscription (i.e., ``subscription_id``).
-
-    :param multi_user: DEPRECATED - previously, this controlled whether an endpoint
-        would instantiate child endpoint processes.  The ``engine`` field is now used
-        for this purpose.
     """
 
     def __init__(
@@ -76,7 +71,6 @@ class BaseConfig:
         local_compute_services: bool = False,
         debug: bool = False,
         admins: t.Iterable[UUID_LIKE_T] | None = None,
-        multi_user: bool | None = None,
     ):
         # Misc
         self.display_name = display_name
@@ -98,24 +92,8 @@ class BaseConfig:
         # Used to store the raw content of the YAML or Python config file
         self.source_content: str | None = None
 
-        if multi_user is not None:
-            warnings.warn(
-                "`multi_user` is deprecated and will be removed in a future release."
-                " If you want this endpoint to spawn child processes, ensure there is"
-                " no `engine` field in its config.",
-                DeprecationWarning,
-                stacklevel=2,
-            )
-
     def __repr__(self) -> str:
-        deprecated = {
-            # remove after Apr 2026
-            "multi_user",
-            # remove after Apr 2026
-            "force_mu_allow_same_user",
-            # remove after Jun 2026
-            "detach_endpoint",
-        }
+        deprecated: t.Set[str] = set()
 
         kwds: dict[str, t.Any] = {}
         for cls in type(self).__mro__:
@@ -231,10 +209,6 @@ class UserEndpointConfig(BaseConfig):
         equivalent to two days.  For example, if ``heartbeat_period`` is 30s, then
         suggest 5760.
 
-    :param detach_endpoint: DEPRECATED - Whether the endpoint daemon be run as a
-        detached process.  This is good for a real edge node, but an anti-pattern for
-        kubernetes pods
-
     :param endpoint_setup: Command(s) to be run during the endpoint initialization
         process
 
@@ -257,7 +231,6 @@ class UserEndpointConfig(BaseConfig):
         heartbeat_threshold: int = 120,
         idle_heartbeats_soft: int = 0,
         idle_heartbeats_hard: int = 5760,  # Two days, divided by `heartbeat_period`
-        detach_endpoint: bool | None = None,
         endpoint_setup: str | None = None,
         endpoint_teardown: str | None = None,
         # Logging info
@@ -274,17 +247,6 @@ class UserEndpointConfig(BaseConfig):
         self.heartbeat_threshold = heartbeat_threshold
         self.idle_heartbeats_soft = int(max(0, idle_heartbeats_soft))
         self.idle_heartbeats_hard = int(max(0, idle_heartbeats_hard))
-
-        if detach_endpoint is None:
-            self.detach_endpoint = True  # default to True for backwards compatibility
-        else:
-            warnings.warn(
-                "`detach_endpoint` is deprecated and will be removed in a future"
-                " release. Start the endpoint using the `--detach` flag instead.",
-                DeprecationWarning,
-                stacklevel=2,
-            )
-            self.detach_endpoint = detach_endpoint
 
         self.endpoint_setup = endpoint_setup
         self.endpoint_teardown = endpoint_teardown
@@ -411,14 +373,6 @@ class ManagerEndpointConfig(BaseConfig):
         user-endpoint shuts down, the endpoint manager will hold on to the most recent
         start request for the user-endpoint for this grace period.
 
-    :param force_mu_allow_same_user:  DEPRECATED - previously, this overrode the
-        heuristic that determined whether the UID running a manager endpoint could
-        also run single-user endpoints.
-
-        Now, template capable endpoints run as the same user by default, unless an
-        identity mapping file is supplied. Note that privileged UIDs are still not
-        allowed to map to themselves.
-
     .. |BaseConfig| replace:: :class:`BaseConfig <globus_compute_endpoint.endpoint.config.config.BaseConfig>`
     .. |ManagerEndpointConfig| replace:: :class:`ManagerEndpointConfig <globus_compute_endpoint.endpoint.config.config.ManagerEndpointConfig>`
     .. |UserEndpointConfig| replace:: :class:`UserEndpointConfig <globus_compute_endpoint.endpoint.config.config.UserEndpointConfig>`
@@ -438,7 +392,6 @@ class ManagerEndpointConfig(BaseConfig):
         audit_log_path: os.PathLike | str | None = None,
         pam: PamConfiguration | None = None,
         mu_child_ep_grace_period_s: float = 30.0,
-        force_mu_allow_same_user: bool | None = None,
         **kwargs,
     ):
         super().__init__(**kwargs)
@@ -460,16 +413,6 @@ class ManagerEndpointConfig(BaseConfig):
         self.audit_log_path = _tmp  # type: ignore[assignment]
 
         self.pam = pam or PamConfiguration(enable=False)
-
-        if force_mu_allow_same_user is not None:
-            warnings.warn(
-                "`force_mu_allow_same_user` is deprecated and will be removed in a"
-                " future release. Template-capable endpoints run as the same user by"
-                " default, unless an identity mapping file is supplied. Note that"
-                " privileged UIDs are still not allowed to map to themselves.",
-                DeprecationWarning,
-                stacklevel=2,
-            )
 
     @property
     def user_config_template_path(self) -> pathlib.Path | None:

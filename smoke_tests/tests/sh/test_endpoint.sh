@@ -40,7 +40,6 @@ fi
 
 cat > "$conf_dir/config.yaml" <<EOF
 environment: $env
-detach_endpoint: False
 engine:
     type: GlobusComputeEngine
     heartbeat_period: 10

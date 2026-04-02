@@ -27,7 +27,6 @@ from daemon.pidfile import PIDLockFile
 from globus_compute_endpoint.auth import get_globus_app_with_scopes
 from globus_compute_endpoint.boot_persistence import disable_on_boot, enable_on_boot
 from globus_compute_endpoint.endpoint.config import (
-    BaseConfig,
     ManagerEndpointConfig,
     UserEndpointConfig,
 )
@@ -749,7 +748,7 @@ def _pidfile(pid_path: pathlib.Path, stale_after_s: int | float):
 
 
 def _do_register_endpoint(
-    ep_dir: pathlib.Path, ep_config: BaseConfig, ep_uuid: str | None
+    ep_dir: pathlib.Path, ep_config: ManagerEndpointConfig, ep_uuid: str | None
 ) -> dict:
     gcc = Client(
         local_compute_services=ep_config.local_compute_services,
@@ -757,23 +756,13 @@ def _do_register_endpoint(
         app=get_globus_app_with_scopes(),
     )
 
-    if isinstance(ep_config, ManagerEndpointConfig):
-        metadata = EndpointManager.get_metadata(ep_dir, ep_config)
-        public = ep_config.public
-        multi_user = is_privileged()
-    else:
-        assert isinstance(ep_config, UserEndpointConfig)  # mypy
-        metadata = Endpoint.get_metadata(ep_config.source_content)
-        public = False
-        multi_user = False
-
     try:
         reg_info = gcc.register_endpoint(
             name=ep_dir.name,
             endpoint_id=ep_uuid or Endpoint.get_endpoint_id(ep_dir),
-            metadata=metadata,
-            public=public,
-            multi_user=multi_user,
+            metadata=EndpointManager.get_metadata(ep_dir, ep_config),
+            public=ep_config.public,
+            multi_user=is_privileged(),
             display_name=ep_config.display_name,
             allowed_functions=ep_config.allowed_functions,
             auth_policy=ep_config.authentication_policy,
@@ -909,7 +898,13 @@ def _do_start_endpoint(
             raise
 
         if not reg_info:
-            reg_info = _do_register_endpoint(ep_dir, ep_config, endpoint_uuid)
+            if isinstance(ep_config, ManagerEndpointConfig):
+                reg_info = _do_register_endpoint(ep_dir, ep_config, endpoint_uuid)
+            else:
+                raise ClickException(
+                    "This endpoint is not template capable and will not start."
+                    " (hint: globus-compute-endpoint migrate-to-template-capable)"
+                )
 
         # detach after reading config and registration so errors are still printed to
         # terminal, but otherwise as early as possible so any files created aren't lost
@@ -946,11 +941,7 @@ def _do_start_endpoint(
         else:
             assert isinstance(ep_config, UserEndpointConfig)
 
-            if die_with_parent:
-                # The endpoint cannot die with its parent if it doesn't have one :)
-                ep_config.detach_endpoint = False
-                log.debug("The --die-with-parent flag has set detach_endpoint to False")
-            else:
+            if not die_with_parent:
                 bname = os.path.basename(sys.argv[0])
                 print(
                     "\nThis endpoint is not template capable.  To add that capability,"
@@ -964,7 +955,6 @@ def _do_start_endpoint(
                 endpoint_uuid,
                 ep_config,
                 state.log_to_console,
-                state.no_color,
                 reg_info,
                 ep_info,
                 die_with_parent,
