@@ -73,11 +73,8 @@ def _get_cls_kwds(cls) -> set[str]:
 
 def test_config_opts_accounted_for_in_tests():
     kwds = _get_cls_kwds(UserEndpointConfig)
-    kwds.remove("multi_user")  # special case deprecated argument
     assert set(known_user_config_opts) == kwds
     kwds = _get_cls_kwds(ManagerEndpointConfig)
-    kwds.remove("multi_user")  # special case deprecated argument
-    kwds.remove("force_mu_allow_same_user")  # special case deprecated argument
     assert set(known_manager_config_opts) == kwds
 
 
@@ -88,11 +85,13 @@ def test_extra_opts_disallowed():
         load_config_yaml(serde_yaml)
     assert "does_not_exist" in str(pyt_e.value)
 
-    conf = {"does_not_exist": True, "multi_user": True}
+    conf = {"does_not_exist": True, "multi_user": True, "display_name": "foo"}
     serde_yaml = yaml.safe_dump(conf)
     with pytest.raises(ClickException) as pyt_e:
         load_config_yaml(serde_yaml)
     assert "does_not_exist" in str(pyt_e.value)
+    assert "multi_user" in str(pyt_e.value)
+    assert "display_name" not in str(pyt_e.value)
 
 
 def test_load_user_endpoint_config_minimal():
@@ -621,7 +620,7 @@ def test_load_user_config_template_valid_extensions(
     conf_dir.mkdir(parents=True, exist_ok=True, mode=0o700)
 
     template_path = conf_dir / f"user_config_template{ext}"
-    template_str = "multi_user: true"
+    template_str = "display_name: foo"
     template_path.write_text(template_str)
 
     assert load_user_config_template(template_path) == template_str

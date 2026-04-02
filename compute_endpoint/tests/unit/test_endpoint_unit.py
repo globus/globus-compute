@@ -14,12 +14,10 @@ import uuid
 from collections import namedtuple
 from contextlib import redirect_stdout
 from datetime import datetime
-from http import HTTPStatus
 from types import SimpleNamespace
 from unittest import mock
 
 import pytest
-import requests
 import yaml
 from globus_compute_endpoint.endpoint import endpoint
 from globus_compute_endpoint.endpoint.config import (
@@ -33,7 +31,7 @@ from globus_compute_endpoint.engines import (
     ThreadPoolEngine,
 )
 from globus_compute_sdk import Client
-from globus_sdk import GlobusAPIError, NetworkError
+from globus_sdk import NetworkError
 
 _mock_base = "globus_compute_endpoint.endpoint.endpoint."
 
@@ -54,12 +52,6 @@ def mock_log():
 
 
 @pytest.fixture
-def mock_daemon():
-    with mock.patch(f"{_mock_base}daemon") as m:
-        yield m
-
-
-@pytest.fixture
 def mock_gcc(mock_reg_info):
     _gcc = mock.Mock(spec=Client)
     _gcc.register_endpoint.return_value = mock_reg_info
@@ -75,7 +67,7 @@ def mock_get_client(mock_gcc):
 
 @pytest.fixture
 def mock_launch():
-    with mock.patch(f"{_mock_base}Endpoint.daemon_launch") as m:
+    with mock.patch(f"{_mock_base}Endpoint.start_interchange") as m:
         yield m
 
 
@@ -87,7 +79,7 @@ def mock_get_config():
 
 @pytest.fixture
 def conf():
-    _conf = UserEndpointConfig(engine=ThreadPoolEngine(), detach_endpoint=False)
+    _conf = UserEndpointConfig(engine=ThreadPoolEngine())
     _conf.source_content = "# test source content"
     _conf.source_content += "\nengine:\n  type: ThreadPoolEngine"
     yield _conf
@@ -99,8 +91,7 @@ def mock_ep_data(fs, conf):
     ep_dir = pathlib.Path("/some/path/mock_endpoint")
     ep_dir.mkdir(parents=True, exist_ok=True)
     log_to_console = False
-    no_color = True
-    yield ep, ep_dir, log_to_console, no_color, conf
+    yield ep, ep_dir, log_to_console, conf
 
 
 @pytest.fixture
@@ -328,7 +319,6 @@ def test_start_without_engine(caplog, conf_dir, conf):
             endpoint_uuid=None,
             endpoint_config=conf,
             log_to_console=False,
-            no_color=True,
             reg_info={},
             ep_info={},
         )
@@ -353,7 +343,6 @@ def test_start_ha_non_compliant(caplog, randomstring, mock_print, conf_dir, conf
             endpoint_uuid=None,
             endpoint_config=conf,
             log_to_console=False,
-            no_color=True,
             reg_info={},
             ep_info={},
         )
@@ -364,47 +353,21 @@ def test_start_ha_non_compliant(caplog, randomstring, mock_print, conf_dir, conf
     assert exc_str in r.message, "Verify expected path tested"
 
 
-def test_start_endpoint_no_reg_provided_registers(
-    mock_print,
-    mock_daemon,
-    mock_launch,
-    mock_log,
-    mock_get_client,
-    mock_ep_data,
-    ep_uuid,
-):
-    ep, ep_dir, log_to_console, no_color, ep_conf = mock_ep_data
-    ep_args = (ep_dir, ep_uuid, ep_conf, log_to_console, no_color)
-
-    ep_json_p = ep_dir / "endpoint.json"
-    assert not ep_json_p.exists(), "Verify test setup"
-
-    ep.start_endpoint(*ep_args, reg_info={}, ep_info={})
-    assert mock_launch.called
-
-    ep_data = json.load(ep_json_p.open())
-    assert ep_data["endpoint_id"] == ep_uuid, "Expect id saved for reregistrations"
-
-
 def test_endpoint_needs_no_client_if_reg_info(
-    mock_get_client, mock_daemon, mock_launch, mock_ep_data, mock_reg_info, ep_uuid
+    mock_get_client, mock_launch, mock_ep_data, mock_reg_info, ep_uuid
 ):
-    ep, ep_dir, log_to_console, no_color, ep_conf = mock_ep_data
-    ep_args = (ep_dir, ep_uuid, ep_conf, log_to_console, no_color)
+    ep, ep_dir, log_to_console, ep_conf = mock_ep_data
+    ep_args = (ep_dir, ep_uuid, ep_conf, log_to_console)
 
-    ep.start_endpoint(*ep_args, reg_info=mock_reg_info, ep_info={})
+    ep.start_endpoint(
+        *ep_args, reg_info=mock_reg_info, ep_info={}, die_with_parent=True
+    )
     assert not mock_get_client.called, "No need for Client!"
     assert mock_launch.called, "Registration given; should start"
-
-    mock_launch.reset_mock()
-    ep.start_endpoint(*ep_args, reg_info={}, ep_info={})
-    assert mock_get_client.called, "Need registration info, need Client"
-    assert mock_launch.called, "Collects registration; should start"
 
 
 def test_start_endpoint_redacts_url_creds_from_logs(
     mock_print,
-    mock_daemon,
     mock_launch,
     mock_log,
     mock_ep_data,
@@ -413,9 +376,11 @@ def test_start_endpoint_redacts_url_creds_from_logs(
     uname,
     pword,
 ):
-    ep, ep_dir, log_to_console, no_color, ep_conf = mock_ep_data
-    ep_args = (ep_dir, ep_uuid, ep_conf, log_to_console, no_color)
-    ep.start_endpoint(*ep_args, reg_info=mock_reg_info, ep_info={})
+    ep, ep_dir, log_to_console, ep_conf = mock_ep_data
+    ep_args = (ep_dir, ep_uuid, ep_conf, log_to_console)
+    ep.start_endpoint(
+        *ep_args, reg_info=mock_reg_info, ep_info={}, die_with_parent=True
+    )
     assert mock_launch.called, "Should launch successfully"
 
     debug_args = "\n".join(str((a, k)) for a, k in mock_log.debug.call_args_list)
@@ -425,14 +390,16 @@ def test_start_endpoint_redacts_url_creds_from_logs(
 
 
 def test_start_endpoint_populates_ep_static_info(
-    mock_print, mock_daemon, mock_ep_data, mock_reg_info, ep_uuid, randomstring
+    mock_print, mock_ep_data, mock_reg_info, ep_uuid, randomstring
 ):
-    ep, ep_dir, log_to_console, no_color, ep_conf = mock_ep_data
-    ep_args = (ep_dir, ep_uuid, ep_conf, log_to_console, no_color)
+    ep, ep_dir, log_to_console, ep_conf = mock_ep_data
+    ep_args = (ep_dir, ep_uuid, ep_conf, log_to_console)
     canary_value = randomstring()
     ep_info = {"canary": canary_value}
-    with mock.patch(f"{_mock_base}Endpoint.daemon_launch") as mock_launch:
-        ep.start_endpoint(*ep_args, reg_info=mock_reg_info, ep_info=ep_info)
+    with mock.patch(f"{_mock_base}Endpoint.start_interchange") as mock_launch:
+        ep.start_endpoint(
+            *ep_args, reg_info=mock_reg_info, ep_info=ep_info, die_with_parent=True
+        )
     assert mock_launch.called, "Should launch successfully"
 
     (*_, found, _audit_fd), _k = mock_launch.call_args
@@ -449,26 +416,6 @@ def test_start_endpoint_populates_ep_static_info(
     assert found["posix_pid"] == os.getpid()
     assert found["posix_sid"] == os.getsid(os.getpid())
     assert found["config_raw"] == ep_conf.source_content
-
-
-def test_start_endpoint_network_error(
-    mock_log, mock_gcc, mock_get_client, mock_ep_data, ep_uuid
-):
-    ep, ep_dir, log_to_console, no_color, ep_conf = mock_ep_data
-    ep_args = (ep_dir, ep_uuid, ep_conf, log_to_console, no_color)
-
-    mock_gcc.register_endpoint.side_effect = NetworkError("foo", Exception)
-
-    f = io.StringIO()
-    f.isatty = lambda: True
-    with redirect_stdout(f):
-        with pytest.raises(SystemExit) as pytest_exc:
-            ep.start_endpoint(*ep_args, reg_info={}, ep_info={})
-
-    assert pytest_exc.value.code == os.EX_TEMPFAIL
-    assert "exception while attempting" in mock_log.exception.call_args[0][0]
-    assert "unable to reach the Globus Compute" in mock_log.critical.call_args[0][0]
-    assert "unable to reach the Globus Compute" in f.getvalue()  # stdout
 
 
 def test_delete_endpoint_network_error(
@@ -488,91 +435,6 @@ def test_delete_endpoint_network_error(
     assert "could not be deleted from the web" in mock_log.warning.call_args[0][0]
     assert "unable to reach the Globus Compute" in mock_log.critical.call_args[0][0]
     assert "unable to reach the Globus Compute" in f.getvalue()  # stdout
-
-
-def test_register_endpoint_invalid_response(
-    mock_log, ep_uuid, other_endpoint_id, mock_gcc, mock_get_client, mock_ep_data
-):
-    ep, ep_dir, log_to_console, no_color, ep_conf = mock_ep_data
-    ep_args = (ep_dir, ep_uuid, ep_conf, log_to_console, no_color)
-
-    mock_gcc.register_endpoint.return_value = {"endpoint_id": other_endpoint_id}
-
-    with pytest.raises(SystemExit) as pytest_exc:
-        ep.start_endpoint(*ep_args, reg_info={}, ep_info={})
-
-    assert pytest_exc.value.code == os.EX_SOFTWARE
-    a, _k = mock_log.error.call_args
-    for expected in (
-        "mismatched endpoint id",
-        "Expected",
-        "received",
-        ep_uuid,
-        other_endpoint_id,
-    ):
-        assert expected in a[0], "Expect contextually helpful info in .error() call"
-
-
-@pytest.mark.parametrize(
-    "exit_code,status_code",
-    (
-        (os.EX_UNAVAILABLE, HTTPStatus.CONFLICT),
-        (os.EX_UNAVAILABLE, HTTPStatus.LOCKED),
-        (os.EX_UNAVAILABLE, HTTPStatus.NOT_FOUND),
-        (os.EX_DATAERR, HTTPStatus.BAD_REQUEST),
-        (os.EX_DATAERR, HTTPStatus.UNPROCESSABLE_ENTITY),
-        ("Error", 418),  # IM_A_TEAPOT
-    ),
-)
-def test_register_endpoint_blocked(
-    mock_log,
-    mock_gcc,
-    mock_get_client,
-    mock_ep_data,
-    randomstring,
-    exit_code,
-    status_code,
-    ep_uuid,
-):
-    """
-    Check to ensure endpoint registration escalates up with API error
-    """
-    ep, ep_dir, log_to_console, no_color, ep_conf = mock_ep_data
-    ep_args = (ep_dir, ep_uuid, ep_conf, log_to_console, no_color)
-
-    some_err = randomstring()
-    res = requests.Response()
-    res.headers = {"Content-Type": "application/json"}
-    res._content = json.dumps({"msg": some_err}).encode()
-    res.status_code = status_code
-    res.request = requests.Request("POST")
-
-    mock_gcc.register_endpoint.side_effect = GlobusAPIError(res)
-
-    f = io.StringIO()
-    f.isatty = lambda: True
-    with redirect_stdout(f):
-        with pytest.raises((GlobusAPIError, SystemExit)) as pytexc:
-            ep.start_endpoint(*ep_args, reg_info={}, ep_info={})
-        stdout_msg = f.getvalue()
-
-    assert mock_log.warning.called
-    a, *_ = mock_log.warning.call_args
-    assert some_err in str(a), "Expected upstream response still shared"
-
-    assert some_err in stdout_msg, f"Expecting error message in stdout ({stdout_msg})"
-
-    if hasattr(pytexc.value, "text"):
-        # Globus AuthAPIError has the .text field filled in from the response
-        assert some_err in str(pytexc.value.text), "Expecting custom error text"
-    else:
-        # Otherwise it's just SystemExit(exit_code)
-        assert pytexc.value.code == exit_code, "Expecting meaningful exit code"
-
-    if exit_code == "Error":
-        # The other route tests SystemExit; nominally this route is an unhandled
-        # traceback -- good.  We should _not_ blanket hide all exceptions.
-        assert pytexc.value.http_status == status_code
 
 
 def test_list_endpoints_none_configured(mock_ep_get, table_buf):
@@ -654,29 +516,6 @@ def test_pid_file_check(fs, is_running, is_active):
     assert pid_status["active"] is is_active
 
 
-def test_daemon_creates_pid(
-    randomstring, mock_print, mock_ep_data, mock_reg_info, ep_uuid
-):
-    ep, ep_dir, log_to_console, no_color, ep_conf = mock_ep_data
-    ep_conf.detach_endpoint = True
-
-    mock_stk = mock.MagicMock()
-    mock_stk.__enter__.return_value = mock_stk
-    mock_stk.enter_context.side_effect = (None, MemoryError)
-    ep_args = (ep_dir, ep_uuid, ep_conf, log_to_console, no_color)
-
-    assert ep_conf.detach_endpoint, "Verify test setup and raison d'etre"
-    with mock.patch(f"{_mock_base}contextlib.ExitStack", return_value=mock_stk):
-        with pytest.raises(MemoryError):
-            ep.start_endpoint(*ep_args, reg_info=mock_reg_info, ep_info={})
-
-    a, k = mock_stk.enter_context.call_args
-    contextmanager_generator = a[0]
-
-    # awful test, but a temporary measure until v4, when we remove daemon context
-    assert contextmanager_generator.func.__name__ == "_pidfile"
-
-
 @pytest.mark.parametrize(
     "engine_cls", (GlobusComputeEngine, ThreadPoolEngine, ProcessPoolEngine)
 )
@@ -719,17 +558,19 @@ def test_endpoint_get_metadata(mocker, engine_cls):
 def test_endpoint_sets_process_title(
     randomstring, mock_ep_data, env, mock_reg_info, ep_uuid
 ):
-    ep, ep_dir, log_to_console, no_color, ep_conf = mock_ep_data
+    ep, ep_dir, log_to_console, ep_conf = mock_ep_data
     ep_conf.environment = env
 
     orig_proc_title = randomstring()
 
-    ep_args = (ep_dir, ep_uuid, ep_conf, log_to_console, no_color)
+    ep_args = (ep_dir, ep_uuid, ep_conf, log_to_console)
     with mock.patch(f"{_mock_base}setproctitle", spec=True) as mock_spt:
         mock_spt.getproctitle.return_value = orig_proc_title
         mock_spt.setproctitle.side_effect = StopIteration("Sentinel")
         with pytest.raises(StopIteration, match="Sentinel"):
-            ep.start_endpoint(*ep_args, reg_info=mock_reg_info, ep_info={})
+            ep.start_endpoint(
+                *ep_args, reg_info=mock_reg_info, ep_info={}, die_with_parent=True
+            )
 
     a, _k = mock_spt.setproctitle.call_args
     assert a[0].startswith(
@@ -745,18 +586,20 @@ def test_endpoint_sets_process_title(
 
 @pytest.mark.parametrize("port", [random.randint(0, 65535)])
 def test_endpoint_respects_port(mock_ep_data, port, mock_reg_info, ep_uuid):
-    ep, ep_dir, log_to_console, no_color, ep_conf = mock_ep_data
+    ep, ep_dir, log_to_console, ep_conf = mock_ep_data
     ep_conf.amqp_port = port
 
     tq_url = mock_reg_info["task_queue_info"]["connection_url"]
     rq_url = mock_reg_info["result_queue_info"]["connection_url"]
     hbq_url = mock_reg_info["heartbeat_queue_info"]["connection_url"]
 
-    ep_args = (ep_dir, ep_uuid, ep_conf, log_to_console, no_color)
+    ep_args = (ep_dir, ep_uuid, ep_conf, log_to_console)
     with mock.patch(f"{_mock_base}update_url_port", spec=True) as mock_upd:
         mock_upd.side_effect = (None, None, StopIteration("Sentinel"))
         with pytest.raises(StopIteration, match="Sentinel"):
-            ep.start_endpoint(*ep_args, reg_info=mock_reg_info, ep_info={})
+            ep.start_endpoint(
+                *ep_args, reg_info=mock_reg_info, ep_info={}, die_with_parent=True
+            )
 
     for (a, _), exp_url in zip(mock_upd.call_args_list, (tq_url, rq_url, hbq_url)):
         assert a == (exp_url, port)
@@ -778,9 +621,9 @@ def test_endpoint_sets_owner_only_access(tmp_path, umask, mask, idmap):
 
 
 def test_always_prints_endpoint_id_to_terminal(
-    mock_daemon, mock_launch, mocker, mock_ep_data, mock_reg_info
+    mock_launch, mocker, mock_ep_data, mock_reg_info
 ):
-    ep, ep_dir, log_to_console, no_color, ep_conf = mock_ep_data
+    ep, ep_dir, log_to_console, ep_conf = mock_ep_data
     ep_id = str(uuid.uuid4())
 
     mock_dup2 = mocker.patch(f"{_mock_base}os.dup2")
@@ -793,7 +636,13 @@ def test_always_prints_endpoint_id_to_terminal(
 
     mock_sys.stdout.isatty.return_value = True
     ep.start_endpoint(
-        ep_dir, ep_id, ep_conf, log_to_console, no_color, reg_info, ep_info={}
+        ep_dir,
+        ep_id,
+        ep_conf,
+        log_to_console,
+        reg_info,
+        ep_info={},
+        die_with_parent=True,
     )
 
     assert mock_sys.stdout.write.called
@@ -804,7 +653,13 @@ def test_always_prints_endpoint_id_to_terminal(
     mock_sys.stdout.isatty.return_value = False
     mock_sys.stderr.isatty.return_value = True
     ep.start_endpoint(
-        ep_dir, ep_id, ep_conf, log_to_console, no_color, reg_info, ep_info={}
+        ep_dir,
+        ep_id,
+        ep_conf,
+        log_to_console,
+        reg_info,
+        ep_info={},
+        die_with_parent=True,
     )
 
     assert not mock_sys.stdout.write.called
@@ -813,7 +668,13 @@ def test_always_prints_endpoint_id_to_terminal(
     mock_sys.reset_mock()
     mock_sys.stderr.isatty.return_value = False
     ep.start_endpoint(
-        ep_dir, ep_id, ep_conf, log_to_console, no_color, reg_info, ep_info={}
+        ep_dir,
+        ep_id,
+        ep_conf,
+        log_to_console,
+        reg_info,
+        ep_info={},
+        die_with_parent=True,
     )
 
     assert not mock_sys.stdout.write.called
@@ -898,44 +759,40 @@ def test_get_endpoint_id(tmp_path: pathlib.Path, json_exists: bool, ep_uuid):
 
 def test_handles_provided_endpoint_id_no_json(
     mock_print,
-    mock_daemon,
     mock_launch,
-    mock_gcc,
-    mock_get_client,
-    mock_ep_data: tuple[Endpoint, pathlib.Path, bool, bool, UserEndpointConfig],
+    mock_ep_data: tuple[Endpoint, pathlib.Path, bool, UserEndpointConfig],
     mock_reg_info: dict,
     ep_uuid,
 ):
-    ep, ep_dir, log_to_console, no_color, ep_conf = mock_ep_data
-    ep_args = (ep_dir, ep_uuid, ep_conf, log_to_console, no_color)
+    ep, ep_dir, log_to_console, ep_conf = mock_ep_data
+    ep_args = (ep_dir, ep_uuid, ep_conf, log_to_console)
 
-    mock_gcc.register_endpoint.return_value = mock_reg_info
-    ep.start_endpoint(*ep_args, reg_info={}, ep_info={})
+    ep.start_endpoint(
+        *ep_args, reg_info=mock_reg_info, ep_info={}, die_with_parent=True
+    )
 
-    _a, k = mock_gcc.register_endpoint.call_args
-    assert k["endpoint_id"] == ep_uuid
+    a, _k = mock_launch.call_args
+    assert a[0] == ep_uuid
 
 
 def test_handles_provided_endpoint_id_with_json(
     mock_print,
-    mock_daemon,
     mock_launch,
-    mock_gcc,
-    mock_get_client,
-    mock_ep_data: tuple[Endpoint, pathlib.Path, bool, bool, UserEndpointConfig],
+    mock_ep_data: tuple[Endpoint, pathlib.Path, bool, UserEndpointConfig],
     mock_reg_info: dict,
     ep_uuid,
 ):
-    ep, ep_dir, log_to_console, no_color, ep_conf = mock_ep_data
-    provided_ep_uuid_str = str(uuid.uuid4())
-    ep_args = (ep_dir, provided_ep_uuid_str, ep_conf, log_to_console, no_color)
+    ep, ep_dir, log_to_console, ep_conf = mock_ep_data
+    ep_args = (ep_dir, ep_uuid, ep_conf, log_to_console)
 
     ep_json = ep_dir / "endpoint.json"
-    ep_json.write_text(json.dumps({"endpoint_id": ep_uuid}))
-    ep.start_endpoint(*ep_args, reg_info={}, ep_info={})
+    ep_json.write_text(json.dumps({"endpoint_id": str(uuid.uuid4())}))
+    ep.start_endpoint(
+        *ep_args, reg_info=mock_reg_info, ep_info={}, die_with_parent=True
+    )
 
-    _a, k = mock_gcc.register_endpoint.call_args
-    assert k["endpoint_id"] == ep_uuid
+    a, _k = mock_launch.call_args
+    assert a[0] == ep_uuid
 
 
 def test_delete_remote_endpoint_no_local_offline(
@@ -954,7 +811,7 @@ def test_delete_endpoint_with_uuid_happy(
     mock_gcc,
     mock_get_client,
     mock_log,
-    mock_ep_data: tuple[Endpoint, pathlib.Path, bool, bool, UserEndpointConfig],
+    mock_ep_data: tuple[Endpoint, pathlib.Path, bool, UserEndpointConfig],
     ep_uuid,
 ):
     ep, ep_dir, *_, ep_config = mock_ep_data
@@ -1011,7 +868,7 @@ def test_delete_endpoint_with_uuid_errors(
     exit_code: bool,
     mock_gcc,
     mock_get_client,
-    mock_ep_data: tuple[Endpoint, pathlib.Path, bool, bool, UserEndpointConfig],
+    mock_ep_data: tuple[Endpoint, pathlib.Path, bool, UserEndpointConfig],
 ):
     ep = mock_ep_data[0]
     ep_uuid = None if no_uuid else str(uuid.uuid4())
