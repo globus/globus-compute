@@ -108,7 +108,6 @@ class EngineModel(BaseConfigModel):
 
 
 class BaseEndpointConfigModel(BaseModel):
-    multi_user: t.Optional[bool]
     display_name: t.Optional[str]
     allowed_functions: t.Optional[t.List[uuid.UUID]]
     admins: t.Optional[t.List[uuid.UUID]]
@@ -130,7 +129,6 @@ class UserEndpointConfigModel(BaseEndpointConfigModel):
     heartbeat_threshold: t.Optional[int]
     idle_heartbeats_soft: t.Optional[int]
     idle_heartbeats_hard: t.Optional[int]
-    detach_endpoint: t.Optional[bool]
     endpoint_setup: t.Optional[str]
     endpoint_teardown: t.Optional[str]
     log_dir: t.Optional[str]

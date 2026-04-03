@@ -1,0 +1,11 @@
+Removed
+^^^^^^^
+
+- Removed the ability to register and start endpoints without templating support.
+
+- Removed the following deprecated endpoint config options related to non-templatable
+  endpoints:
+
+  - ``multi_user``
+  - ``force_mu_allow_same_user``
+  - ``detach_endpoint``

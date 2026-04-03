@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import contextlib
 import json
 import logging
 import os
@@ -15,13 +14,12 @@ import sys
 import time
 import typing as t
 from datetime import datetime
-from http import HTTPStatus
 
-import daemon
 import psutil
 import setproctitle
 import texttable
 import yaml
+from click import ClickException
 from globus_compute_endpoint import __version__
 from globus_compute_endpoint.auth import get_globus_app_with_scopes
 from globus_compute_endpoint.endpoint.config import (
@@ -33,7 +31,6 @@ from globus_compute_endpoint.endpoint.config.utils import get_config
 from globus_compute_endpoint.endpoint.interchange import EndpointInterchange
 from globus_compute_endpoint.endpoint.result_store import ResultStore
 from globus_compute_endpoint.endpoint.utils import _redact_url_creds, update_url_port
-from globus_compute_endpoint.logging_config import setup_logging
 from globus_compute_sdk.sdk.client import Client
 from globus_sdk import AuthAPIError, GlobusAPIError, NetworkError
 
@@ -473,25 +470,11 @@ class Endpoint:
         endpoint_uuid,
         endpoint_config: UserEndpointConfig,
         log_to_console: bool,
-        no_color: bool,
         reg_info: dict,
         ep_info: dict,
         die_with_parent: bool = False,
         audit_fd: int | None = None,
     ):
-        # If we are running a full detached daemon then we will send the output to
-        # log files, otherwise we can piggy back on our stdout
-        if endpoint_config.detach_endpoint:
-            stdout: t.TextIO = open(
-                os.path.join(endpoint_dir, endpoint_config.stdout), "a+"
-            )
-            stderr: t.TextIO = open(
-                os.path.join(endpoint_dir, endpoint_config.stderr), "a+"
-            )
-        else:
-            stdout = sys.stdout
-            stderr = sys.stderr
-
         ostream = None
         if sys.stdout.isatty():
             ostream = sys.stdout
@@ -527,94 +510,7 @@ class Endpoint:
             raise
 
         try:
-            files_preserve = []
-            if audit_fd:
-                files_preserve.append(audit_fd)
-            context = daemon.DaemonContext(
-                working_directory=endpoint_dir,
-                umask=0o002,
-                stdout=stdout,
-                stderr=stderr,
-                detach_process=endpoint_config.detach_endpoint,
-                files_preserve=files_preserve,
-            )
-
-        except Exception:
-            log.exception(
-                "Caught exception while trying to setup endpoint context dirs"
-            )
-            exit(-1)
-
-        # place registration after everything else so that the endpoint will
-        # only be registered if everything else has been set up successfully
-        if not reg_info:
-            endpoint_uuid = Endpoint.get_endpoint_id(endpoint_dir) or endpoint_uuid
-            log.debug("Attempting registration; trying with eid: %s", endpoint_uuid)
-            try:
-                fx_client = Endpoint.get_funcx_client(endpoint_config)
-                reg_info = fx_client.register_endpoint(
-                    name=endpoint_dir.name,
-                    endpoint_id=endpoint_uuid,
-                    metadata=Endpoint.get_metadata(endpoint_config.source_content),
-                    multi_user=False,
-                    display_name=endpoint_config.display_name,
-                    allowed_functions=endpoint_config.allowed_functions,
-                    auth_policy=endpoint_config.authentication_policy,
-                    subscription_id=endpoint_config.subscription_id,
-                    high_assurance=endpoint_config.high_assurance,
-                    admins=endpoint_config.admins,
-                )
-
-            except GlobusAPIError as e:
-                blocked_msg = f"Endpoint registration blocked.  [{e.text}]"
-                log.warning(blocked_msg)
-                if ostream:
-                    print(blocked_msg, file=ostream)
-                if e.http_status in (
-                    HTTPStatus.CONFLICT,
-                    HTTPStatus.LOCKED,
-                    HTTPStatus.NOT_FOUND,
-                ):
-                    raise SystemExit(os.EX_UNAVAILABLE) from e
-                elif e.http_status in (
-                    HTTPStatus.BAD_REQUEST,
-                    HTTPStatus.UNPROCESSABLE_ENTITY,
-                ):
-                    raise SystemExit(os.EX_DATAERR) from e
-                raise
-
-            except NetworkError as e:
-                # the output of a NetworkError exception is huge and unhelpful, so
-                # it seems better to just stringify it here and get a concise error
-                log.exception(
-                    f"Caught exception while attempting endpoint registration: {e}"
-                )
-                msg = (
-                    "globus-compute-endpoint is unable to reach the Globus Compute "
-                    "service due to a network error.\n"
-                    "Please ensure the Globus Compute service address is reachable, "
-                    "then attempt restarting the endpoint."
-                )
-                log.critical(msg)
-                if ostream:
-                    print(msg, file=ostream)
-                exit(os.EX_TEMPFAIL)
-
-            ret_ep_uuid = reg_info.get("endpoint_id")
-            if endpoint_uuid and ret_ep_uuid != endpoint_uuid:
-                log.error(
-                    "Unexpected response from server: mismatched endpoint id."
-                    f"\n  Expected: {endpoint_uuid}, received: {ret_ep_uuid}"
-                )
-                exit(os.EX_SOFTWARE)
-
-        try:
-            endpoint_uuid = reg_info["endpoint_id"]
-        except KeyError:
-            log.error("Invalid credential structure")
-            exit(os.EX_DATAERR)
-
-        try:
+            ret_ep_uuid = reg_info["endpoint_id"]
             tq_info, rq_info, hbq_info = (
                 reg_info["task_queue_info"],
                 reg_info["result_queue_info"],
@@ -623,6 +519,15 @@ class Endpoint:
         except KeyError:
             log.error("Invalid credential structure")
             exit(os.EX_DATAERR)
+
+        if endpoint_uuid and ret_ep_uuid != endpoint_uuid:
+            log.error(
+                "Unexpected response from server: mismatched endpoint id."
+                f"\n  Expected: {endpoint_uuid}, received: {ret_ep_uuid}"
+            )
+            exit(os.EX_SOFTWARE)
+        else:
+            endpoint_uuid = ret_ep_uuid
 
         if endpoint_config.amqp_port is not None:
             for q_info in tq_info, rq_info, hbq_info:
@@ -648,23 +553,13 @@ class Endpoint:
         ptitle += f" [{setproctitle.getproctitle()}]"
         setproctitle.setproctitle(ptitle)
 
-        parent_pid = 0
         if die_with_parent:
             parent_pid = os.getppid()
-
-        log.debug("Launching endpoint daemon process")
-
-        # NOTE
-        # It's important that this log is emitted before we enter the daemon context
-        # because daemonization closes down everything, a log message inside the
-        # context won't write the currently configured loggers
-        logfile = endpoint_dir / "endpoint.log"
-        log.debug(
-            "Reconfiguring logging for daemonization. logfile: %s , debug: %s",
-            logfile,
-            self.debug,
-        )
-
+        else:
+            raise ClickException(
+                "This endpoint is not template capable and will not start. "
+                "(hint: globus-compute-endpoint migrate-to-template-capable)"
+            )
         if ostream:
             msg = f"Starting endpoint; registered ID: {endpoint_uuid}"
             if log_to_console:
@@ -672,63 +567,32 @@ class Endpoint:
                 msg = f"\n    {msg}\n"
             print(msg, file=ostream)
 
-        with contextlib.ExitStack() as stk:
-            stk.enter_context(context)
-            if endpoint_config.detach_endpoint:
-                # special case until daemon.DaemonContext logic removed
-                pid_path = Endpoint.pid_path(endpoint_dir)
-                pid_path.unlink(missing_ok=True)
+        now_tz = datetime.now().astimezone()
+        ep_info.update(
+            posix_username=pwd.getpwuid(os.getuid()).pw_name,
+            posix_uid=os.getuid(),
+            posix_gid=os.getgid(),
+            posix_groups=os.getgroups(),
+            posix_pid=os.getpid(),
+            posix_sid=os.getsid(os.getpid()),
+            config_raw=endpoint_config.source_content,
+            start_iso=now_tz.isoformat(),
+            start_unix=now_tz.timestamp(),
+        )
 
-                from globus_compute_endpoint.cli import _pidfile
-
-                pid_ctxt = _pidfile(pid_path, endpoint_config.heartbeat_period * 3)
-                stk.enter_context(pid_ctxt)
-
-            # Per DaemonContext implementation, and that we _don't_ pass stdin,
-            # fd 0 is already connected to devnull.  Unfortunately, there is an
-            # as-yet unknown interaction on Polaris (ALCF) that needs this
-            # connection setup *again*.  So, repeat what daemon context already
-            # did, and dup2 stdin from devnull to ... devnull.  (!@#$%^&*)
-            # On any other system, this should make no difference (same file!)
-            with open(os.devnull) as nullf:
-                if os.dup2(nullf.fileno(), 0) != 0:
-                    msg = "Unable to close stdin; endpoint will not start."
-                    log.critical(msg)
-                    raise Exception(msg)
-
-            setup_logging(
-                logfile=logfile,
-                debug=self.debug,
-                console_enabled=log_to_console,
-                no_color=no_color,
-            )
-
-            now_tz = datetime.now().astimezone()
-            ep_info.update(
-                posix_username=pwd.getpwuid(os.getuid()).pw_name,
-                posix_uid=os.getuid(),
-                posix_gid=os.getgid(),
-                posix_groups=os.getgroups(),
-                posix_pid=os.getpid(),
-                posix_sid=os.getsid(os.getpid()),
-                config_raw=endpoint_config.source_content,
-                start_iso=now_tz.isoformat(),
-                start_unix=now_tz.timestamp(),
-            )
-
-            Endpoint.daemon_launch(
-                endpoint_uuid,
-                endpoint_dir,
-                endpoint_config,
-                reg_info,
-                result_store,
-                parent_pid,
-                ep_info,
-                audit_fd,
-            )
+        Endpoint.start_interchange(
+            endpoint_uuid,
+            endpoint_dir,
+            endpoint_config,
+            reg_info,
+            result_store,
+            parent_pid,
+            ep_info,
+            audit_fd,
+        )
 
     @staticmethod
-    def daemon_launch(
+    def start_interchange(
         endpoint_uuid,
         endpoint_dir,
         endpoint_config: UserEndpointConfig,

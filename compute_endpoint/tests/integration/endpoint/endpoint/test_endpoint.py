@@ -1,9 +1,7 @@
-import json
 import os
 import pathlib
 import random
 import shutil
-import uuid
 from unittest import mock
 
 import pytest
@@ -69,67 +67,6 @@ def test_non_configured_endpoint(tmp_path):
         assert "no endpoint configuration" in result.stdout
 
 
-@pytest.mark.parametrize(
-    "display_name",
-    [
-        None,
-        "xyz",
-        "😎 Great display/.name",
-    ],
-)
-def test_start_endpoint_display_name(fs, display_name):
-    responses.add(  # 404 == we are verifying the POST, not the response
-        responses.POST, _SVC_ADDY + "/v3/endpoints", json={}, status=404
-    )
-
-    ep = endpoint.Endpoint()
-    ep_conf = UserEndpointConfig(engine=mock.Mock())
-    ep_dir = pathlib.Path("/some/path/some_endpoint_name")
-    ep_dir.mkdir(parents=True, exist_ok=True)
-    ep_conf.display_name = display_name
-
-    with pytest.raises(SystemExit) as pyt_exc:
-        ep.start_endpoint(ep_dir, None, ep_conf, False, True, reg_info={}, ep_info={})
-    assert int(str(pyt_exc.value)) == os.EX_UNAVAILABLE, "Verify exit due to test 404"
-
-    req = pyt_exc.value.__cause__._underlying_response.request
-    req_json = json.loads(req.body)
-    if display_name is not None:
-        assert display_name == req_json["display_name"]
-    else:
-        assert "display_name" not in req_json
-
-
-def test_start_endpoint_data_passthrough(fs):
-    responses.add(  # 404 == we are verifying the POST, not the response
-        responses.POST, _SVC_ADDY + "/v3/endpoints", json={}, status=404
-    )
-
-    ep = endpoint.Endpoint()
-    ep_conf = UserEndpointConfig(engine=mock.Mock())
-    ep_dir = pathlib.Path("/some/path/some_endpoint_name")
-    ep_dir.mkdir(parents=True, exist_ok=True)
-    ep_conf.allowed_functions = [uuid.uuid4() for _ in range(random.randint(1, 10))]
-    ep_conf.authentication_policy = str(uuid.uuid4())
-    ep_conf.subscription_id = str(uuid.uuid4())
-    ep_conf.admins = [uuid.uuid4() for _ in range(random.randint(1, 10))]
-    ep_conf.public = True
-
-    with pytest.raises(SystemExit) as pyt_exc:
-        ep.start_endpoint(ep_dir, None, ep_conf, False, True, reg_info={}, ep_info={})
-    assert int(str(pyt_exc.value)) == os.EX_UNAVAILABLE, "Verify exit due to test 404"
-
-    req = pyt_exc.value.__cause__._underlying_response.request
-    req_json = json.loads(req.body)
-
-    assert len(req_json["allowed_functions"]) == len(ep_conf.allowed_functions)
-    assert req_json["allowed_functions"] == [str(f) for f in ep_conf.allowed_functions]
-    assert req_json["authentication_policy"] == str(ep_conf.authentication_policy)
-    assert req_json["subscription_uuid"] == str(ep_conf.subscription_id)
-    assert len(req_json["admins"]) == len(ep_conf.admins)
-    assert req_json["admins"] == [str(a) for a in ep_conf.admins]
-
-
 def test_stop_remote_endpoint(mocker):
     ep_uuid = "some-uuid"
     ep_dir = pathlib.Path("some_ep_dir") / "abc-endpoint"
@@ -163,10 +100,8 @@ def test_endpoint_setup_execution(mocker, tmp_path, randomstring):
     endpoint_config = UserEndpointConfig(
         endpoint_setup=command,
         engine=mock.Mock(),
-        detach_endpoint=False,
     )
     log_to_console = False
-    no_color = True
     reg_info = {}
     ep_info = {}
 
@@ -178,7 +113,6 @@ def test_endpoint_setup_execution(mocker, tmp_path, randomstring):
                 endpoint_uuid,
                 endpoint_config,
                 log_to_console,
-                no_color,
                 reg_info,
                 ep_info,
             )

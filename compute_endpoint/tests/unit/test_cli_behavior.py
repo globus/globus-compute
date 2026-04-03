@@ -106,6 +106,13 @@ def mock_ep(gc_dir, ep_name):
 
 
 @pytest.fixture
+def mock_mep():
+    with mock.patch(f"{_MOCK_BASE}EndpointManager") as m:
+        m.return_value = m
+        yield m
+
+
+@pytest.fixture
 def mock_client():
     with mock.patch(f"{_MOCK_BASE}Client") as m:
         mock_client = mock.Mock(spec=Client)
@@ -130,6 +137,22 @@ def mock_get_config():
 
 
 @pytest.fixture
+def mock_load_config_yaml_mep():
+    conf = ManagerEndpointConfig()
+    with mock.patch(f"{_MOCK_BASE}load_config_yaml") as m:
+        m.return_value = conf
+        yield m
+
+
+@pytest.fixture
+def mock_get_config_mep():
+    conf = ManagerEndpointConfig()
+    with mock.patch(f"{_MOCK_BASE}get_config") as m:
+        m.return_value = conf
+        yield m
+
+
+@pytest.fixture
 def mock_render_config_user_template():
     with mock.patch(f"{_MOCK_BASE}render_config_user_template") as m:
         yield m
@@ -144,6 +167,42 @@ def mock_send_endpoint_startup_failure_to_amqp():
 @pytest.fixture
 def mock_daemon():
     with mock.patch(f"{_MOCK_BASE}daemon") as m:
+        yield m
+
+
+@pytest.fixture
+def mock__do_register_endpoint(ep_uuid):
+    with mock.patch(f"{_MOCK_BASE}_do_register_endpoint") as m:
+        m.return_value = {
+            "endpoint_id": ep_uuid,
+            "task_queue_info": {
+                "connection_url": "amqps://user:password@mq.fqdn",
+                "exchange": "some_exchange",
+                "queue": "some_queue",
+            },
+            "command_queue_info": {
+                "connection_url": "amqps://user:password@mq.fqdn",
+                "exchange": "some_exchange",
+                "queue": "some_queue",
+                "queue_publish_kwargs": {
+                    "exchange": "some_exchange",
+                    "routing_key": "some_key",
+                    "mandatory": True,
+                    "properties": {"delivery_mode": 2},
+                },
+            },
+            "heartbeat_queue_info": {
+                "connection_url": "amqps://user:password@mq.fqdn",
+                "exchange": "some_exchange",
+                "queue": "some_queue",
+                "queue_publish_kwargs": {
+                    "exchange": "some_exchange",
+                    "routing_key": "some_key",
+                    "mandatory": True,
+                    "properties": {"delivery_mode": 2},
+                },
+            },
+        }
         yield m
 
 
@@ -292,18 +351,28 @@ def test_start_endpoint_no_such_ep(run_line, mock_ep, ep_name):
 
 
 def test_start_endpoint_existing_ep(
-    run_line, mock_ep, make_endpoint_dir, ep_name, mock_client
+    run_line,
+    mock_mep,
+    make_manager_endpoint_dir,
+    ep_name,
+    mock_send_endpoint_startup_failure_to_amqp,
+    mock__do_register_endpoint,
+    mock_client,
 ):
-    make_endpoint_dir()
+    make_manager_endpoint_dir()
     run_line(f"start {ep_name}")
-    mock_ep.start_endpoint.assert_called_once()
+    mock_mep.start.assert_called_once()
 
 
 def test_start_endpoint_already_running(
-    make_endpoint_dir, mock_client, ep_name, mock_send_endpoint_startup_failure_to_amqp
+    make_manager_endpoint_dir,
+    mock_client,
+    ep_name,
+    mock_send_endpoint_startup_failure_to_amqp,
+    mock__do_register_endpoint,
 ):
     """Check to ensure endpoint already active message prints to console"""
-    ep_dir = make_endpoint_dir()
+    ep_dir = make_manager_endpoint_dir()
     pid_path = Endpoint.pid_path(ep_dir)
     pid_path.write_text("12345")
     f = io.StringIO()
@@ -319,8 +388,15 @@ def test_start_endpoint_already_running(
     assert "remove the PID file" in serr, "Expect suggested action conveyed"
 
 
-def test_start_endpoint_stale(mock_ep, make_endpoint_dir, ep_name, mock_client):
-    ep_dir = make_endpoint_dir()
+def test_start_endpoint_stale(
+    mock_mep,
+    make_manager_endpoint_dir,
+    ep_name,
+    mock_client,
+    mock_send_endpoint_startup_failure_to_amqp,
+    mock__do_register_endpoint,
+):
+    ep_dir = make_manager_endpoint_dir()
     pid_path = Endpoint.pid_path(ep_dir)
     pid_path.write_text("12345")
     stale_time = time.time() - 95  # something larger than HB * 3
@@ -335,18 +411,13 @@ def test_start_endpoint_stale(mock_ep, make_endpoint_dir, ep_name, mock_client):
     assert "Removing PID file" in serr, "Expect action taken in warning"
 
 
-@pytest.mark.parametrize("is_uep", (False, True))
-def test_start_non_template_emits_upgrade_message(
-    mock_ep, make_endpoint_dir, is_uep, mock_client
-):
+def test_cannot_start_sep(mock_ep, make_endpoint_dir, mock_client):
     ep_dir = make_endpoint_dir()
-    f = io.StringIO()
-    with redirect_stdout(f):
-        cli._do_start_endpoint(
-            ep_dir=ep_dir, endpoint_uuid=None, die_with_parent=is_uep
-        )
+    with pytest.raises(ClickException) as pyt_e:
+        cli._do_start_endpoint(ep_dir=ep_dir, endpoint_uuid=None)
 
-    assert ("migrate-to-template-capable" in f.getvalue()) is not is_uep
+    assert "not template capable" in str(pyt_e.value)
+    assert "will not start" in str(pyt_e.value)
 
 
 @pytest.mark.parametrize("cli_cmd", ["configure"])
@@ -362,16 +433,10 @@ def test_endpoint_uuid_name_not_supported(run_line, cli_cmd):
 @pytest.mark.parametrize(
     "stdin_data",
     [
-        (False, "..."),
-        (False, "()"),
-        (False, json.dumps([1, 2, 3])),
-        (False, json.dumps("abc")),
-        (True, "{}"),
-        (True, json.dumps({"amqp_creds": {}})),
-        (True, json.dumps({"config": "myconfig"})),
-        (True, json.dumps({"amqp_creds": {}, "config": ""})),
-        (True, json.dumps({"amqp_creds": {"a": 1}, "config": "myconfig"})),
-        (True, json.dumps({"amqp_creds": {}, "config": "myconfig", "audit_fd": 1})),
+        json.dumps({"amqp_creds": {"foo": "bar"}}),
+        json.dumps({"amqp_creds": {"baz": "qux"}, "config": ""}),
+        json.dumps({"amqp_creds": {"a": 1}, "config": "myconfig"}),
+        json.dumps({"amqp_creds": {"b": 2}, "config": "myconfig", "audit_fd": 1}),
     ],
 )
 def test_start_ep_reads_stdin(
@@ -382,10 +447,7 @@ def test_start_ep_reads_stdin(
     make_endpoint_dir,
     stdin_data,
     ep_name,
-    randomstring,
 ):
-    data_is_valid, data = stdin_data
-
     mock_load_conf = mocker.patch(f"{_MOCK_BASE}load_config_yaml")
     mock_load_conf.return_value = mock_get_config.return_value
 
@@ -393,39 +455,29 @@ def test_start_ep_reads_stdin(
     mock__do_register_endpoint = mocker.patch(f"{_MOCK_BASE}_do_register_endpoint")
     mock__do_register_endpoint.return_value = remote_register_endpoint_response
 
-    mock_log = mocker.patch(f"{_MOCK_BASE}log")
     mock_sys = mocker.patch(f"{_MOCK_BASE}sys")
     mock_sys.stdin.closed = False
     mock_sys.stdin.isatty.return_value = False
-    mock_sys.stdin.read.return_value = data
+    mock_sys.stdin.read.return_value = stdin_data
 
     make_endpoint_dir()
 
-    run_line(f"start {ep_name}")
+    run_line(f"start {ep_name} --die-with-parent")
     assert mock_ep.start_endpoint.called
     s_ep_a, _ = mock_ep.start_endpoint.call_args
-    reg_info_found = s_ep_a[5]
-    audit_fd_found = s_ep_a[8]
+    reg_info_found = s_ep_a[4]
+    audit_fd_found = s_ep_a[7]
 
-    if data_is_valid:
-        data_dict = json.loads(data)
-        reg_info = data_dict.get("amqp_creds", remote_register_endpoint_response)
-        config_str = data_dict.get("config")
-        audit_fd = data_dict.get("audit_fd")
+    data_dict = json.loads(stdin_data)
+    reg_info = data_dict.get("amqp_creds", remote_register_endpoint_response)
+    config_str = data_dict.get("config")
+    audit_fd = data_dict.get("audit_fd")
 
-        assert reg_info_found == reg_info
-        assert audit_fd_found == audit_fd
-        if config_str:
-            config_str_found = mock_load_conf.call_args[0][0]
-            assert config_str_found == config_str
-
-    else:
-        assert mock_get_config.called
-        assert mock__do_register_endpoint.called
-        assert mock_log.debug.called
-        a, k = mock_log.debug.call_args
-        assert "Invalid info on stdin" in a[0]
-        assert reg_info_found == remote_register_endpoint_response
+    assert reg_info_found == reg_info
+    assert audit_fd_found == audit_fd
+    if config_str:
+        config_str_found = mock_load_conf.call_args[0][0]
+        assert config_str_found == config_str
 
 
 @pytest.mark.parametrize("fn_count", range(-1, 5))
@@ -450,14 +502,63 @@ def test_start_ep_stdin_allowed_fns_overrides_conf(
     mock_sys = mocker.patch(f"{_MOCK_BASE}sys")
     mock_sys.stdin.closed = False
     mock_sys.stdin.isatty.return_value = False
-    mock_sys.stdin.read.return_value = json.dumps({"allowed_functions": allowed_fns})
+    mock_sys.stdin.read.return_value = json.dumps(
+        {"amqp_creds": {"foo": "bar"}, "allowed_functions": allowed_fns}
+    )
 
     make_endpoint_dir()
 
-    run_line(f"start {ep_name}")
+    run_line(f"start {ep_name} --die-with-parent")
     assert mock_ep.start_endpoint.called
     (_, _, found_conf, *_), _k = mock_ep.start_endpoint.call_args
     assert found_conf.allowed_functions == allowed_fns, "allowed field not overridden!"
+
+
+@pytest.mark.parametrize(
+    "display_name",
+    [
+        None,
+        "xyz",
+        "😎 Great display/.name",
+    ],
+)
+def test__do_register_endpoint_data_passthrough(
+    make_manager_endpoint_dir, mock_client, display_name
+):
+    class FakeGlobusAPIError(GlobusAPIError):
+        def __init__(self, http_status):
+            self.http_status = http_status
+
+        @property
+        def text(self):
+            return "Conflict"
+
+    mock_client.register_endpoint.side_effect = FakeGlobusAPIError(HTTPStatus.CONFLICT)
+
+    ep_dir = make_manager_endpoint_dir()
+    ep_conf = ManagerEndpointConfig()
+    ep_conf.allowed_functions = [uuid.uuid4() for _ in range(random.randint(1, 10))]
+    ep_conf.authentication_policy = str(uuid.uuid4())
+    ep_conf.subscription_id = str(uuid.uuid4())
+    ep_conf.admins = [uuid.uuid4() for _ in range(random.randint(1, 10))]
+    ep_conf.public = True
+    ep_conf.display_name = display_name
+
+    with pytest.raises(SystemExit) as pyt_exc:
+        cli._do_register_endpoint(ep_dir, ep_conf, None)
+    assert int(str(pyt_exc.value)) == os.EX_UNAVAILABLE, "Verify exit due to test 404"
+
+    kwargs = mock_client.register_endpoint.call_args[1]
+
+    assert len(kwargs["allowed_functions"]) == len(ep_conf.allowed_functions)
+    assert list(kwargs["allowed_functions"]) == [
+        str(f) for f in ep_conf.allowed_functions
+    ]
+    assert kwargs["auth_policy"] == str(ep_conf.authentication_policy)
+    assert kwargs["subscription_id"] == str(ep_conf.subscription_id)
+    assert len(kwargs["admins"]) == len(ep_conf.admins)
+    assert list(kwargs["admins"]) == [str(a) for a in ep_conf.admins]
+    assert kwargs["display_name"] == display_name
 
 
 @pytest.mark.parametrize("use_uuid", (True, False))
@@ -471,13 +572,13 @@ def test_stop_endpoint(
 
 
 def test_restart_endpoint_does_start_and_stop(
-    run_line, mock_ep, make_endpoint_dir, ep_name, mock_client
+    run_line, mock_ep, mock_mep, make_manager_endpoint_dir, ep_name, mock_client
 ):
-    make_endpoint_dir()
+    make_manager_endpoint_dir()
     run_line(f"restart {ep_name}")
 
     mock_ep.stop_endpoint.assert_called_once()
-    mock_ep.start_endpoint.assert_called_once()
+    mock_mep.start.assert_called_once()
 
 
 @responses.activate
@@ -499,7 +600,7 @@ def test__do_register_endpoint_registration_blocked(
     get_standard_compute_client,
     randomstring,
     register_endpoint_failure_response,
-    make_endpoint_dir,
+    make_manager_endpoint_dir,
     ep_uuid,
 ):
     mock_gcc = get_standard_compute_client()
@@ -510,12 +611,12 @@ def test__do_register_endpoint_registration_blocked(
     some_err = randomstring()
     register_endpoint_failure_response(ep_uuid, status_code, some_err)
 
-    ep_dir = make_endpoint_dir(ep_uuid=ep_uuid)
+    ep_dir = make_manager_endpoint_dir(ep_uuid=ep_uuid)
 
     f = io.StringIO()
     with redirect_stdout(f):
         with pytest.raises((GlobusAPIError, SystemExit)) as pyexc:
-            cli._do_register_endpoint(ep_dir, UserEndpointConfig(), ep_uuid)
+            cli._do_register_endpoint(ep_dir, ManagerEndpointConfig(), ep_uuid)
         stdout_msg = f.getvalue()
 
     assert mock_log.warning.called
@@ -536,11 +637,11 @@ def test__do_register_endpoint_registration_blocked(
 
 @pytest.mark.parametrize("with_json", (False, True))
 def test__do_register_endpoint_provided_endpoint_id(
-    mock_client, ep_uuid, make_endpoint_dir, with_json
+    mock_client, ep_uuid, make_manager_endpoint_dir, with_json
 ):
-    ep_dir = make_endpoint_dir(ep_uuid=ep_uuid if with_json else None)
+    ep_dir = make_manager_endpoint_dir(ep_uuid=ep_uuid if with_json else None)
 
-    cli._do_register_endpoint(ep_dir, UserEndpointConfig(), ep_uuid)
+    cli._do_register_endpoint(ep_dir, ManagerEndpointConfig(), ep_uuid)
 
     _a, k = mock_client.register_endpoint.call_args
     assert k["endpoint_id"] == ep_uuid
@@ -686,9 +787,7 @@ def test_configure_validates_name(mock_command_ensure, run_line):
         ["ep2", "abc 😎 /.great"],
     ],
 )
-def test_start_ep_display_name_in_config(
-    run_line, mock_command_ensure, make_endpoint_dir, display_test
-):
+def test_start_ep_display_name_in_config(run_line, mock_command_ensure, display_test):
     dir_name, display_name = display_test
 
     conf = mock_command_ensure.endpoint_config_dir / dir_name / "config.yaml"
@@ -712,7 +811,7 @@ def test_start_ep_display_name_in_config(
     ),
 )
 def test_start_ep_high_assurance_in_config(
-    run_line, mock_command_ensure, make_endpoint_dir, ep_name, set_ha
+    run_line, mock_command_ensure, ep_name, set_ha
 ):
     conf = mock_command_ensure.endpoint_config_dir / ep_name / "config.yaml"
     configure_arg = ""
@@ -734,9 +833,7 @@ def test_start_ep_high_assurance_in_config(
         assert conf_dict.get("high_assurance", False) is False
 
 
-def test_configure_ep_auth_policy_in_config(
-    run_line, mock_command_ensure, make_endpoint_dir
-):
+def test_configure_ep_auth_policy_in_config(run_line, mock_command_ensure):
     ep_name = "my-ep"
     auth_policy = str(uuid.uuid4())
     conf = mock_command_ensure.endpoint_config_dir / ep_name / "config.yaml"
@@ -749,9 +846,7 @@ def test_configure_ep_auth_policy_in_config(
     assert conf_dict["authentication_policy"] == auth_policy
 
 
-def test_configure_ep_subscription_id_in_config(
-    run_line, mock_command_ensure, make_endpoint_dir
-):
+def test_configure_ep_subscription_id_in_config(run_line, mock_command_ensure):
     ep_name = "my-ep"
     subscription_id = str(uuid.uuid4())
     conf = mock_command_ensure.endpoint_config_dir / ep_name / "config.yaml"
@@ -917,24 +1012,24 @@ def test_start_ep_incorrect_config_py(
 
 @mock.patch("globus_compute_endpoint.endpoint.config.utils.load_config_yaml")
 def test_start_ep_config_py_takes_precedence(
-    mock_load, run_line, mock_ep, make_endpoint_dir, ep_name, mock_client
+    mock_load, run_line, mock_mep, make_manager_endpoint_dir, ep_name, mock_client
 ):
-    conf_py = make_endpoint_dir() / "config.py"
+    conf_py = make_manager_endpoint_dir() / "config.py"
     conf_py.write_text(
-        "from globus_compute_endpoint.endpoint.config import UserEndpointConfig"
-        "\nconfig = UserEndpointConfig()"
+        "from globus_compute_endpoint.endpoint.config import ManagerEndpointConfig"
+        "\nconfig = ManagerEndpointConfig()"
     )
 
     run_line(f"start {ep_name}")
-    assert mock_ep.start_endpoint.called
+    assert mock_mep.start.called
     assert not mock_load.called, "Key outcome: config.py takes precedence"
 
 
 def test_start_ep_umask_set_restrictive(
-    run_line, make_endpoint_dir, ep_name, mock_ep, mock_client
+    run_line, make_manager_endpoint_dir, ep_name, mock_mep, mock_client
 ):
     orig_umask = os.umask(0)
-    make_endpoint_dir()
+    make_manager_endpoint_dir()
     run_line(f"start {ep_name}")
     assert os.umask(orig_umask) == 0o077
 
@@ -942,13 +1037,13 @@ def test_start_ep_umask_set_restrictive(
 def test_start_ep_detached(
     run_line,
     mock_command_ensure,
-    make_endpoint_dir,
+    make_manager_endpoint_dir,
     ep_name,
     mock_daemon,
     mock_client,
     mock_send_endpoint_startup_failure_to_amqp,
 ):
-    make_endpoint_dir()
+    make_manager_endpoint_dir()
 
     mock_daemon_context_class = mock_daemon.DaemonContext
     mock_daemon_context_class.return_value.__enter__.side_effect = Exception(
@@ -1005,25 +1100,6 @@ def test_delete_endpoint_with_malformed_config_sc28515(
     assert conf_dir.exists() and conf_dir.is_dir()
     run_line(f"delete {ep_name} --yes --force")
     assert not conf_dir.exists()
-
-
-@pytest.mark.parametrize("die_with_parent", [True, False])
-def test_die_with_parent_detached(
-    mock_get_config,
-    run_line,
-    mock_ep,
-    die_with_parent,
-    ep_name,
-    make_endpoint_dir,
-    mock_client,
-):
-    make_endpoint_dir()
-
-    if die_with_parent:
-        run_line(f"start {ep_name} --die-with-parent")
-    else:
-        run_line(f"start {ep_name}")
-    assert mock_get_config.return_value.detach_endpoint is (not die_with_parent)
 
 
 def test_python_exec(mocker: MockFixture, run_line: t.Callable):
@@ -1092,14 +1168,14 @@ def test_get_endpoint_by_name_or_uuid_error_message(tmp_path, run_line, data):
 def test_invalid_grant_triggers_login_if_interactive(
     mocker: MockFixture,
     run_line,
-    mock_ep,
-    make_endpoint_dir,
+    mock_mep,
+    make_manager_endpoint_dir,
     mock_send_endpoint_startup_failure_to_amqp,
     ep_name,
     mock_client,
     is_tty,
 ):
-    make_endpoint_dir()
+    make_manager_endpoint_dir()
 
     mock_resp = mock.MagicMock(
         status_code=400,
@@ -1107,8 +1183,8 @@ def test_invalid_grant_triggers_login_if_interactive(
         text='{"error":"invalid_grant"}',
     )
     mocker.patch.object(
-        mock_ep,
-        "start_endpoint",
+        mock_mep,
+        "start",
         side_effect=globus_sdk.AuthAPIError(r=mock_resp),
     )
     exc_base = "globus_compute_endpoint.exception_handling"
@@ -1126,8 +1202,8 @@ def test_invalid_grant_triggers_login_if_interactive(
 @pytest.mark.parametrize(
     "cmd,ep_method,auth_err_msg",
     [
-        ("start", "start_endpoint", '{"error":"something else"}'),
-        ("start", "start_endpoint", ""),
+        ("start", "start", '{"error":"something else"}'),
+        ("start", "start", ""),
         ("stop", "stop_endpoint", "err_msg"),
         ("delete --yes", "delete_endpoint", "err_msg"),
     ],
@@ -1135,8 +1211,9 @@ def test_invalid_grant_triggers_login_if_interactive(
 def test_handle_globus_auth_error(
     mocker: MockFixture,
     run_line,
+    mock_mep,
     mock_ep,
-    make_endpoint_dir,
+    make_manager_endpoint_dir,
     ep_name,
     cmd,
     ep_method,
@@ -1144,7 +1221,7 @@ def test_handle_globus_auth_error(
     mock_client,
     mock_send_endpoint_startup_failure_to_amqp,
 ):
-    make_endpoint_dir()
+    make_manager_endpoint_dir()
 
     mock_log = mocker.patch("globus_compute_endpoint.exception_handling.log")
     mock_resp = mock.MagicMock(
@@ -1152,11 +1229,13 @@ def test_handle_globus_auth_error(
         reason="Bad Request",
         text=auth_err_msg,
     )
-    mocker.patch.object(
-        mock_ep,
-        ep_method,
-        side_effect=globus_sdk.AuthAPIError(r=mock_resp),
-    )
+    for obj in (mock_ep, mock_mep):
+        if hasattr(obj, ep_method):
+            mocker.patch.object(
+                obj,
+                ep_method,
+                side_effect=globus_sdk.AuthAPIError(r=mock_resp),
+            )
 
     res = run_line(f"{cmd} {ep_name}", assert_exit_code=os.EX_NOPERM)
 
