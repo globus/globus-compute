@@ -798,8 +798,9 @@ def _do_register_endpoint(
             sys.exit(os.EX_DATAERR)
         raise
     except NetworkError as e:
-        log.exception("Network error while registering endpoint")
-        log.critical(f"Network failure; unable to register endpoint: {e}")
+        msg = f"Network failure; unable to register endpoint: {e}"
+        log.debug("Network error while registering endpoint", exc_info=e)
+        log.critical(msg)
         sys.exit(os.EX_TEMPFAIL)
 
     # Mostly to appease mypy, but also a useful text if it ever
