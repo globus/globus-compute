@@ -616,11 +616,14 @@ def test__do_register_endpoint_handles_network_error_scriptably(
         cli._do_register_endpoint(conf_dir, ManagerEndpointConfig(), ep_uuid)
 
     assert pyexc.value.code == os.EX_TEMPFAIL, "Expecting meaningful exit code"
-    assert mock_log.exception.called, "Expected usable traceback"
+    assert mock_log.debug.called
+
+    _, k = mock_log.debug.call_args
+    assert "exc_info" in k, "Expected usable traceback"
     assert mock_log.critical.called
-    a = mock_log.critical.call_args[0][0]
-    assert "Network failure" in a
-    assert some_err in a
+    a, _ = mock_log.critical.call_args
+    assert "Network failure" in a[0]
+    assert some_err in a[0]
 
 
 @mock.patch(f"{_MOCK_BASE}setup_logging")
