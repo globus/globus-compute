@@ -42,6 +42,7 @@ from globus_compute_endpoint.endpoint.config import (
 from globus_compute_endpoint.endpoint.config.utils import load_config_yaml
 from globus_compute_endpoint.endpoint.endpoint import Endpoint
 from globus_compute_endpoint.endpoint.identity_mapper import MappedPosixIdentity
+from globus_compute_endpoint.exceptions import MessageSystemExit
 from globus_compute_sdk import Client
 from globus_compute_sdk.sdk.auth.auth_client import ComputeAuthClient
 from globus_compute_sdk.sdk.auth.globus_app import UserApp
@@ -377,7 +378,7 @@ def test_start_endpoint_already_running(
     pid_path.write_text("12345")
     f = io.StringIO()
     with redirect_stderr(f):
-        with pytest.raises(SystemExit) as pyt_e:
+        with pytest.raises(MessageSystemExit) as pyt_e:
             cli._do_start_endpoint(ep_dir=ep_dir, endpoint_uuid=None)
     pid_path.unlink()
 
@@ -386,6 +387,9 @@ def test_start_endpoint_already_running(
     assert "Another instance " in serr, "Expect cause explained"
     assert "Refusing to start." in serr, "Expect action taken conveyed"
     assert "remove the PID file" in serr, "Expect suggested action conveyed"
+    assert "Another instance " in pyt_e.value.msg
+    assert "Refusing to start." in pyt_e.value.msg
+    assert "remove the PID file" in pyt_e.value.msg
 
 
 def test_start_endpoint_stale(
@@ -523,15 +527,17 @@ def test_start_ep_stdin_allowed_fns_overrides_conf(
     ],
 )
 def test__do_register_endpoint_data_passthrough(
-    make_manager_endpoint_dir, mock_client, display_name
+    randomstring, make_manager_endpoint_dir, mock_client, display_name
 ):
+    exp_err_reason = randomstring()
+
     class FakeGlobusAPIError(GlobusAPIError):
         def __init__(self, http_status):
             self.http_status = http_status
 
         @property
         def text(self):
-            return "Conflict"
+            return f"{exp_err_reason}"
 
     mock_client.register_endpoint.side_effect = FakeGlobusAPIError(HTTPStatus.CONFLICT)
 
@@ -544,9 +550,10 @@ def test__do_register_endpoint_data_passthrough(
     ep_conf.public = True
     ep_conf.display_name = display_name
 
-    with pytest.raises(SystemExit) as pyt_exc:
+    with pytest.raises(MessageSystemExit) as pyt_e:
         cli._do_register_endpoint(ep_dir, ep_conf, None)
-    assert int(str(pyt_exc.value)) == os.EX_UNAVAILABLE, "Verify exit due to test 404"
+    assert pyt_e.value.code == os.EX_UNAVAILABLE
+    assert exp_err_reason in pyt_e.value.msg, "Verify expected test-exit"
 
     kwargs = mock_client.register_endpoint.call_args[1]
 
@@ -615,7 +622,7 @@ def test__do_register_endpoint_registration_blocked(
 
     f = io.StringIO()
     with redirect_stdout(f):
-        with pytest.raises((GlobusAPIError, SystemExit)) as pyexc:
+        with pytest.raises((GlobusAPIError, MessageSystemExit)) as pyexc:
             cli._do_register_endpoint(ep_dir, ManagerEndpointConfig(), ep_uuid)
         stdout_msg = f.getvalue()
 
@@ -713,7 +720,7 @@ def test__do_register_endpoint_handles_network_error_scriptably(
     some_err = randomstring()
     mock_client.register_endpoint.side_effect = NetworkError(some_err, Exception())
 
-    with pytest.raises(SystemExit) as pyexc:
+    with pytest.raises(MessageSystemExit) as pyexc:
         cli._do_register_endpoint(conf_dir, ManagerEndpointConfig(), ep_uuid)
 
     assert pyexc.value.code == os.EX_TEMPFAIL, "Expecting meaningful exit code"
@@ -725,6 +732,8 @@ def test__do_register_endpoint_handles_network_error_scriptably(
     a, _ = mock_log.critical.call_args
     assert "Network failure" in a[0]
     assert some_err in a[0]
+    assert "Network failure" in pyexc.value.msg
+    assert some_err in a[0] in pyexc.value.msg
 
 
 @mock.patch(f"{_MOCK_BASE}setup_logging")
