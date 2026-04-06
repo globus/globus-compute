@@ -48,6 +48,7 @@ from globus_compute_endpoint.endpoint.utils import (
     user_input_select,
 )
 from globus_compute_endpoint.exception_handling import handle_auth_errors
+from globus_compute_endpoint.exceptions import MessageSystemExit
 from globus_compute_endpoint.logging_config import setup_logging
 from globus_compute_sdk import Client
 from globus_compute_sdk.sdk.auth.auth_client import ComputeAuthClient
@@ -693,7 +694,7 @@ def _pidfile(pid_path: pathlib.Path, stale_after_s: int | float):
                 " correct, then remove the PID file before starting again."
             )
             log.error(msg)
-            sys.exit(os.EX_CANTCREAT)
+            raise MessageSystemExit(os.EX_CANTCREAT, msg)
 
         else:
             log.warning(
@@ -779,18 +780,18 @@ def _do_register_endpoint(
             HTTPStatus.LOCKED,
             HTTPStatus.NOT_FOUND,
         ):
-            sys.exit(os.EX_UNAVAILABLE)
+            raise MessageSystemExit(os.EX_UNAVAILABLE, blocked_msg)
         elif e.http_status in (
             HTTPStatus.BAD_REQUEST,
             HTTPStatus.UNPROCESSABLE_ENTITY,
         ):
-            sys.exit(os.EX_DATAERR)
+            raise MessageSystemExit(os.EX_DATAERR, blocked_msg)
         raise
     except NetworkError as e:
         msg = f"Network failure; unable to register endpoint: {e}"
         log.debug("Network error while registering endpoint", exc_info=e)
         log.critical(msg)
-        sys.exit(os.EX_TEMPFAIL)
+        raise MessageSystemExit(os.EX_TEMPFAIL, msg)
 
     # Mostly to appease mypy, but also a useful text if it ever
     # *does* happen
@@ -849,7 +850,7 @@ def _do_start_endpoint(
         try:
             yield
         except (SystemExit, Exception) as e:
-            if isinstance(e, SystemExit):
+            if issubclass(type(e), SystemExit):
                 if e.code in (0, None):
                     # normal, system exit
                     raise
@@ -857,7 +858,7 @@ def _do_start_endpoint(
             if reg_info:
                 # We're quitting anyway, so just let any exceptions bubble
                 msg = (
-                    f"Failed to start or unexpected error:\n  ({type(e).__name__}) {e}"
+                    f"Failed to start or unexpected error:\n  [{type(e).__name__}] {e}"
                 )
                 send_endpoint_startup_failure_to_amqp(reg_info, msg=msg)
 

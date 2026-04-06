@@ -32,6 +32,7 @@ from globus_compute_endpoint.endpoint.rabbit_mq import (
     ResultPublisher,
 )
 from globus_compute_endpoint.endpoint.utils import _redact_url_creds
+from globus_compute_endpoint.exceptions import MessageSystemExit
 from globus_sdk import UserApp
 from pytest_mock import MockFixture
 
@@ -527,15 +528,18 @@ def test_mismatched_id_gracefully_exits(
     ep_uuid = str(uuid.uuid4())
     assert wrong_uuid != ep_uuid, "Verify test setup"
 
-    with pytest.raises(SystemExit) as pyexc:
+    with pytest.raises(MessageSystemExit) as pyt_e:
         EndpointManager(conf_dir, ep_uuid, mock_conf, mock_reg_info)
 
-    assert pyexc.value.code == os.EX_SOFTWARE, "Expected meaningful exit code"
+    assert pyt_e.value.code == os.EX_SOFTWARE, "Expected meaningful exit code"
     assert mock_log.error.called
     a = mock_log.error.call_args[0][0]
-    assert "mismatched endpoint" in a
-    assert f"Expected: {ep_uuid}" in a
-    assert f"received: {wrong_uuid}" in a
+    assert "mismatched endpoint" in a, "Expect logged"
+    assert "mismatched endpoint" in pyt_e.value.msg, "Expect available for sending"
+    assert f"Expected: {ep_uuid}" in a, "Expect logged"
+    assert f"Expected: {ep_uuid}" in pyt_e.value.msg, "Expect available for sending"
+    assert f"received: {wrong_uuid}" in a, "Expect logged"
+    assert f"received: {wrong_uuid}" in pyt_e.value.msg, "Expect available for sending"
 
 
 @pytest.mark.parametrize(
@@ -573,12 +577,14 @@ def test_handles_invalid_reg_info(
     should_succeed, mock_gcc.register_endpoint.return_value = received_data
 
     if not should_succeed:
-        with pytest.raises(SystemExit) as pyexc:
+        with pytest.raises(MessageSystemExit) as pyexc:
             EndpointManager(conf_dir, ep_uuid, mock_conf, received_data[1])
         assert pyexc.value.code == os.EX_DATAERR, "Expected meaningful exit code"
         assert mock_log.error.called
         a = mock_log.error.call_args[0][0]
         assert "Invalid or unexpected" in a
+        assert "Invalid or unexpected" in pyexc.value.msg
+
     else:
         # "null" test
         EndpointManager(conf_dir, ep_uuid, mock_conf, received_data[1])
@@ -898,11 +904,13 @@ def test_clean_exit_on_identity_collection_error(
 
 
 @pytest.mark.no_mock_pim
+@pytest.mark.parametrize("isatty", (False, True))
 def test_as_root_gracefully_handles_unreadable_identity_mapper_conf(
-    mocker, mock_log, conf_dir, mock_conf_root, identity_map_path
+    mocker, mock_log, conf_dir, mock_conf_root, identity_map_path, isatty
 ):
     mock_print = mocker.patch(f"{_MOCK_BASE}print")
     mocker.patch(f"{_MOCK_BASE}is_privileged", return_value=True)
+    mocker.patch(f"{_MOCK_BASE}sys.stderr.isatty", return_value=isatty)
 
     ep_uuid = str(uuid.uuid1())
     reg_info = {
@@ -910,25 +918,33 @@ def test_as_root_gracefully_handles_unreadable_identity_mapper_conf(
         "command_queue_info": {"connection_url": 1, "queue": 1},
     }
     identity_map_path.chmod(mode=0o000)
-    with pytest.raises(SystemExit) as pyt_exc:
+    with pytest.raises(MessageSystemExit) as pyt_e:
         EndpointManager(conf_dir, ep_uuid, mock_conf_root, reg_info)
 
-    assert pyt_exc.value.code == os.EX_NOPERM
+    assert pyt_e.value.code == os.EX_NOPERM
     assert mock_log.error.called
-    assert mock_print.called
-    for a in (mock_log.error.call_args[0][0], mock_print.call_args[0][0]):
-        assert "PermissionError" in a
+    assert mock_print.called is isatty
+
+    found_msg = mock_log.error.call_args[0][0]
+    assert "PermissionError" in found_msg
+    assert found_msg == pyt_e.value.msg
+    if isatty:
+        assert mock_print.call_args[0][0] == found_msg
 
     identity_map_path.chmod(mode=0o644)
     identity_map_path.write_text("[{asfg")
-    with pytest.raises(SystemExit) as pyt_exc:
+    with pytest.raises(MessageSystemExit) as pyt_e:
         EndpointManager(conf_dir, ep_uuid, mock_conf_root, reg_info)
 
-    assert pyt_exc.value.code == os.EX_CONFIG
+    assert pyt_e.value.code == os.EX_CONFIG
     assert mock_log.error.called
-    assert mock_print.called
-    for a in (mock_log.error.call_args[0][0], mock_print.call_args[0][0]):
-        assert "Unable to read identity mapping" in a
+    assert mock_print.called is isatty
+
+    found_msg = mock_log.error.call_args[0][0]
+    assert "Unable to read identity mapping" in found_msg
+    assert found_msg == pyt_e.value.msg
+    if isatty:
+        assert mock_print.call_args[0][0] == found_msg
 
 
 def test_iterates_even_if_no_commands(mocker, epmanager_as_root):

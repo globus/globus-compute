@@ -56,6 +56,7 @@ from globus_compute_endpoint.endpoint.utils import (
     send_endpoint_startup_failure_to_amqp,
     update_url_port,
 )
+from globus_compute_endpoint.exceptions import MessageSystemExit
 from globus_compute_sdk import Client
 from globus_compute_sdk.sdk.auth.auth_client import ComputeAuthClient
 from globus_compute_sdk.sdk.compute_dir import ensure_compute_dir
@@ -176,11 +177,12 @@ class EndpointManager:
 
         upstream_ep_uuid = reg_info.get("endpoint_id")
         if endpoint_uuid and upstream_ep_uuid != endpoint_uuid:
-            log.error(
+            msg = (
                 "Unexpected response from server: mismatched endpoint id."
                 f"\n  Expected: {endpoint_uuid}, received: {upstream_ep_uuid}"
             )
-            sys.exit(os.EX_SOFTWARE)
+            log.error(msg)
+            raise MessageSystemExit(os.EX_SOFTWARE, msg)
 
         endpoint_uuid = str(upstream_ep_uuid)  # convenience, and satisfy mypy
         self._endpoint_uuid = uuid.UUID(endpoint_uuid)
@@ -214,8 +216,9 @@ class EndpointManager:
             except PermissionError as e:
                 msg = f"({type(e).__name__}) {e}"
                 log.error(msg)
-                print(msg, file=sys.stderr)
-                sys.exit(os.EX_NOPERM)
+                if sys.stderr.isatty():
+                    print(msg, file=sys.stderr)
+                raise MessageSystemExit(os.EX_NOPERM, msg)
 
             except Exception as e:
                 msg = (
@@ -224,8 +227,9 @@ class EndpointManager:
                 )
                 log.debug(msg, exc_info=e)
                 log.error(msg)
-                print(msg, file=sys.stderr)
-                sys.exit(os.EX_CONFIG)
+                if sys.stderr.isatty():
+                    print(msg, file=sys.stderr)
+                raise MessageSystemExit(os.EX_CONFIG, msg)
 
         try:
             cq_info = reg_info["command_queue_info"]
@@ -237,11 +241,12 @@ class EndpointManager:
         except Exception as e:
             log_reg_info = _redact_url_creds(str(reg_info))
             log.debug("%s", log_reg_info)
-            log.error(
+            msg = (
                 "Invalid or unexpected registration data structure:"
-                f" ({e.__class__.__name__}) {e}"
+                f" ({type(e).__name__}) {e}"
             )
-            sys.exit(os.EX_DATAERR)
+            log.error(msg)
+            raise MessageSystemExit(os.EX_DATAERR, msg)
 
         if config.amqp_port:
             cq_info["connection_url"] = update_url_port(
