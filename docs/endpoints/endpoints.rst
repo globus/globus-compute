@@ -962,33 +962,6 @@ To stop the endpoint, use the ``stop`` subcommand:
    > Endpoint <my_endpoint> is now stopped
 
 
-
-.. _enable_on_boot:
-
-Installing as a Service
-=======================
-
-Run ``globus-compute-endpoint enable-on-boot`` to install a systemd unit file:
-
-.. code-block:: console
-
-   $ globus-compute-endpoint enable-on-boot my_endpoint
-   Systemd service installed. Run
-      sudo systemctl enable globus-compute-endpoint-my_endpoint.service --now
-   to enable the service and start the endpoint.
-
-Run ``globus-compute-endpoint disable-on-boot`` for commands to disable and
-uninstall the service:
-
-.. code-block:: console
-
-   $ globus-compute-endpoint disable-on-boot my-endpoint
-   Run the following to disable on-boot-persistence:
-      systemctl stop globus-compute-endpoint-my-endpoint
-      systemctl disable globus-compute-endpoint-my-endpoint
-      rm /etc/systemd/system/globus-compute-endpoint-my-endpoint.service
-
-
 .. _auth-policies:
 
 Authentication Policies
