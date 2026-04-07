@@ -797,10 +797,80 @@ pulling out the configuration from the logs:
    $ sed -n "/Begin Compute/,/End Compute/p" ~/.globus_compute/uep.[...]/endpoint.log | less
 
 
+.. _exit_code_table:
+
+Endpoint Process Startup Errors
+-------------------------------
+
+Sometimes a provided ``user_endpoint_config`` structure will make for an invalid or
+incorrect configuration or some other error prevents the endpoint process from starting
+up.  It is not always possible to get complete and specific information back to the SDK
+about the failure, leaving the user with an opaque process exit code.  For example, this
+is a possible response from the API when an endpoint process fails to startup:
+
+.. code-block:: text
+   :caption: A possible error response; edited for clarity
+
+   globus_sdk.services.compute.errors.ComputeAPIError: (
+     'POST',
+     'https://compute.api.globus.org/v3/endpoints/[ENDPOINT_ID]/submit',
+     'Bearer',
+     422, 'SEMANTICALLY_INVALID',
+     'Request payload failed validation: Failed to start or unexpected error:\n  (SystemExit) 73'
+   )
+
+The `HTTP response code`__ of 422 is the Compute web-service saying "The user process
+did not successfully start.  Here's what the Endpoint reported."  However, the endpoint
+only reported that the user process stopped (``SystemExit``) and returned the exit code
+``73``.
+
+__ https://developer.mozilla.org/en-US/docs/Web/HTTP/Reference/Status/422
+
+The user process log (``~/.globus_compute/uep.[ENDPOINT_ID].[UEP_ID]/endpoint.log``) and
+parent endpoint process log (``~/.globus_compute/<endpoint_name>/endpoint.log``) may
+have clues as to what wrong.  If log access is a burden (for example, shell access is
+not available), end-users may use the following table of UEP exit codes for help
+understanding some common errors:
+
+.. table:: Possible user endpoint process exit codes
+   :widths: auto
+   :align: left
+
+   +-----------------------------+---------------+-------------------------------------+
+   | Python ``os`` constant name | Integer value | Likely Reason                       |
+   +=============================+===============+=====================================+
+   | ``os.EX_DATAERR``           | 65            | Registration of the endpoint was    |
+   |                             |               | blocked by the Compute API with an  |
+   |                             |               | HTTP 400 (bad request), HTTP 422    |
+   |                             |               | (unprocessable entity) response;    |
+   |                             |               | look to the logs for more           |
+   |                             |               | information.                        |
+   +-----------------------------+---------------+-------------------------------------+
+   | ``os.EX_UNAVAILABLE``       | 69            | Registration of the endpoint was    |
+   |                             |               | blocked by the Compute API with an  |
+   |                             |               | HTTP 404 (not found), HTTP 409      |
+   |                             |               | (conflict), or HTTP 423 (locked)    |
+   |                             |               | response; look to the logs for more |
+   |                             |               | information.                        |
+   +-----------------------------+---------------+-------------------------------------+
+   | ``os.EX_SOFTWARE``          | 70            | The endpoint received an unexpected |
+   |                             |               | response from the Compute API.  This|
+   |                             |               | might happen with a very outdated   |
+   |                             |               | endpoint install.                   |
+   +-----------------------------+---------------+-------------------------------------+
+   | ``os.EX_CANTCREAT``         | 73            | Cannot create a PID file; another   |
+   |                             |               | instance of the user process may    |
+   |                             |               | still be running.                   |
+   +-----------------------------+---------------+-------------------------------------+
+
+
 Testing Templates
 -----------------
 
-Iterating on template changes by restarting the endpoint and submitting a task can be very slow. As a result, the Compute Endpoint CLI includes a :ref:`tool for rendering config templates offline, without touching the endpoint lifecycle at all. <testing-templates>`
+Iterating on template changes by restarting the endpoint and submitting a task can be
+very slow.  As a result, the Compute Endpoint CLI includes a :ref:`tool for rendering
+config templates offline, without touching the endpoint lifecycle at all.
+<testing-templates>`
 
 
 Client Identities

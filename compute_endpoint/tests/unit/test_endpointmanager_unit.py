@@ -579,7 +579,7 @@ def test_handles_invalid_reg_info(
     if not should_succeed:
         with pytest.raises(MessageSystemExit) as pyexc:
             EndpointManager(conf_dir, ep_uuid, mock_conf, received_data[1])
-        assert pyexc.value.code == os.EX_DATAERR, "Expected meaningful exit code"
+        assert pyexc.value.code == os.EX_SOFTWARE, "Expected meaningful exit code"
         assert mock_log.error.called
         a = mock_log.error.call_args[0][0]
         assert "Invalid or unexpected" in a
