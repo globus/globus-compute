@@ -496,6 +496,32 @@ uninstall the service:
       # ...
 
 
+Common Startup Errors
+=====================
+
+Rounding out the table in § :ref:`exit_code_table`, there are a couple of well-known
+errors that administrators may additionally encounter.  Given the local access, the
+root cause of these exit codes should be evident in the ``endpoint.log`` or even on the
+console.  For completeness, however, when run as a multi-user endpoint, the following
+two exit codes are possible:
+
+.. table:: Possible endpoint process exit codes
+   :widths: auto
+   :align: left
+
+   +-----------------------------+---------------+-------------------------------------+
+   | Python ``os`` constant name | Integer value | Likely Reason                       |
+   +=============================+===============+=====================================+
+   | ``os.EX_NOPERM``            | 77            | Missing required permissions to read|
+   |                             |               | the identity mapping configuration  |
+   |                             |               | file.                               |
+   +-----------------------------+---------------+-------------------------------------+
+   | ``os.EX_CONFIG``            | 78            | Unknown problem reading or parsing  |
+   |                             |               | the identity mapping configuration  |
+   |                             |               | file.                               |
+   +-----------------------------+---------------+-------------------------------------+
+
+
 .. _pam:
 
 Pluggable Authentication Modules (PAM)

@@ -246,7 +246,7 @@ class EndpointManager:
                 f" ({type(e).__name__}) {e}"
             )
             log.error(msg)
-            raise MessageSystemExit(os.EX_DATAERR, msg)
+            raise MessageSystemExit(os.EX_SOFTWARE, msg)
 
         if config.amqp_port:
             cq_info["connection_url"] = update_url_port(
