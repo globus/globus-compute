@@ -143,7 +143,7 @@ properly generate the :ref:`multi-user-config-yaml` and
 
 .. code-block:: console
 
-   # globus-compute-endpoint configure my_mu_ep
+   # gce configure my_mu_ep
    Created profile for endpoint named <my_mu_ep>
 
        Configuration file: /root/.globus_compute/my_mu_ep/config.yaml
@@ -399,6 +399,8 @@ consult the Globus Connect Server's `Identity Mapping documentation`_.
 .. _idmap_output: https://docs.globus.org/globus-connect-server/v5.4/identity-mapping-guide/#output_document
 
 
+.. _start_mep:
+
 Starting the Multi-User Endpoint
 ================================
 
@@ -410,7 +412,7 @@ starting and stopping:
 
 .. code-block:: console
 
-   # globus-compute-endpoint start my_mu_ep
+   # gce start my_mu_ep
          >>> Endpoint ID: [endpoint_uuid] <<<
    ----> Wed Aug  6 20:03:02 2025
 
@@ -426,14 +428,72 @@ isolation of execution environments:
    └── User Endpoint Process (eve, UID: 1003)
 
 
+.. warning::
+
+   When the endpoint runs for the first time, it registers with the Compute API,
+   receiving an identifier |nbsp| --- |nbsp| the ``[endpoint_uuid]`` in the above
+   console output.
+
+   *This (endpoint) identifier will be locked for use to specifically and only the same
+   identity going forward.*
+
+   If the intention is to run this endpoint with service account credentials, be sure
+   to export those credentials at first run:
+
+   .. code-block:: console
+
+      # GLOBUS_COMPUTE_CLIENT_ID=... GLOBUS_COMPUTE_CLIENT_SECRET=... gce start my_mu_ep
+
+   Alternatively:
+
+   .. code-block:: console
+
+      # export GLOBUS_COMPUTE_CLIENT_ID=...
+      # export GLOBUS_COMPUTE_CLIENT_SECRET=...
+      # gce start my_mu_ep
+
+
 .. _mep-as-a-service:
 
 Installing as a Service
 =======================
 
-Installing the multi-user endpoint as a service is the same :ref:`procedure as
-with a regular endpoint <enable_on_boot>`: use the ``enable-on-boot``.  This
-will dynamically create and install a systemd unit file.
+Run ``gce enable-on-boot`` to install a systemd unit file:
+
+.. code-block:: console
+
+   $ gce enable-on-boot my_endpoint
+   Systemd service installed. Run
+      sudo systemctl enable globus-compute-endpoint-my_endpoint.service --now
+   to enable the service and start the endpoint.
+
+Run ``gce disable-on-boot`` for commands to disable and
+uninstall the service:
+
+.. code-block:: console
+
+   $ gce disable-on-boot my-endpoint
+   Run the following to disable on-boot-persistence:
+      systemctl stop globus-compute-endpoint-my-endpoint
+      systemctl disable globus-compute-endpoint-my-endpoint
+      rm /etc/systemd/system/globus-compute-endpoint-my-endpoint.service
+
+.. tip::
+
+   See the warning in the :ref:`previous section <start_mep>`; typically, endpoints run
+   as a service use client credentials (i.e., need the ``GLOBUS_COMPUTE_CLIENT_ID`` and
+   ``GLOBUS_COMPUTE_CLIENT_SECRET`` environment variables).  A reminder of the syntax
+   in Systemd unit files:
+
+   .. code-block:: systemd
+
+      # ...
+
+      [Service]
+      Environment="GLOBUS_COMPUTE_CLIENT_ID=<...identifier...>"
+      Environment="GLOBUS_COMPUTE_CLIENT_SECRET=<...secret...>"
+      ExecStart=/path/to/gce start ...
+      # ...
 
 
 .. _pam:
@@ -647,9 +707,7 @@ restrict access to users authenticated via the OIDC server:
 
 .. code-block:: console
 
-   $ globus-compute-endpoint configure \
-       --allowed-domains "<OIDC-domain>" \
-       my_oidc_compute_endpoint
+   $ gce configure --allowed-domains "<OIDC-domain>" my_oidc_compute_endpoint
 
 To apply the same restriction to an existing multi-user endpoint, create an
 authentication policy using either the `Globus Auth API <https://docs.globus.org/api/auth/reference/#create_policy>`_
