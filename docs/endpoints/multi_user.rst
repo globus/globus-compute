@@ -173,6 +173,7 @@ field to specify the identity mapping file path:
 
    amqp_port: 443
    display_name: null
+   public: true
    identity_mapping_config_path: /root/.globus_compute/my_mu_ep/example_identity_mapping_config.json
 
 Please refer to :ref:`endpoint-manager-config` for details on each field.
