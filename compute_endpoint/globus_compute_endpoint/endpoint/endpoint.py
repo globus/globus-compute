@@ -116,6 +116,7 @@ class Endpoint:
         display_name: str | None,
         auth_policy: str | None,
         subscription_id: str | None,
+        public_visibility: bool = False,
     ):
         config_text = original_path.read_text()
         config_dict = yaml.safe_load(config_text)
@@ -147,6 +148,11 @@ class Endpoint:
 
         if subscription_id:
             config_dict["subscription_id"] = subscription_id
+
+        # Default to public visibility only if the provided config doesn't
+        #   already specify it
+        if public_visibility and "public" not in config_dict:
+            config_dict["public"] = public_visibility
 
         # Empty file yields '{}' which is valid but may be unclear as to format
         config_text = "# The generated config file is currently empty\n"
@@ -249,6 +255,7 @@ class Endpoint:
                 display_name,
                 auth_policy,
                 subscription_id,
+                public_visibility=id_mapping,
             )
 
         finally:

@@ -327,6 +327,24 @@ endpoint process, which manages user endpoint processes.  Under the hood, all
 configuration options in this file are used to create an instance of the
 |ManagerEndpointConfig| class.
 
+- ``public``
+
+  A boolean value, dictating whether other users can discover this endpoint in
+  the Globus Compute web API and Globus `Web UI`_.  It defaults to ``true``.
+
+  .. warning::
+
+     This field does **not** indicate access/usage of the endpoint.  It determines
+     only whether this endpoint is easily discoverable via the Globus web portal
+     |nbsp| --- |nbsp| access is controlled via the ``admins`` field
+     (management of endpoint) and the identity mapping configuration (Compute usage),
+     both described below.
+
+  .. code-block:: yaml
+     :caption: ``config.yaml`` -- example public multi-user endpoint
+
+     public: true
+
 - ``identity_mapping_config_path``
 
   A path to an identity mapping configuration, per the Globus Connect Server
@@ -364,22 +382,6 @@ configuration options in this file are used to create an instance of the
      :caption: Example ``config.yaml`` with a custom user config schema path
 
      user_config_schema_path: /path/to/my_schema.json
-
-- ``public``
-
-  A boolean value, dictating whether other users can discover this endpoint in
-  the Globus Compute web API and Globus `Web UI`_.  It defaults to ``false``.
-
-  .. warning::
-
-     This field does **not** prevent access to the endpoint.  It determines only
-     whether this endpoint is easily discoverable |nbsp| --- |nbsp| do not use
-     this field as a security control.
-
-  .. code-block:: yaml
-     :caption: ``config.yaml`` -- example public multi-user endpoint
-
-     public: true
 
 - ``admins``
 
