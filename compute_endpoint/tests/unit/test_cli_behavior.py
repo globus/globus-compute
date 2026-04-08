@@ -871,6 +871,33 @@ def test_configure_ep_subscription_id_in_config(run_line, mock_command_ensure):
     assert conf_dict["subscription_id"] == subscription_id
 
 
+@pytest.mark.parametrize(
+    ("is_privileged", "mu_arg", "public_visible"),
+    (
+        (False, None, False),
+        (True, None, True),
+        (True, True, True),
+    ),
+)
+def test_configure_ep_public_visible(
+    run_line, mock_command_ensure, is_privileged, mu_arg, public_visible
+):
+    ep_name = "my-ep"
+    conf = mock_command_ensure.endpoint_config_dir / ep_name / "config.yaml"
+
+    with mock.patch(f"{_MOCK_BASE}is_privileged", return_value=is_privileged):
+        mu_arg_str = f" --multi-user {mu_arg}" if mu_arg is not None else ""
+        run_line(f"configure {mu_arg_str} {ep_name}")
+
+        with open(conf) as f:
+            conf_dict = yaml.safe_load(f)
+
+        if public_visible:
+            assert conf_dict["public"] is True
+        else:
+            assert "public" not in conf_dict or conf_dict["public"] is False
+
+
 def test_configure_ep_endpoint_config_deprecated(run_line, randomstring, mock_ep):
     ep_config_arg = randomstring()
 
