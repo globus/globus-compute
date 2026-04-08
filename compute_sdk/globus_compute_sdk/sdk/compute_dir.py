@@ -4,21 +4,19 @@ import os
 import pathlib
 
 
+def get_compute_dir() -> pathlib.Path:
+    if user_dir := os.getenv("GLOBUS_COMPUTE_USER_DIR"):
+        return pathlib.Path(user_dir)
+    return pathlib.Path.home() / ".globus_compute"
+
+
 def ensure_compute_dir() -> pathlib.Path:
-    dirname = pathlib.Path.home() / ".globus_compute"
+    dirname = get_compute_dir()
 
-    user_dir = os.getenv("GLOBUS_COMPUTE_USER_DIR")
-    if user_dir:
-        dirname = pathlib.Path(user_dir)
-
-    if dirname.is_dir():
-        pass
-    elif dirname.is_file():
-        raise FileExistsError(
-            f"Error creating directory {dirname}, "
-            "please remove or rename the conflicting file"
-        )
-    else:
+    if not dirname.exists():
         dirname.mkdir(mode=0o700, parents=True, exist_ok=True)
+
+    if not dirname.is_dir():
+        raise NotADirectoryError(f"Failed to create directory: {dirname}\n")
 
     return dirname
