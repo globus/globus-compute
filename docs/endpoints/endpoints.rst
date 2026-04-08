@@ -45,9 +45,15 @@ For those just looking for the quickstart commands:
 
    $ globus-compute-endpoint configure my_first_endpoint
 
-   $ globus-compute-endpoint start my_first_endpoint
+   $ gce start my_first_endpoint
 
-   $ globus-compute-endpoint stop my_first_endpoint
+   $ gce stop my_first_endpoint
+
+
+.. note::
+   Installing the Globus Compute Endpoint package also adds ``gce`` as a shell
+   alias for ``globus-compute-endpoint``.  Note that ``gce`` is used
+   interchangeably with ``globus-compute-endpoint`` in this document.
 
 
 Configuring an Endpoint
@@ -58,7 +64,7 @@ via the ``configure`` subcommand:
 
 .. code-block:: console
 
-   $ globus-compute-endpoint configure my_endpoint
+   $ gce configure my_endpoint
    Created profile for endpoint named <my_endpoint>
 
        Configuration file: /home/user/.globus_compute/my_endpoint/config.yaml
@@ -69,7 +75,7 @@ via the ``configure`` subcommand:
 
    Use the `start` subcommand to run it:
 
-   globus-compute-endpoint start my_endpoint
+   gce start my_endpoint
 
 .. hint::
 
@@ -223,18 +229,18 @@ environment variable or the ``--config-dir`` option when issuing endpoint comman
 
     $ export GLOBUS_COMPUTE_USER_DIR=$HOME/.custom_dir_2
 
-    $ globus-compute-endpoint configure endpoint_in_new_group
+    $ gce configure endpoint_in_new_group
 
-    $ globus-compute-endpoint start endpoint_in_new_group
+    $ gce start endpoint_in_new_group
 
 
 * ``--config-dir``
 
   .. code-block:: console
 
-    $ globus-compute-endpoint configure --config-dir ~/.custom_3 endpoint_in_group_3
+    $ gce configure --config-dir ~/.custom_3 endpoint_in_group_3
 
-    $ globus-compute-endpoint start --config-dir ~/.custom_3 endpoint_in_group_3
+    $ gce start --config-dir ~/.custom_3 endpoint_in_group_3
 
 .. note::
   ``--config-dir`` overrides ``GLOBUS_COMPUTE_USER_DIR`` if both are specified.
@@ -250,7 +256,7 @@ updates every second as a hint that the manager endpoint process is running:
 
 .. code-block:: console
 
-   $ globus-compute-endpoint start my_endpoint
+   $ gce start my_endpoint
          >>> Endpoint ID: [endpoint_uuid] <<<
    ----> Wed Aug  6 20:03:02 2025
 
@@ -290,7 +296,7 @@ subcommand:
 
 .. code-block:: console
 
-   $ globus-compute-endpoint stop my_endpoint
+   $ gce stop my_endpoint
    > Endpoint <my_endpoint> is now stopped
 
 Alternatively, if the PID of the manager endpoint process is handy, then either
@@ -342,7 +348,7 @@ To list available endpoints on the current system, run:
 
 .. code-block:: console
 
-   $ globus-compute-endpoint list
+   $ gce list
    +--------------------------------------+--------------+-----------------------+
    |             Endpoint ID              |    Status    |   Endpoint Name       |
    +======================================+==============+=======================+
@@ -381,12 +387,12 @@ Configuring With Custom Files
 =============================
 
 The files used during endpoint configuration can be customized using the ``--*-config``
-options to ``globus-compute-endpoint configure``. This can be useful for automating
+options to ``gce configure``. This can be useful for automating
 endpoint configuration with pre-defined files.
 
 .. note::
    For a complete, up-to-date list of custom file options, see
-   ``globus-compute-endpoint configure --help``.
+   ``gce configure --help``.
 
 Say there are three custom files in a directory that we want to use during configuration:
 
@@ -410,13 +416,13 @@ Say there are three custom files in a directory that we want to use during confi
       "additionalProperties": false
    }
 
-The ``globus-compute-endpoint configure`` command can be told to use those, instead of
+The ``gce configure`` command can be told to use those, instead of
 the defaults, using ``--manager-config``, ``--template-config``, and
 ``--schema-config``, respectively:
 
 .. code-block:: console
 
-   $ globus-compute-endpoint configure \
+   $ gce configure \
       --manager-config custom_manager_config.yaml \
       --template-config custom_user_template.yaml.j2 \
       --schema-config custom_user_schema.json \
@@ -428,7 +434,7 @@ to only allow the ``endpoint_setup`` variable and no additional properties.
 
 .. code-block:: console
 
-   $ globus-compute-endpoint list
+   $ gce list
    +------------------------------+-------------+------------------------+
    |         Endpoint ID          |   Status    |     Endpoint Name      |
    +==============================+=============+========================+
