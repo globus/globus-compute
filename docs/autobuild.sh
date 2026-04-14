@@ -29,12 +29,12 @@ doc_dir="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" &> /dev/null && pwd)"
 cd "$doc_dir" || { echo "Unable to change directory to '$doc_dir';"; exit 2; }
 
 dev_venvs=(  # add dev-specific venvs activate paths here
-    ../venvs/gcdocs/bin/activate
-    ../.venv-docs/bin/activate  # created by ../Makefile (`make docs`)
+    "$GCDOCS_VENV"
+    ../.venv-docs  # created by ../Makefile (`make docs`)
 )
 for venv_activate in "${dev_venvs[@]}"; do
-    [[ -f "$venv_activate" ]] && {
-        source "$venv_activate" || exit 2
+    [[ -f "$venv_activate/bin/activate" ]] && {
+        source "$venv_activate/bin/activate" || exit 2
         _ACTIVATED=1
         break
     }
@@ -47,6 +47,8 @@ else
     python -m pip install -U pip setuptools || exit 2
     python -m pip install -e '../compute_sdk[docs]' -e '../compute_endpoint' || exit 2
 fi
+
+echo -e "\n  Using virtual environment: \033[94;40;1m$(basename "$VIRTUAL_ENV") ($VIRTUAL_ENV)\033[0m\n"
 
 # inaugural run
 make clean html || exit 2
