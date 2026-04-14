@@ -9,4 +9,5 @@ Tutorials
    dynamic_python_environments
    dynamic_containers
    mpi
+   stage_data_with_transfer
 
