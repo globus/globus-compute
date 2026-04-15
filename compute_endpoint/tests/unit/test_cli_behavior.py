@@ -875,8 +875,11 @@ def test_configure_ep_subscription_id_in_config(run_line, mock_command_ensure):
     ("is_privileged", "mu_arg", "public_visible"),
     (
         (False, None, False),
+        (False, True, True),
+        (False, False, False),
         (True, None, True),
         (True, True, True),
+        (True, False, False),
     ),
 )
 def test_configure_ep_public_visible(
