@@ -981,9 +981,8 @@ class EndpointManager:
 
         proc_args = [
             "globus-compute-endpoint",
-            "start",
+            "_start-user-endpoint",
             ep_name,
-            "--die-with-parent",
             *args,
         ]
 

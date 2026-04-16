@@ -387,7 +387,7 @@ def test_start_endpoint_already_running(
     f = io.StringIO()
     with redirect_stderr(f):
         with pytest.raises(MessageSystemExit) as pyt_e:
-            cli._do_start_endpoint(ep_dir=ep_dir, endpoint_uuid=None)
+            cli._start_endpoint_manager(ep_dir=ep_dir, endpoint_uuid=None)
     pid_path.unlink()
 
     serr = f.getvalue()
@@ -410,24 +410,12 @@ def test_start_endpoint_stale(
     os.utime(pid_path, (stale_time, stale_time))
     f = io.StringIO()
     with redirect_stderr(f):
-        cli._do_start_endpoint(ep_dir=ep_dir, endpoint_uuid=None)
+        cli._start_endpoint_manager(ep_dir=ep_dir, endpoint_uuid=None)
 
     serr = f.getvalue()
     assert "Previous endpoint instance" in serr, "Expect 'who' in warning"
     assert "failed to shutdown cleanly" in serr, "Expect 'what' in warning"
     assert "Removing PID file" in serr, "Expect action taken in warning"
-
-
-@pytest.mark.parametrize("is_uep", (False, True))
-def test_cannot_start_sep(
-    mock_ep, mock_command_ensure, gc_dir, make_endpoint_dir, is_uep, mock_client
-):
-    ep_dir = make_endpoint_dir()
-    with pytest.raises(ClickException) as pyt_e:
-        cli._do_start_endpoint(ep_dir=ep_dir, endpoint_uuid=None)
-
-    assert "not template capable" in str(pyt_e.value)
-    assert "will not start" in str(pyt_e.value)
 
 
 @pytest.mark.parametrize("cli_cmd", ["configure"])
@@ -441,29 +429,36 @@ def test_endpoint_uuid_name_not_supported(run_line, cli_cmd):
 
 
 @pytest.mark.parametrize(
-    "stdin_data",
+    "reg_info,config_str,ep_info,audit_fd",
     [
-        json.dumps({"amqp_creds": {"foo": "bar"}}),
-        json.dumps({"amqp_creds": {"baz": "qux"}, "config": ""}),
-        json.dumps({"amqp_creds": {"a": 1}, "config": "myconfig"}),
-        json.dumps({"amqp_creds": {"b": 2}, "config": "myconfig", "audit_fd": 1}),
+        ({"foo": "bar"}, "", {}, None),
+        ({"baz": "qux"}, "", {"endpoint_id": str(uuid.uuid4())}, 1),
+        ({"a": 1}, "myconfig", {}, 1),
+        ({"b": 2}, "myconfig", {"endpoint_id": str(uuid.uuid4())}, None),
     ],
 )
-def test_start_ep_reads_stdin(
+def test_start_user_ep_reads_stdin(
     mocker,
     run_line,
     mock_ep,
     mock_get_config,
     make_endpoint_dir,
-    stdin_data,
     ep_name,
+    reg_info,
+    config_str,
+    ep_info,
+    audit_fd,
 ):
     mock_load_conf = mocker.patch(f"{_MOCK_BASE}load_config_yaml")
     mock_load_conf.return_value = mock_get_config.return_value
 
-    remote_register_endpoint_response = {}
-    mock__do_register_endpoint = mocker.patch(f"{_MOCK_BASE}_do_register_endpoint")
-    mock__do_register_endpoint.return_value = remote_register_endpoint_response
+    data_dict = {
+        "amqp_creds": reg_info,
+        "config": config_str,
+        "ep_info": ep_info,
+        "audit_fd": audit_fd,
+    }
+    stdin_data = json.dumps(data_dict)
 
     mock_sys = mocker.patch(f"{_MOCK_BASE}sys")
     mock_sys.stdin.closed = False
@@ -472,30 +467,24 @@ def test_start_ep_reads_stdin(
 
     make_endpoint_dir()
 
-    run_line(f"start {ep_name} --die-with-parent")
+    run_line(f"_start-user-endpoint {ep_name}")
     assert mock_ep.start_endpoint.called
-    s_ep_a, _ = mock_ep.start_endpoint.call_args
-    reg_info_found = s_ep_a[4]
-    audit_fd_found = s_ep_a[7]
+    _, s_ep_k = mock_ep.start_endpoint.call_args
+    config_str_found = mock_load_conf.call_args[0][0]
 
-    data_dict = json.loads(stdin_data)
-    reg_info = data_dict.get("amqp_creds", remote_register_endpoint_response)
-    config_str = data_dict.get("config")
-    audit_fd = data_dict.get("audit_fd")
-
-    assert reg_info_found == reg_info
-    assert audit_fd_found == audit_fd
-    if config_str:
-        config_str_found = mock_load_conf.call_args[0][0]
-        assert config_str_found == config_str
+    assert config_str == config_str_found
+    assert reg_info == s_ep_k["reg_info"]
+    assert ep_info == s_ep_k["ep_info"]
+    assert audit_fd == s_ep_k["audit_fd"]
 
 
 @pytest.mark.parametrize("fn_count", range(-1, 5))
-def test_start_ep_stdin_allowed_fns_overrides_conf(
+def test_start_uep_stdin_allowed_fns_overrides_conf(
     mocker,
     run_line,
     mock_ep,
     mock_get_config,
+    mock_load_config_yaml,
     make_endpoint_dir,
     ep_name,
     fn_count,
@@ -513,15 +502,22 @@ def test_start_ep_stdin_allowed_fns_overrides_conf(
     mock_sys.stdin.closed = False
     mock_sys.stdin.isatty.return_value = False
     mock_sys.stdin.read.return_value = json.dumps(
-        {"amqp_creds": {"foo": "bar"}, "allowed_functions": allowed_fns}
+        {
+            "amqp_creds": {"foo": "bar"},
+            "ep_info": {},
+            "config": "",
+            "allowed_functions": allowed_fns,
+        }
     )
 
     make_endpoint_dir()
 
-    run_line(f"start {ep_name} --die-with-parent")
+    run_line(f"_start-user-endpoint {ep_name}")
     assert mock_ep.start_endpoint.called
-    (_, _, found_conf, *_), _k = mock_ep.start_endpoint.call_args
-    assert found_conf.allowed_functions == allowed_fns, "allowed field not overridden!"
+    _, k = mock_ep.start_endpoint.call_args
+    assert (
+        k["endpoint_config"].allowed_functions == allowed_fns
+    ), "allowed field not overridden!"
 
 
 @pytest.mark.parametrize(
@@ -750,9 +746,9 @@ def test_debug_configurable(
     ep_dir = gc_dir / ep_name
     ep_dir.mkdir(parents=True)
     config = {"debug": False, "engine": {"type": "ThreadPoolEngine"}}
-    data = {"config": yaml.safe_dump(config)}
+    data = {"amqp_creds": {}, "ep_info": {}, "config": yaml.safe_dump(config)}
 
-    run_line(f"start {ep_name}", stdin=json.dumps(data), assert_exit_code=None)
+    run_line(f"_start-user-endpoint {ep_name}", stdin=json.dumps(data))
 
     _a, k = mock_setup_log.call_args
     assert mock_command_ensure.debug is False, "Verify test setup"
@@ -763,7 +759,7 @@ def test_debug_configurable(
     config["debug"] = True
     data["config"] = yaml.safe_dump(config)
 
-    run_line(f"start {ep_name}", stdin=json.dumps(data), assert_exit_code=None)
+    run_line(f"_start-user-endpoint {ep_name}", stdin=json.dumps(data))
 
     _a, k = mock_setup_log.call_args
     assert mock_command_ensure.debug is False, "Verify test setup"
@@ -779,9 +775,9 @@ def test_cli_debug_overrides_config(
     ep_dir = gc_dir / ep_name
     ep_dir.mkdir(parents=True)
     config = {"debug": False, "engine": {"type": "ThreadPoolEngine"}}
-    data = {"config": yaml.safe_dump(config)}
+    data = {"amqp_creds": {}, "ep_info": {}, "config": yaml.safe_dump(config)}
 
-    run_line(f"start {ep_name}", stdin=json.dumps(data), assert_exit_code=None)
+    run_line(f"_start-user-endpoint {ep_name}", stdin=json.dumps(data))
 
     _a, k = mock_setup_log.call_args
     assert mock_command_ensure.debug is True, "Verify test setup"
@@ -1179,15 +1175,15 @@ def test_name_or_uuid_decorator(tmp_path, mocker, run_line, name, uuid):
         # dummy config.yaml so that Endpoint._get_ep_dirs finds this
         (ep_conf_dir / "config.yaml").write_text("")
 
-    mock__do_start_endpoint = mocker.patch(f"{_MOCK_BASE}_do_start_endpoint")
+    mock__start_epm = mocker.patch(f"{_MOCK_BASE}_start_endpoint_manager")
 
     run_line(f"-c {gc_conf_dir} start {name}")
     run_line(f"-c {gc_conf_dir} start {uuid}")
 
-    assert mock__do_start_endpoint.call_count == 2
+    assert mock__start_epm.call_count == 2
 
     first_result, second_result = (
-        call.kwargs["ep_dir"] for call in mock__do_start_endpoint.call_args_list
+        call.kwargs["ep_dir"] for call in mock__start_epm.call_args_list
     )
 
     assert first_result == second_result
@@ -1304,14 +1300,15 @@ def test_happy_path_exit_no_amqp_msg(
     make_endpoint_dir,
     ep_name,
     exit_exc,
+    mock_load_config_yaml,
 ):
     mock_send = mocker.patch(f"{_MOCK_BASE}send_endpoint_startup_failure_to_amqp")
     make_endpoint_dir()
 
-    stdin = json.dumps({"amqp_creds": {"some": "data"}})
+    stdin = json.dumps({"amqp_creds": {"some": "data"}, "ep_info": {}, "config": ""})
     if exit_exc is not None:
         mock_ep.start_endpoint.side_effect = exit_exc
-    run_line(f"start {ep_name}", assert_exit_code=0, stdin=stdin)
+    run_line(f"_start-user-endpoint {ep_name}", assert_exit_code=0, stdin=stdin)
     assert mock_ep.start_endpoint.called
     assert not mock_send.called
 
@@ -1335,13 +1332,14 @@ def test_fail_exit_sends_amqp_msg(
     ep_name,
     ec,
     exit_exc,
+    mock_load_config_yaml,
 ):
     mock_send = mocker.patch(f"{_MOCK_BASE}send_endpoint_startup_failure_to_amqp")
     make_endpoint_dir()
 
-    stdin = json.dumps({"amqp_creds": {"some": "data"}})
+    stdin = json.dumps({"amqp_creds": {"some": "data"}, "ep_info": {}, "config": ""})
     mock_ep.start_endpoint.side_effect = exit_exc
-    run_line(f"start {ep_name}", assert_exit_code=ec, stdin=stdin)
+    run_line(f"_start-user-endpoint {ep_name}", assert_exit_code=ec, stdin=stdin)
     assert mock_ep.start_endpoint.called
     assert mock_send.called
 

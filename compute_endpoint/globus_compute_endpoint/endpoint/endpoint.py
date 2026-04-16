@@ -17,7 +17,6 @@ import psutil
 import setproctitle
 import texttable
 import yaml
-from click import ClickException
 from globus_compute_endpoint.auth import get_globus_app_with_scopes
 from globus_compute_endpoint.endpoint.config import (
     BaseConfig,
@@ -476,7 +475,6 @@ class Endpoint:
         log_to_console: bool,
         reg_info: dict,
         ep_info: dict,
-        die_with_parent: bool = False,
         audit_fd: int | None = None,
     ):
         ostream = None
@@ -557,13 +555,6 @@ class Endpoint:
         ptitle += f" [{setproctitle.getproctitle()}]"
         setproctitle.setproctitle(ptitle)
 
-        if die_with_parent:
-            parent_pid = os.getppid()
-        else:
-            raise ClickException(
-                "This endpoint is not template capable and will not start. "
-                "(hint: globus-compute-endpoint migrate-to-template-capable)"
-            )
         if ostream:
             msg = f"Starting endpoint; registered ID: {endpoint_uuid}"
             if log_to_console:
@@ -584,6 +575,7 @@ class Endpoint:
             start_unix=now_tz.timestamp(),
         )
 
+        parent_pid = os.getppid()
         Endpoint.start_interchange(
             endpoint_uuid,
             endpoint_dir,

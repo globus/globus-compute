@@ -95,7 +95,6 @@ class CommandState:
         self.no_color = False
         self.log_to_console = False
         self.endpoint_uuid = None
-        self.die_with_parent = False
         self.detach = False
 
     @classmethod
@@ -168,19 +167,12 @@ def common_options(f):
     return f
 
 
-def start_options(f):
+def mep_start_options(f):
     f = click.option(
         "--endpoint-uuid",
         default=None,
         callback=set_param_to_config,
         help="The UUID to register with the Globus Compute services",
-    )(f)
-    f = click.option(
-        "--die-with-parent",
-        is_flag=True,
-        hidden=True,
-        callback=set_param_to_config,
-        help="Shutdown if parent process goes away",
     )(f)
     f = click.option(
         "--detach",
@@ -571,34 +563,26 @@ def configure_endpoint(
 
 @app.command(name="start", help="Start an endpoint")
 @name_or_uuid_arg
-@start_options
+@mep_start_options
 @common_options
 @handle_auth_errors
 def start_endpoint(*, ep_dir: pathlib.Path, **_kwargs):
-    """Start an endpoint
-
-    This function will do:
-    1. Connect to the broker service, and register itself
-    2. Get connection info from broker service
-    3. Start the interchange as a daemon
-
-    |                      Broker service       |
-    |               -----2----> Forwarder       |
-    |    /register <-----3----+   ^             |
-    +-----^-----------------------+-------------+
-          |     |                 |
-          1     4                 6
-          |     v                 |
-    +-----+-----+-----+           v
-    |      Start      |---5---> EndpointInterchange
-    |     Endpoint    |         daemon
-    +-----------------+
-    """
     state = CommandState.ensure()
-    _do_start_endpoint(
+    _start_endpoint_manager(
         ep_dir=ep_dir,
         endpoint_uuid=state.endpoint_uuid,
-        die_with_parent=state.die_with_parent,
+    )
+
+
+@app.command(name="_start-user-endpoint", hidden=True)
+@name_or_uuid_arg
+@common_options
+@handle_auth_errors
+def start_user_endpoint(*, ep_dir: pathlib.Path, **_kwargs):
+    state = CommandState.ensure()
+    _start_user_endpoint(
+        ep_dir=ep_dir,
+        endpoint_uuid=state.endpoint_uuid,
     )
 
 
@@ -789,12 +773,14 @@ def _do_register_endpoint(
     return reg_info
 
 
-def _do_start_endpoint(
+def _start_endpoint_manager(
     *,
     ep_dir: pathlib.Path,
     endpoint_uuid: str | None,
-    die_with_parent: bool = False,
 ):
+    if not _has_multi_user:
+        raise ClickException("multi-user endpoints are not supported on this system")
+
     os.umask(0o077)
     state = CommandState.ensure()
     if ep_dir.is_dir():
@@ -805,34 +791,7 @@ def _do_start_endpoint(
             no_color=state.no_color,
         )
 
-    _no_fn_list_canary = -15  # an arbitrary random integer; invalid as an allow_list
-    ep_info = {}
     reg_info = {}
-    config_str: str | None = None
-    audit_fd: int | None = None
-    fn_allow_list: list[str] | None | int = _no_fn_list_canary
-    if sys.stdin and not (sys.stdin.closed or sys.stdin.isatty()):
-        try:
-            stdin_data = json.loads(sys.stdin.read())
-
-            if not isinstance(stdin_data, dict):
-                type_name = stdin_data.__class__.__name__
-                raise ValueError(
-                    "Expecting JSON dictionary with endpoint info; got"
-                    f" {type_name} instead"
-                )
-
-            ep_info = stdin_data.get("ep_info", {})
-            reg_info = stdin_data.get("amqp_creds", {})
-            config_str = stdin_data.get("config")
-            audit_fd = stdin_data.get("audit_fd")
-            fn_allow_list = stdin_data.get("allowed_functions", _no_fn_list_canary)
-
-            del stdin_data  # clarity for intended scope
-
-        except Exception as e:
-            exc_type = e.__class__.__name__
-            log.debug("Invalid info on stdin -- (%s) %s", exc_type, e)
 
     @contextlib.contextmanager
     def _send_message_on_error_exit():
@@ -856,10 +815,133 @@ def _do_start_endpoint(
     with contextlib.ExitStack() as stk:
         stk.enter_context(_send_message_on_error_exit())
         try:
-            if config_str is not None:
-                ep_config = load_config_yaml(config_str)
-            else:
-                ep_config = get_config(ep_dir)
+            ep_config = get_config(ep_dir)
+
+            if not state.debug and ep_config.debug:
+                setup_logging(
+                    logfile=ep_dir / "endpoint.log",
+                    debug=ep_config.debug,
+                    console_enabled=state.log_to_console,
+                    no_color=state.no_color,
+                )
+
+        except Exception as e:
+            if isinstance(e, ClickException):
+                raise
+
+            # We've likely not exported to the log, so at least put _something_ in the
+            # logs for the human to debug; motivated by SC-28607
+            exc_type = type(e).__name__
+            msg = (
+                "Failed to find or parse endpoint configuration.  Endpoint will not"
+                f" start. ({exc_type}) {e}"
+            )
+            log.critical(msg)
+            raise
+
+        if not isinstance(ep_config, ManagerEndpointConfig):
+            raise ClickException(
+                f"Configuration for endpoint {ep_dir.name} contains an `engine` field;"
+                " endpoint will not start. (Hint: move the `engine` block to"
+                " `user_config_template.yaml.j2`)"
+            )
+
+        reg_info = _do_register_endpoint(ep_dir, ep_config, endpoint_uuid)
+
+        # detach after reading config and registration so errors are still printed to
+        # terminal, but otherwise as early as possible so any files created aren't lost
+        # during daemonization
+        if state.detach:
+            print(f"> Endpoint <{ep_dir.name}> starting in detached mode.")
+            daemon_context = daemon.DaemonContext(
+                working_directory=ep_dir,
+                umask=0o002,
+                # DaemonContext tries to not detach when the parent pid is 1 because
+                # it assumes that means the parent is `init`, but that prevents users
+                # from detaching in `docker run` context, so force the issue
+                detach_process=True,
+            )
+            stk.enter_context(daemon_context)
+
+            setup_logging(
+                logfile=ep_dir / "endpoint.log",
+                debug=ep_config.debug or state.debug,
+                console_enabled=state.log_to_console,
+                no_color=state.no_color,
+            )
+
+        pid_path = Endpoint.pid_path(ep_dir)
+        stk.enter_context(_pidfile(pid_path, ep_config.heartbeat_period * 3))
+
+        epm = EndpointManager(ep_dir, endpoint_uuid, ep_config, reg_info)
+        epm.start()
+
+
+def _start_user_endpoint(
+    *,
+    ep_dir: pathlib.Path,
+    endpoint_uuid: str | None,
+):
+    os.umask(0o077)
+    state = CommandState.ensure()
+    if ep_dir.is_dir():
+        setup_logging(
+            logfile=ep_dir / "endpoint.log",
+            debug=state.debug,
+            console_enabled=state.log_to_console,
+            no_color=state.no_color,
+        )
+
+    _no_fn_list_canary = -15  # an arbitrary random integer; invalid as an allow_list
+    ep_info: dict
+    reg_info: dict
+    config_str: str
+    audit_fd: int | None = None
+    fn_allow_list: list[str] | None | int = _no_fn_list_canary
+    if sys.stdin and not (sys.stdin.closed or sys.stdin.isatty()):
+        try:
+            stdin_data = json.loads(sys.stdin.read())
+
+            ep_info = stdin_data["ep_info"]
+            reg_info = stdin_data["amqp_creds"]
+            config_str = stdin_data["config"]
+            audit_fd = stdin_data.get("audit_fd")
+            fn_allow_list = stdin_data.get("allowed_functions", _no_fn_list_canary)
+
+            del stdin_data  # clarity for intended scope
+
+        except Exception as e:
+            exc_type = e.__class__.__name__
+            log.debug("Invalid info on stdin -- (%s) %s", exc_type, e)
+            raise ClickException(
+                "Missing or invalid endpoint information from stdin. (Hint: this"
+                " command is not meant to be invoked manually; it should only be run"
+                " by an endpoint manager process.)"
+            ) from e
+
+    @contextlib.contextmanager
+    def _send_message_on_error_exit():
+        try:
+            yield
+        except (SystemExit, Exception) as e:
+            if issubclass(type(e), SystemExit):
+                if e.code in (0, None):
+                    # normal, system exit
+                    raise
+
+            if reg_info:
+                # We're quitting anyway, so just let any exceptions bubble
+                msg = (
+                    f"Failed to start or unexpected error:\n  [{type(e).__name__}] {e}"
+                )
+                send_endpoint_startup_failure_to_amqp(reg_info, msg=msg)
+
+            raise
+
+    with contextlib.ExitStack() as stk:
+        stk.enter_context(_send_message_on_error_exit())
+        try:
+            ep_config = load_config_yaml(config_str)
             del config_str
 
             if fn_allow_list != _no_fn_list_canary:
@@ -887,69 +969,25 @@ def _do_start_endpoint(
             log.critical(msg)
             raise
 
-        if not reg_info:
-            if isinstance(ep_config, ManagerEndpointConfig):
-                reg_info = _do_register_endpoint(ep_dir, ep_config, endpoint_uuid)
-            else:
-                raise ClickException(
-                    "This endpoint is not template capable and will not start."
-                    " (hint: globus-compute-endpoint migrate-to-template-capable)"
-                )
-
-        # detach after reading config and registration so errors are still printed to
-        # terminal, but otherwise as early as possible so any files created aren't lost
-        # during daemonization
-        if state.detach:
-            print(f"> Endpoint <{ep_dir.name}> starting in detached mode.")
-            daemon_context = daemon.DaemonContext(
-                working_directory=ep_dir,
-                umask=0o002,
-                # DaemonContext tries to not detach when the parent pid is 1 because
-                # it assumes that means the parent is `init`, but that prevents users
-                # from detaching in `docker run` context, so force the issue
-                detach_process=True,
-            )
-            stk.enter_context(daemon_context)
-
-            setup_logging(
-                logfile=ep_dir / "endpoint.log",
-                debug=ep_config.debug or state.debug,
-                console_enabled=state.log_to_console,
-                no_color=state.no_color,
+        if not isinstance(ep_config, UserEndpointConfig):
+            raise ClickException(
+                f"Configuration for endpoint {ep_dir.name} is missing an `engine`"
+                " field; endpoint will not start. (Hint: is "
+                "`user_config_template.yaml.j2` missing an `engine` block?)"
             )
 
         pid_path = Endpoint.pid_path(ep_dir)
         stk.enter_context(_pidfile(pid_path, ep_config.heartbeat_period * 3))
 
-        if isinstance(ep_config, ManagerEndpointConfig):
-            if not _has_multi_user:
-                raise ClickException(
-                    "multi-user endpoints are not supported on this system"
-                )
-            epm = EndpointManager(ep_dir, endpoint_uuid, ep_config, reg_info)
-            epm.start()
-        else:
-            assert isinstance(ep_config, UserEndpointConfig)
-
-            if not die_with_parent:
-                bname = os.path.basename(sys.argv[0])
-                print(
-                    "\nThis endpoint is not template capable.  To add that capability,"
-                    " run:\n\n"
-                    f"    $ {bname} migrate-to-template-capable {ep_dir.name}\n",
-                    flush=True,
-                )
-
-            get_cli_endpoint(ep_config).start_endpoint(
-                ep_dir,
-                endpoint_uuid,
-                ep_config,
-                state.log_to_console,
-                reg_info,
-                ep_info,
-                die_with_parent,
-                audit_fd,
-            )
+        get_cli_endpoint(ep_config).start_endpoint(
+            endpoint_dir=ep_dir,
+            endpoint_uuid=endpoint_uuid,
+            endpoint_config=ep_config,
+            log_to_console=state.log_to_console,
+            reg_info=reg_info,
+            ep_info=ep_info,
+            audit_fd=audit_fd,
+        )
 
 
 @app.command("stop")
@@ -973,15 +1011,14 @@ def _do_stop_endpoint(*, ep_dir: pathlib.Path, remote: bool = False) -> None:
 @app.command("restart")
 @name_or_uuid_arg
 @common_options
-@start_options
+@mep_start_options
 def restart_endpoint(*, ep_dir: pathlib.Path, **_kwargs):
     """Restarts an endpoint"""
     state = CommandState.ensure()
     _do_stop_endpoint(ep_dir=ep_dir)
-    _do_start_endpoint(
+    _start_endpoint_manager(
         ep_dir=ep_dir,
         endpoint_uuid=state.endpoint_uuid,
-        die_with_parent=state.die_with_parent,
     )
 
 
