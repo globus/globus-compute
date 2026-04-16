@@ -1812,7 +1812,7 @@ def test_warns_if_executable_not_found(
     assert not k.get("fork", True)
 
 
-def test_start_endpoint_children_die_with_parent(successful_exec_from_mocked_root):
+def test_start_endpoint_children_correct_command(successful_exec_from_mocked_root):
     mock_os, *_, em = successful_exec_from_mocked_root
     with pytest.raises(SystemExit) as pyexc:
         em._event_loop()
@@ -1821,7 +1821,7 @@ def test_start_endpoint_children_die_with_parent(successful_exec_from_mocked_roo
     a, k = mock_os.execvpe.call_args
     assert a[0] == "globus-compute-endpoint", "Sanity check"
     assert k["args"][0] == a[0], "Expect transparency for admin"
-    assert any("--die-with-parent" == i for i in k["args"]), "trust flag does the work"
+    assert k["args"][1] == "_start-user-endpoint", "trust CLI does the work"
 
 
 def test_start_endpoint_children_have_own_session(successful_exec_from_mocked_root):

@@ -357,9 +357,7 @@ def test_endpoint_needs_no_client_if_reg_info(
     ep, ep_dir, log_to_console, ep_conf = mock_ep_data
     ep_args = (ep_dir, ep_uuid, ep_conf, log_to_console)
 
-    ep.start_endpoint(
-        *ep_args, reg_info=mock_reg_info, ep_info={}, die_with_parent=True
-    )
+    ep.start_endpoint(*ep_args, reg_info=mock_reg_info, ep_info={})
     assert not mock_get_client.called, "No need for Client!"
     assert mock_launch.called, "Registration given; should start"
 
@@ -376,9 +374,7 @@ def test_start_endpoint_redacts_url_creds_from_logs(
 ):
     ep, ep_dir, log_to_console, ep_conf = mock_ep_data
     ep_args = (ep_dir, ep_uuid, ep_conf, log_to_console)
-    ep.start_endpoint(
-        *ep_args, reg_info=mock_reg_info, ep_info={}, die_with_parent=True
-    )
+    ep.start_endpoint(*ep_args, reg_info=mock_reg_info, ep_info={})
     assert mock_launch.called, "Should launch successfully"
 
     debug_args = "\n".join(str((a, k)) for a, k in mock_log.debug.call_args_list)
@@ -395,9 +391,7 @@ def test_start_endpoint_populates_ep_static_info(
     canary_value = randomstring()
     ep_info = {"canary": canary_value}
     with mock.patch(f"{_mock_base}Endpoint.start_interchange") as mock_launch:
-        ep.start_endpoint(
-            *ep_args, reg_info=mock_reg_info, ep_info=ep_info, die_with_parent=True
-        )
+        ep.start_endpoint(*ep_args, reg_info=mock_reg_info, ep_info=ep_info)
     assert mock_launch.called, "Should launch successfully"
 
     (*_, found, _audit_fd), _k = mock_launch.call_args
@@ -528,9 +522,7 @@ def test_endpoint_sets_process_title(
         mock_spt.getproctitle.return_value = orig_proc_title
         mock_spt.setproctitle.side_effect = StopIteration("Sentinel")
         with pytest.raises(StopIteration, match="Sentinel"):
-            ep.start_endpoint(
-                *ep_args, reg_info=mock_reg_info, ep_info={}, die_with_parent=True
-            )
+            ep.start_endpoint(*ep_args, reg_info=mock_reg_info, ep_info={})
 
     a, _k = mock_spt.setproctitle.call_args
     assert a[0].startswith(
@@ -557,9 +549,7 @@ def test_endpoint_respects_port(mock_ep_data, port, mock_reg_info, ep_uuid):
     with mock.patch(f"{_mock_base}update_url_port", spec=True) as mock_upd:
         mock_upd.side_effect = (None, None, StopIteration("Sentinel"))
         with pytest.raises(StopIteration, match="Sentinel"):
-            ep.start_endpoint(
-                *ep_args, reg_info=mock_reg_info, ep_info={}, die_with_parent=True
-            )
+            ep.start_endpoint(*ep_args, reg_info=mock_reg_info, ep_info={})
 
     for (a, _), exp_url in zip(mock_upd.call_args_list, (tq_url, rq_url, hbq_url)):
         assert a == (exp_url, port)
@@ -602,7 +592,6 @@ def test_always_prints_endpoint_id_to_terminal(
         log_to_console,
         reg_info,
         ep_info={},
-        die_with_parent=True,
     )
 
     assert mock_sys.stdout.write.called
@@ -619,7 +608,6 @@ def test_always_prints_endpoint_id_to_terminal(
         log_to_console,
         reg_info,
         ep_info={},
-        die_with_parent=True,
     )
 
     assert not mock_sys.stdout.write.called
@@ -634,7 +622,6 @@ def test_always_prints_endpoint_id_to_terminal(
         log_to_console,
         reg_info,
         ep_info={},
-        die_with_parent=True,
     )
 
     assert not mock_sys.stdout.write.called
@@ -727,9 +714,7 @@ def test_handles_provided_endpoint_id_no_json(
     ep, ep_dir, log_to_console, ep_conf = mock_ep_data
     ep_args = (ep_dir, ep_uuid, ep_conf, log_to_console)
 
-    ep.start_endpoint(
-        *ep_args, reg_info=mock_reg_info, ep_info={}, die_with_parent=True
-    )
+    ep.start_endpoint(*ep_args, reg_info=mock_reg_info, ep_info={})
 
     a, _k = mock_launch.call_args
     assert a[0] == ep_uuid
@@ -747,9 +732,7 @@ def test_handles_provided_endpoint_id_with_json(
 
     ep_json = ep_dir / "endpoint.json"
     ep_json.write_text(json.dumps({"endpoint_id": str(uuid.uuid4())}))
-    ep.start_endpoint(
-        *ep_args, reg_info=mock_reg_info, ep_info={}, die_with_parent=True
-    )
+    ep.start_endpoint(*ep_args, reg_info=mock_reg_info, ep_info={})
 
     a, _k = mock_launch.call_args
     assert a[0] == ep_uuid
