@@ -721,6 +721,31 @@ def _pidfile(pid_path: pathlib.Path, stale_after_s: int | float):
             pass
 
 
+class _SendMessageOnErrorExit(contextlib.AbstractContextManager):
+    def __init__(self, reg_info: dict | None = None) -> None:
+        self.reg_info = reg_info
+
+    def __exit__(
+        self,
+        exc_type: type[BaseException] | None,
+        exc_val: BaseException | None,
+        exc_tb: object | None,
+    ):
+        if exc_type is None or exc_val is None or exc_tb is None:
+            return
+
+        if isinstance(exc_val, SystemExit) and exc_val.code in (0, None):
+            # normal, system exit
+            return
+
+        if self.reg_info:
+            msg = (
+                f"Failed to start or unexpected error:\n  ({exc_type.__name__})"
+                f" {exc_val}"
+            )
+            send_endpoint_startup_failure_to_amqp(self.reg_info, msg=msg)
+
+
 def _do_register_endpoint(
     ep_dir: pathlib.Path, ep_config: ManagerEndpointConfig, ep_uuid: str | None
 ) -> dict:
@@ -791,29 +816,9 @@ def _start_endpoint_manager(
             no_color=state.no_color,
         )
 
-    reg_info = {}
-
-    @contextlib.contextmanager
-    def _send_message_on_error_exit():
-        try:
-            yield
-        except (SystemExit, Exception) as e:
-            if issubclass(type(e), SystemExit):
-                if e.code in (0, None):
-                    # normal, system exit
-                    raise
-
-            if reg_info:
-                # We're quitting anyway, so just let any exceptions bubble
-                msg = (
-                    f"Failed to start or unexpected error:\n  [{type(e).__name__}] {e}"
-                )
-                send_endpoint_startup_failure_to_amqp(reg_info, msg=msg)
-
-            raise
-
     with contextlib.ExitStack() as stk:
-        stk.enter_context(_send_message_on_error_exit())
+        error_exit_ctx = _SendMessageOnErrorExit()
+        stk.enter_context(error_exit_ctx)
         try:
             ep_config = get_config(ep_dir)
 
@@ -847,6 +852,7 @@ def _start_endpoint_manager(
             )
 
         reg_info = _do_register_endpoint(ep_dir, ep_config, endpoint_uuid)
+        error_exit_ctx.reg_info = reg_info
 
         # detach after reading config and registration so errors are still printed to
         # terminal, but otherwise as early as possible so any files created aren't lost
@@ -919,27 +925,8 @@ def _start_user_endpoint(
                 " by an endpoint manager process.)"
             ) from e
 
-    @contextlib.contextmanager
-    def _send_message_on_error_exit():
-        try:
-            yield
-        except (SystemExit, Exception) as e:
-            if issubclass(type(e), SystemExit):
-                if e.code in (0, None):
-                    # normal, system exit
-                    raise
-
-            if reg_info:
-                # We're quitting anyway, so just let any exceptions bubble
-                msg = (
-                    f"Failed to start or unexpected error:\n  [{type(e).__name__}] {e}"
-                )
-                send_endpoint_startup_failure_to_amqp(reg_info, msg=msg)
-
-            raise
-
     with contextlib.ExitStack() as stk:
-        stk.enter_context(_send_message_on_error_exit())
+        stk.enter_context(_SendMessageOnErrorExit(reg_info))
         try:
             ep_config = load_config_yaml(config_str)
             del config_str
