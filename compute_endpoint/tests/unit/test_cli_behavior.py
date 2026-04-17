@@ -881,7 +881,7 @@ def test_configure_ep_subscription_id_in_config(run_line, gc_dir, make_endpoint_
 
 
 @pytest.mark.parametrize(
-    ("is_privileged", "mu_arg", "public_visible"),
+    ("is_privileged", "mu_arg", "exp_public"),
     (
         (False, None, False),
         (False, True, True),
@@ -891,23 +891,20 @@ def test_configure_ep_subscription_id_in_config(run_line, gc_dir, make_endpoint_
         (True, False, False),
     ),
 )
-def test_configure_ep_public_visible(
-    run_line, mock_command_ensure, is_privileged, mu_arg, public_visible
+def test_configure_ep_public_visible_by_default(
+    run_line, gc_dir, ep_name, is_privileged, mu_arg, exp_public
 ):
-    ep_name = "my-ep"
-    conf = mock_command_ensure.endpoint_config_dir / ep_name / "config.yaml"
+    conf = gc_dir / ep_name / "config.yaml"
 
+    mu_arg_str = f" --multi-user {mu_arg}" if mu_arg is not None else ""
     with mock.patch(f"{_MOCK_BASE}is_privileged", return_value=is_privileged):
-        mu_arg_str = f" --multi-user {mu_arg}" if mu_arg is not None else ""
         run_line(f"configure {mu_arg_str} {ep_name}")
 
-        with open(conf) as f:
-            conf_dict = yaml.safe_load(f)
+    with open(conf) as f:
+        conf_dict = yaml.safe_load(f)
 
-        if public_visible:
-            assert conf_dict["public"] is True
-        else:
-            assert "public" not in conf_dict or conf_dict["public"] is False
+    assert exp_public is ("public" in conf_dict)
+    assert exp_public is (conf_dict.get("public") is True)
 
 
 def test_configure_ep_endpoint_config_deprecated(run_line, randomstring, mock_ep):
