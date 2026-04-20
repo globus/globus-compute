@@ -4,11 +4,9 @@ import json
 import logging
 import os
 import pathlib
-import platform
 import pwd
 import re
 import shutil
-import socket
 import subprocess
 import sys
 import time
@@ -20,7 +18,6 @@ import setproctitle
 import texttable
 import yaml
 from click import ClickException
-from globus_compute_endpoint import __version__
 from globus_compute_endpoint.auth import get_globus_app_with_scopes
 from globus_compute_endpoint.endpoint.config import (
     BaseConfig,
@@ -909,19 +906,6 @@ class Endpoint:
         table._width[idx_name] = max(10, table._width[idx_name])
 
         print(table.draw(), file=ofile)
-
-    @staticmethod
-    def get_metadata(config_src: str | None) -> dict:
-        metadata: dict = {
-            "endpoint_version": __version__,
-            "python_version": platform.python_version(),
-            "hostname": socket.getfqdn(),
-            # should be more accurate than `getpass.getuser()` in non-login situations
-            "local_user": pwd.getpwuid(os.getuid()).pw_name,
-            "endpoint_config": config_src,
-        }
-
-        return metadata
 
     @staticmethod
     def _run_command(name: str, command: str):
