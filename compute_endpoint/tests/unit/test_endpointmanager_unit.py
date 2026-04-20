@@ -14,6 +14,7 @@ import typing as t
 import uuid
 from collections import namedtuple
 from concurrent.futures import Future
+from types import SimpleNamespace
 from unittest import mock
 
 import pika
@@ -455,6 +456,40 @@ def mock_ctl():
     with mock.patch(f"{_MOCK_BASE}_import_pyprctl") as m:
         m.return_value = m
         yield m
+
+
+def test_get_metadata(mocker):
+    exp_meta = {
+        "endpoint_version": "106.7",
+        "python_version": "3.14.159",
+        "hostname": "oneohtrix.never",
+        "local_user": "daniel",
+        "endpoint_config": "foo: bar",
+        "user_config_template": "{{ template }}",
+        "user_config_schema": "{'schema': true}",
+    }
+
+    mocker.patch(f"{_MOCK_BASE}__version__", exp_meta["endpoint_version"])
+    mocker.patch("platform.python_version", return_value=exp_meta["python_version"])
+    mocker.patch(f"{_MOCK_BASE}socket.getfqdn", return_value=exp_meta["hostname"])
+    mocker.patch(
+        f"{_MOCK_BASE}pwd.getpwuid",
+        return_value=SimpleNamespace(pw_name=exp_meta["local_user"]),
+    )
+    mocker.patch(
+        f"{_MOCK_BASE}load_user_config_template",
+        return_value=exp_meta["user_config_template"],
+    )
+    mocker.patch(
+        f"{_MOCK_BASE}load_user_config_schema",
+        return_value=exp_meta["user_config_schema"],
+    )
+    test_config = ManagerEndpointConfig()
+    test_config.source_content = exp_meta["endpoint_config"]
+
+    meta = EndpointManager.get_metadata(pathlib.Path(), test_config)
+
+    assert meta == exp_meta
 
 
 @pytest.mark.parametrize("env", (None, "blar", "local", "production"))

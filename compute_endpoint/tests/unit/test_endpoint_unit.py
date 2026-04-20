@@ -26,8 +26,6 @@ from globus_compute_endpoint.endpoint.config import (
 )
 from globus_compute_endpoint.endpoint.endpoint import Endpoint
 from globus_compute_endpoint.engines import (
-    GlobusComputeEngine,
-    ProcessPoolEngine,
     ThreadPoolEngine,
 )
 from globus_compute_sdk import Client
@@ -514,44 +512,6 @@ def test_pid_file_check(fs, is_running, is_active):
     pid_status = Endpoint.check_pidfile(ep_dir)
     assert pid_status["exists"] is is_running
     assert pid_status["active"] is is_active
-
-
-@pytest.mark.parametrize(
-    "engine_cls", (GlobusComputeEngine, ThreadPoolEngine, ProcessPoolEngine)
-)
-def test_endpoint_get_metadata(mocker, engine_cls):
-    mock_data = {
-        "endpoint_version": "106.7",
-        "python_version": "3.12.7",
-        "hostname": "oneohtrix.never",
-        "local_user": "daniel",
-    }
-
-    mocker.patch(
-        "globus_compute_endpoint.endpoint.endpoint.__version__",
-        mock_data["endpoint_version"],
-    )
-    mocker.patch("platform.python_version", return_value=mock_data["python_version"])
-
-    mock_fqdn = mocker.patch("globus_compute_endpoint.endpoint.endpoint.socket.getfqdn")
-    mock_fqdn.return_value = mock_data["hostname"]
-
-    mock_pwuid = mocker.patch("globus_compute_endpoint.endpoint.endpoint.pwd.getpwuid")
-    mock_pwuid.return_value = SimpleNamespace(pw_name=mock_data["local_user"])
-
-    k = {}
-    if engine_cls is GlobusComputeEngine:
-        k["address"] = "::1"
-    test_config = UserEndpointConfig(engine=engine_cls(**k))
-    test_config.source_content = "foo: bar"
-    meta = Endpoint.get_metadata(test_config.source_content)
-
-    test_config.engine.shutdown()
-
-    for k, v in mock_data.items():
-        assert meta[k] == v
-
-    assert meta["endpoint_config"] == test_config.source_content
 
 
 @pytest.mark.parametrize("env", (None, "blar", "local", "production"))
