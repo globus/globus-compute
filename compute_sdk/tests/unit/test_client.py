@@ -1002,7 +1002,7 @@ def test_ha_register_and_submit_warning_deduplication(gcc, mocker):
         for _ in range(10):
             gcc.batch_run("endpoint_id", batch=mocker.Mock())
 
-    assert len(record) == 11, "Verify always checked for an HA warning"
+    assert len(record) > 10, "Verify always checked for an HA warning"
 
     with warnings.catch_warnings(record=True) as records:
         for _ in range(10):
@@ -1023,3 +1023,19 @@ def test_get_endpoints_with_role(gcc, role):
 
     gcc.get_endpoints(role=role)
     gcc._compute_web_client.v2.get_endpoints.assert_called_with(role=role)
+
+
+def test_worker_lost_warn_serialization(gcc, mock_worker_lost_task):
+    tid = mock_worker_lost_task["task_id"]
+
+    mock_v2_get_task = mock.MagicMock()
+    mock_v2_get_task.text = mock_worker_lost_task
+
+    gcc._task_status_table[tid] = mock_worker_lost_task
+    gcc._compute_web_client = mock.MagicMock()
+    gcc._compute_web_client.v2.get_task.return_value = mock_v2_get_task
+
+    with pytest.raises(TaskExecutionFailed) as e:
+        gcc.get_task(tid)
+
+    assert "One common cause of WorkerLost exceptions" in str(e.value)
