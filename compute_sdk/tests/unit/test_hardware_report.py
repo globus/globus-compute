@@ -1,22 +1,19 @@
 import logging
 import shlex
 from types import SimpleNamespace
+from unittest import mock
 
 import pytest
 from globus_compute_sdk.sdk.hardware_report import (
     _run_command,
     cpu_info,
+    mem_info,
     run_hardware_report,
+    swap_info,
 )
 
 _MOCK_BASE = "globus_compute_sdk.sdk.hardware_report."
 _NON_PORTABLE_COMMANDS = [cpu_info(), "lshw", "nvidia-smi"]
-
-
-@pytest.fixture(autouse=True)
-def mock_mem_info(mocker):
-    # mem_info depends on psutil which is not installed on sdk
-    mocker.patch(f"{_MOCK_BASE}mem_info", lambda: None)
 
 
 @pytest.mark.parametrize("missing_command", _NON_PORTABLE_COMMANDS)
@@ -56,3 +53,17 @@ def test_run_command_handles_missing_commands(mocker, caplog, missing_command):
         else:
             assert output == command_arg0
             assert f"{command_arg0} was not found in the PATH" not in caplog.text
+
+
+@pytest.mark.parametrize("psutil_using_func", (mem_info, swap_info))
+def test_missing_psutil_handled_gracefully(psutil_using_func):
+    ps_mock = mock.Mock()
+    with mock.patch.dict("sys.modules", {"psutil": ps_mock}):
+        with mock.patch(f"{_MOCK_BASE}_format_psmem", side_effect=MemoryError):
+            with pytest.raises(MemoryError):
+                psutil_using_func()
+
+    with mock.patch.dict("sys.modules", {"psutil": None}):
+        with mock.patch("builtins.__import__", side_effect=ImportError):
+            r = psutil_using_func()
+    assert "`psutil` not installed" in r
