@@ -9,7 +9,7 @@ import typing as t
 import pytest
 from globus_compute_sdk import Client
 from globus_compute_sdk.serialize.concretes import DillCodeSource
-from globus_sdk import ClientApp
+from globus_sdk import ClientApp, GlobusAppConfig
 
 # the non-tutorial endpoint will be required, with the following priority order for
 # finding the ID:
@@ -151,10 +151,14 @@ def compute_test_config(pytestconfig, compute_test_config_name):
         os.environ["GLOBUS_SDK_ENVIRONMENT"] = sdk_env
 
     if api_client_id and api_client_secret:
+        # config reads env var at init, and default config is created at startup,
+        # before env var is set; so make a new config now to read the env var
+        globus_app_config = GlobusAppConfig()
         client_args["app"] = ClientApp(
             "compute_smoke_tests",
             client_id=api_client_id,
             client_secret=api_client_secret,
+            config=globus_app_config,
         )
 
     client_args["code_serialization_strategy"] = DillCodeSource()
