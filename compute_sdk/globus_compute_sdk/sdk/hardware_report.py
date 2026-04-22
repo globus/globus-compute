@@ -30,16 +30,22 @@ def _format_psmem(psdata) -> str:
 
 @display_name("psutil.virtual_memory()")
 def mem_info() -> str:
-    import psutil  # import here bc psutil is installed with endpoint but not sdk
+    try:
+        import psutil  # psutil installed with endpoint, not sdk
 
-    return _format_psmem(psutil.virtual_memory())
+        return _format_psmem(psutil.virtual_memory())
+    except ImportError:
+        return "Python module `psutil` not installed; virtual memory info not available"
 
 
 @display_name("psutil.swap_memory()")
 def swap_info() -> str:
-    import psutil  # import here bc psutil is installed with endpoint but not sdk
+    try:
+        import psutil  # psutil installed with endpoint, not sdk
 
-    return _format_psmem(psutil.swap_memory())
+        return _format_psmem(psutil.swap_memory())
+    except ImportError:
+        return "Python module `psutil` not installed; virtual memory info not available"
 
 
 @display_name("python_runtime_host_info")
