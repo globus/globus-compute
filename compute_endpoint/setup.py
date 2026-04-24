@@ -6,7 +6,7 @@ from setuptools import find_packages, setup
 REQUIRES = [
     "requests>=2.31.0,<3",
     "globus-sdk",  # version will be bounded by `globus-compute-sdk`
-    "globus-compute-sdk==4.9.0",
+    "globus-compute-sdk==4.10.1",
     "globus-identity-mapping==0.5.0",
     # table printing used in list-endpoints
     "texttable>=1.6.4,<2",
@@ -34,7 +34,7 @@ REQUIRES = [
     # 'parsl' is a core requirement of the globus-compute-endpoint, essential to a range
     # of different features and functions
     # pin exact versions because it does not use semver
-    "parsl==2026.2.23",
+    "parsl==2026.4.20",
     "pika>=1.2.0",
     "pyprctl<0.2.0",
     "setproctitle>=1.3.2,<1.4",
