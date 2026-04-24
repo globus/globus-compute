@@ -3688,6 +3688,7 @@ New Functionality
 .. |SlurmProvider| replace:: ``SlurmProvider``
 .. _SlurmProvider: https://parsl.readthedocs.io/en/stable/stubs/parsl.providers.SlurmProvider.html
 
+.. _2026.4.20: https://pypi.org/project/parsl/2026.4.20/
 .. _2026.2.23: https://pypi.org/project/parsl/2026.2.23/
 .. _2026.1.5: https://pypi.org/project/parsl/2026.1.5/
 .. _2025.12.1: https://pypi.org/project/parsl/2025.12.1/
