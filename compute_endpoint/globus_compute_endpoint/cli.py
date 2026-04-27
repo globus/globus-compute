@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import contextlib
+import gc
 import json
 import logging
 import os
@@ -768,6 +769,7 @@ def _do_register_endpoint(
             high_assurance=ep_config.high_assurance,
             admins=ep_config.admins,
         )
+        del gcc
     except GlobusAPIError as e:
         blocked_msg = f"Endpoint registration blocked.  [{e.text}]"
         log.warning(blocked_msg)
@@ -789,6 +791,11 @@ def _do_register_endpoint(
         log.debug("Network error while registering endpoint", exc_info=e)
         log.critical(msg)
         raise MessageSystemExit(os.EX_TEMPFAIL, msg)
+
+    # avoid __del__-time errors after fork(); urllib3 connectionpool doesn't like us
+    # closing fds ahead of it, but we don't have a direct avenue to tell it explicitly
+    # to let go of them.  So, encourage Python to do it via the collector.
+    gc.collect()
 
     # Mostly to appease mypy, but also a useful text if it ever
     # *does* happen
