@@ -163,22 +163,20 @@ def ensure_result_queue(pika_conn_params):
         else:
             routing_key = queue_opts["queue"]
 
-        with pika.BlockingConnection(pika_conn_params) as mq_conn:
-            with mq_conn.channel() as chan:
-                chan.exchange_declare(**exchange_opts)
-                chan.queue_declare(**queue_opts)
-                queues_created.append(queue_opts["queue"])
-                chan.queue_bind(
-                    queue=queue_opts["queue"],
-                    exchange=exchange_opts["exchange"],
-                    routing_key=routing_key,
-                )
-
-    _do_ensure()  # The main "results" should always exist for our tests
-    yield _do_ensure
+        chan.exchange_declare(**exchange_opts)
+        chan.queue_declare(**queue_opts)
+        queues_created.append(queue_opts["queue"])
+        chan.queue_bind(
+            queue=queue_opts["queue"],
+            exchange=exchange_opts["exchange"],
+            routing_key=routing_key,
+        )
 
     with pika.BlockingConnection(pika_conn_params) as mq_conn:
         with mq_conn.channel() as chan:
+            _do_ensure()  # The main "results" should always exist for our tests
+            yield _do_ensure
+
             for q_name in queues_created:
                 chan.queue_delete(q_name)
 
@@ -200,22 +198,20 @@ def ensure_heartbeat_queue(pika_conn_params):
         else:
             routing_key = queue_opts["queue"]
 
-        with pika.BlockingConnection(pika_conn_params) as mq_conn:
-            with mq_conn.channel() as chan:
-                chan.exchange_declare(**exchange_opts)
-                chan.queue_declare(**queue_opts)
-                queues_created.append(queue_opts["queue"])
-                chan.queue_bind(
-                    queue=queue_opts["queue"],
-                    exchange=exchange_opts["exchange"],
-                    routing_key=routing_key,
-                )
-
-    _do_ensure()  # The main "heartbeats" should always exist for our tests
-    yield _do_ensure
+        chan.exchange_declare(**exchange_opts)
+        chan.queue_declare(**queue_opts)
+        queues_created.append(queue_opts["queue"])
+        chan.queue_bind(
+            queue=queue_opts["queue"],
+            exchange=exchange_opts["exchange"],
+            routing_key=routing_key,
+        )
 
     with pika.BlockingConnection(pika_conn_params) as mq_conn:
         with mq_conn.channel() as chan:
+            _do_ensure()  # The main "heartbeats" should always exist for our tests
+            yield _do_ensure
+
             for q_name in queues_created:
                 chan.queue_delete(q_name)
 
@@ -407,20 +403,19 @@ def ensure_task_queue(pika_conn_params, tod_session_num, request):
         queue_opts.setdefault("arguments", {"x-expires": 30 * 1000})
         queue_opts.setdefault("durable", True)
 
-        with pika.BlockingConnection(pika_conn_params) as mq_conn:
-            with mq_conn.channel() as chan:
-                chan.exchange_declare(**exchange_opts)
-                chan.queue_declare(**queue_opts)
-                queues_created.append(queue_opts["queue"])
-                chan.queue_bind(
-                    queue=queue_opts["queue"],
-                    exchange=exchange_opts["exchange"],
-                    routing_key=queue_opts["queue"],
-                )
-
-    yield _do_ensure
+        chan.exchange_declare(**exchange_opts)
+        chan.queue_declare(**queue_opts)
+        queues_created.append(queue_opts["queue"])
+        chan.queue_bind(
+            queue=queue_opts["queue"],
+            exchange=exchange_opts["exchange"],
+            routing_key=queue_opts["queue"],
+        )
 
     with pika.BlockingConnection(pika_conn_params) as mq_conn:
         with mq_conn.channel() as chan:
+
+            yield _do_ensure
+
             for q_name in queues_created:
                 chan.queue_delete(q_name)
