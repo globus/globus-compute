@@ -405,6 +405,7 @@ def ensure_task_queue(pika_conn_params, tod_session_num, request):
             queue_opts = {"queue": f"task_{queue_id}.tasks"}
         # play nice with dev/test resources; auto clean
         queue_opts.setdefault("arguments", {"x-expires": 30 * 1000})
+        queue_opts.setdefault("durable", True)
 
         with pika.BlockingConnection(pika_conn_params) as mq_conn:
             with mq_conn.channel() as chan:
