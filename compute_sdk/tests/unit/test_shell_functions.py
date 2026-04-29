@@ -310,7 +310,6 @@ def test_stdout_naming(run_in_tmp_dir, monkeypatch):
     assert os.path.join(run_in_tmp_dir, task_id) not in result.stdout
     assert run_in_tmp_dir.name in result.stdout
     for std_file in os.listdir(run_in_tmp_dir):
-
         assert len(std_file.split(".")) == 3
         assert std_file.split(".")[-1] in ["stdout", "stderr"]
         assert std_file.split(".")[0] == task_id

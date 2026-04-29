@@ -85,12 +85,12 @@ def test_executor(compute_client, endpoint, tutorial_function_id, timeout_s: int
             for f in concurrent.futures.as_completed(futures, timeout=timeout_s):
                 results.append(f.result())
 
-            assert (
-                len(results) == num_tasks
-            ), f"Expected {num_tasks} results; received: {len(results)}"
-            assert all(
-                "Hello World!" == item for item in results
-            ), f"Invalid result: {results}"
+            assert len(results) == num_tasks, (
+                f"Expected {num_tasks} results; received: {len(results)}"
+            )
+            assert all("Hello World!" == item for item in results), (
+                f"Invalid result: {results}"
+            )
 
         futures = list(gce.reload_tasks())
         assert len(futures) == submit_count * num_tasks
@@ -98,6 +98,6 @@ def test_executor(compute_client, endpoint, tutorial_function_id, timeout_s: int
         results = []
         for f in concurrent.futures.as_completed(futures, timeout=timeout_s):
             results.append(f.result())
-        assert all(
-            "Hello World!" == item for item in results
-        ), f"Invalid result: {results}"
+        assert all("Hello World!" == item for item in results), (
+            f"Invalid result: {results}"
+        )

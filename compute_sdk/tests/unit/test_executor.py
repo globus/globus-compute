@@ -892,9 +892,9 @@ def test_reload_tasks_all_completed(gce: Executor):
 
     assert len(client_futures) == num_tasks
     assert sum(1 for fut in client_futures if fut.done()) == num_tasks
-    assert (
-        _RESULT_WATCHERS.get(gce.task_group_id) is None
-    ), "Should NOT start watcher: all tasks done!"
+    assert _RESULT_WATCHERS.get(gce.task_group_id) is None, (
+        "Should NOT start watcher: all tasks done!"
+    )
 
 
 @pytest.mark.parametrize(

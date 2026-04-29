@@ -177,9 +177,9 @@ def test_provider_container_compatibility(
 def test_configs_repr_default_kwargs():
     assert repr(UserEndpointConfig()) == "UserEndpointConfig()"
     defs = f"pam={PamConfiguration(enable=False)!r}"
-    assert (
-        repr(ManagerEndpointConfig()) == f"ManagerEndpointConfig({defs})"
-    ), "mep is on base"
+    assert repr(ManagerEndpointConfig()) == f"ManagerEndpointConfig({defs})", (
+        "mep is on base"
+    )
 
 
 @pytest.mark.parametrize("kw,cls", known_user_config_opts.items())

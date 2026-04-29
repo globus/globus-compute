@@ -12,6 +12,7 @@ import warnings
 
 import globus_sdk
 from globus_compute_common.sdk_version_sharing import user_agent_substring
+
 from globus_compute_sdk.errors import (
     SerializationError,
     TaskExecutionFailed,

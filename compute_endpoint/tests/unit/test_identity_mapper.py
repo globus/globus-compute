@@ -139,9 +139,9 @@ def test_atomically_loads_new_configurations(mocker, conf_p):
         yield False
 
         assert isinstance(pim.identity_mappings, list)
-        assert "py_or_sh_or_rb_or_exe_or" in str(
-            pim.identity_mappings
-        ), "bad config; expect not changed"
+        assert "py_or_sh_or_rb_or_exe_or" in str(pim.identity_mappings), (
+            "bad config; expect not changed"
+        )
 
         conf_p.write_text("[]")
         yield False

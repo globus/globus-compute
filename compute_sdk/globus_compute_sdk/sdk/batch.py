@@ -7,6 +7,8 @@ import uuid
 from collections import defaultdict
 from dataclasses import asdict, dataclass
 
+from globus_sdk import __version__ as __version_globus__
+
 from globus_compute_sdk.sdk.utils.uuid_like import (
     UUID_LIKE_T,
     as_optional_uuid,
@@ -14,7 +16,6 @@ from globus_compute_sdk.sdk.utils.uuid_like import (
 )
 from globus_compute_sdk.serialize import ComputeSerializer
 from globus_compute_sdk.version import __version__
-from globus_sdk import __version__ as __version_globus__
 
 _default_serde = ComputeSerializer()
 

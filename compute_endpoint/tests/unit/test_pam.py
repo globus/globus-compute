@@ -31,9 +31,9 @@ def test_pamh_username_limits_length(randomstring, name_len):
     assert pamh.max_username_len > 0
 
     pamh.username = randomstring(pamh.max_username_len + 1)
-    assert (
-        len(pamh.username) == pamh.max_username_len
-    ), "Like ssh, protect buggy PAM implementations from themselves"
+    assert len(pamh.username) == pamh.max_username_len, (
+        "Like ssh, protect buggy PAM implementations from themselves"
+    )
 
 
 def test_pamh_start_does_not_clobber_existing_session(pamh):

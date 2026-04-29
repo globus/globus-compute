@@ -511,9 +511,9 @@ def test_sets_process_title(
     assert mock_spt.setproctitle.called, "Sanity check"
 
     a, *_ = mock_spt.setproctitle.call_args
-    assert a[0].startswith(
-        "Globus Compute Endpoint"
-    ), "Expect easily identifiable process name"
+    assert a[0].startswith("Globus Compute Endpoint"), (
+        "Expect easily identifiable process name"
+    )
     assert "*(" in a[0], "Expected asterisk as subtle clue of 'manager process'"
     assert f"{ep_uuid}, {conf_dir.name}" in a[0], "Can find process by conf"
 
@@ -1666,9 +1666,9 @@ def test_non_root_keeps_original_environment(
     with pytest.raises(SystemExit) as pyexc:
         em._event_loop()
 
-    assert (
-        pyexc.value.code == _GOOD_UNPRIVILEGED_EC
-    ), "Q&D: verify we exec'ed, based on '+= 1'"
+    assert pyexc.value.code == _GOOD_UNPRIVILEGED_EC, (
+        "Q&D: verify we exec'ed, based on '+= 1'"
+    )
     _, k = mock_os.execvpe.call_args
     env = k["env"]
     assert all(env[k] and env[k] == expected_env[k] for k in exp_keys)
@@ -1799,9 +1799,9 @@ def test_warns_if_executable_not_found(
 
     assert mock_log.error.called
     a, _k = mock_log.error.call_args
-    assert (
-        "Unable to start user endpoint" in a[0]
-    ), "Expect attempt to log, even if fds closed"
+    assert "Unable to start user endpoint" in a[0], (
+        "Expect attempt to log, even if fds closed"
+    )
     assert f" [exit code: {ec};" in a[0], "Expect exit code for debugging"
     assert exc_text in a[0]
 
@@ -2047,9 +2047,9 @@ def test_run_as_same_user_does_not_change_uid(successful_exec_from_mocked_root):
     with pytest.raises(SystemExit) as pyexc:
         em._event_loop()
 
-    assert (
-        pyexc.value.code == _GOOD_UNPRIVILEGED_EC
-    ), "Q&D: verify we exec'ed, but no privilege drop"
+    assert pyexc.value.code == _GOOD_UNPRIVILEGED_EC, (
+        "Q&D: verify we exec'ed, but no privilege drop"
+    )
 
     assert not mock_os.initgroups.called
     assert not mock_os.setresuid.called

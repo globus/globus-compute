@@ -19,6 +19,9 @@ from pathlib import Path
 from urllib.parse import urlparse
 
 import colorama
+from rich import get_console
+from rich.console import Console
+
 from globus_compute_sdk import Client, Executor
 from globus_compute_sdk.sdk._environments import (
     get_amqp_service_host,
@@ -33,8 +36,6 @@ from globus_compute_sdk.sdk.utils.sample_function import (
     sdk_tutorial_sample_simple_function,
 )
 from globus_compute_sdk.serialize.concretes import DillCodeTextInspect
-from rich import get_console
-from rich.console import Console
 
 OUTPUT_FILENAME = "globus_compute_diagnostic_{}.txt.gz"
 # How long to wait for any individual diagnostic before timing out
@@ -64,7 +65,7 @@ def cat(
     def kernel() -> None:
         for filename in files:
             cat_cmd = "cat " + filename
-            print(f'{cat_cmd}\n{"=" * len(cat_cmd)}')
+            print(f"{cat_cmd}\n{'=' * len(cat_cmd)}")
             if os.path.exists(filename):
                 with open(filename, "rb") as f:
                     if max_bytes:
@@ -77,7 +78,7 @@ def cat(
                 print(f" | {indented_content}")
             else:
                 print_warning(f"No file named {filename}\n")
-            print(f'{"-" * len(cat_cmd)}\n')
+            print(f"{'-' * len(cat_cmd)}\n")
 
     return kernel
 

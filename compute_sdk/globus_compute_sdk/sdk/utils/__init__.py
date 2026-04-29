@@ -7,9 +7,10 @@ from itertools import islice
 from pathlib import Path
 
 import dill
-import globus_compute_sdk.version as sdk_version
 import packaging.version
 from packaging.version import Version
+
+import globus_compute_sdk.version as sdk_version
 
 
 def chunk_by(iterable: t.Iterable, size) -> t.Iterable[tuple]:
@@ -81,12 +82,12 @@ def check_version(task_details: dict | None, check_py_micro: bool = True) -> str
         if python_mismatch or sdk_dill != worker_dill:
             return (
                 "\nEnvironment differences detected between local SDK and "
-                f"endpoint {worker_epid} workers:\n"
-                f"\t    SDK: Python {sdk_py}/Dill {sdk_dill}\n"
-                f"\tWorkers: Python {worker_py}/Dill {worker_dill}\n"
-                f"This may cause serialization issues.  See "
-                "https://globus-compute.readthedocs.io/en/latest/sdk/executor_user_guide.html#avoiding-serialization-errors "  # noqa"
-                "for more information."
+                f"endpoint {worker_epid} workers:"
+                f"\n\t    SDK: Python {sdk_py}/Dill {sdk_dill}"
+                f"\n\tWorkers: Python {worker_py}/Dill {worker_dill}"
+                f"\nThis may cause serialization issues.  See"
+                " https://globus-compute.readthedocs.io/en/latest/sdk/executor_user_guide.html#avoiding-serialization-errors"
+                " for more information."
             )
     return None
 
