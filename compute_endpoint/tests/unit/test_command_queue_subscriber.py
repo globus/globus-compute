@@ -129,9 +129,9 @@ def test_cqs_connect_limit_very_high_sc30467():
     cq = cqs.CommandQueueSubscriber(
         queue_info=None, command_queue=None, stop_event=None
     )
-    assert (
-        cq.connect_attempt_limit >= 5000
-    ), "Some very high limit as RMQ can be down for awhile; SC-30467"
+    assert cq.connect_attempt_limit >= 5000, (
+        "Some very high limit as RMQ can be down for awhile; SC-30467"
+    )
 
 
 def test_cqs_gracefully_handles_unexpected_exception(mock_log, mock_rnd):

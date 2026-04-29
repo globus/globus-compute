@@ -3,7 +3,6 @@ import typing as t
 
 
 class ShellResult:
-
     def __init__(
         self,
         cmd: str,
@@ -68,7 +67,6 @@ class ShellResult:
 
 
 class ShellFunction:
-
     def __init__(
         self,
         cmd: str,

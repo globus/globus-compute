@@ -157,9 +157,9 @@ def test_submit_specifies_deserializers(eng_args, task_bytes, endpoint_uuid, tas
 
     eng.submit(f, task_bytes, {})
 
-    assert exp_task_deser == set(
-        k["kwargs"]["task_deserializers"]
-    ), eng.serde.allowed_deserializer_types
+    assert exp_task_deser == set(k["kwargs"]["task_deserializers"]), (
+        eng.serde.allowed_deserializer_types
+    )
 
 
 def test_expected_abstract_methods(eng_args):

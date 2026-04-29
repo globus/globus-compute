@@ -189,9 +189,9 @@ def test_heartbeat_includes_static_info(ei, mock_rp, mock_tqs, mock_pack, mock_e
 
     # Note that this is the "hooked up" test.  The content of `get_status_report`
     # is verified by the engine-specific unit tests.
-    assert (
-        ei.engine.get_status_report.call_count == num_hbs_until_quit + 1
-    ), f"Should be {num_hbs_until_quit} heartbeats and a final sign off"
+    assert ei.engine.get_status_report.call_count == num_hbs_until_quit + 1, (
+        f"Should be {num_hbs_until_quit} heartbeats and a final sign off"
+    )
     for a, k in mock_pack.call_args_list:
         assert all(a[0].global_state[k] == v for k, v in mock_ep_info.items())
 

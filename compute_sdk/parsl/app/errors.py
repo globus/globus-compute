@@ -1,7 +1,8 @@
 import logging
+from collections.abc import Callable
 from functools import wraps
 from types import TracebackType
-from typing import Any, Callable, TypeVar, Union
+from typing import Any, TypeVar
 
 import dill
 from tblib import Traceback
@@ -37,7 +38,7 @@ R = TypeVar("R")
 
 def wrap_error(
     func: Callable[..., R],
-) -> Callable[..., Union[R, RemoteExceptionWrapper]]:
+) -> Callable[..., R | RemoteExceptionWrapper]:
     @wraps(func)  # type: ignore
     def wrapper(*args: object, **kwargs: object) -> Any:
         import sys

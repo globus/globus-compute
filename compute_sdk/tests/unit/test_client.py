@@ -354,9 +354,9 @@ def test_register_function(gcc: gc.Client, serde: ComputeSerializer):
     assert data["function_name"] == funk.__name__
     assert data["function_code"] is not None
     assert data["description"] == inspect.getdoc(funk)
-    assert (
-        data["meta"]["python_version"] == metadata["python_version"]
-    ), "Expect to match the *running* Python version"
+    assert data["meta"]["python_version"] == metadata["python_version"], (
+        "Expect to match the *running* Python version"
+    )
     assert data["meta"]["sdk_version"] == metadata["sdk_version"]
     assert data["meta"]["serde_identifier"] == metadata["serde_identifier"]
 

@@ -225,11 +225,13 @@ def make_endpoint_dir(gc_dir, ep_name):
             ep_json = ep_dir / "endpoint.json"
             ep_json.write_text(json.dumps({"endpoint_id": ep_uuid}))
         ep_config = Endpoint._config_file_path(ep_dir)
-        ep_config.write_text("""
+        ep_config.write_text(
+            """
 display_name: null
 engine:
     type: ThreadPoolEngine
-            """.strip())
+            """.strip()
+        )
         return ep_dir
 
     return func
@@ -246,15 +248,20 @@ def make_manager_endpoint_dir(gc_dir, ep_name):
         ep_config = Endpoint._config_file_path(ep_dir)
         ep_template = Endpoint.user_config_template_path(ep_dir)
         ep_schema = Endpoint.user_config_schema_path(ep_dir)
-        ep_config.write_text("""
+        ep_config.write_text(
+            """
 display_name: null
-            """.strip())
-        ep_template.write_text("""
+            """.strip()
+        )
+        ep_template.write_text(
+            """
 heartbeat_period: {{ heartbeat }}
 engine:
     type: ThreadPoolEngine
-            """.strip())
-        ep_schema.write_text("""
+            """.strip()
+        )
+        ep_schema.write_text(
+            """
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "type": "object",
@@ -262,7 +269,8 @@ engine:
     "heartbeat": { "type": "number" }
   }
 }
-            """.strip())
+            """.strip()
+        )
         return ep_dir
 
     return func
@@ -515,9 +523,9 @@ def test_start_uep_stdin_allowed_fns_overrides_conf(
     run_line(f"_start-user-endpoint {ep_name}")
     assert mock_ep.start_endpoint.called
     _, k = mock_ep.start_endpoint.call_args
-    assert (
-        k["endpoint_config"].allowed_functions == allowed_fns
-    ), "allowed field not overridden!"
+    assert k["endpoint_config"].allowed_functions == allowed_fns, (
+        "allowed field not overridden!"
+    )
 
 
 @pytest.mark.parametrize(
@@ -1101,9 +1109,9 @@ def test_start_ep_detached(
 
     assert mock_daemon_context_class.called, "Expect DaemonContext was created"
     daemon_constructor_kwargs = mock_daemon_context_class.call_args.kwargs
-    assert (
-        daemon_constructor_kwargs.get("detach_process") is True
-    ), "Expect DaemonContext is told to detach, not use its own heuristic"
+    assert daemon_constructor_kwargs.get("detach_process") is True, (
+        "Expect DaemonContext is told to detach, not use its own heuristic"
+    )
 
     assert res.exception is not None, "Expect *an* exception was raised"
     assert "early exit" in str(res.exception), "Expect the *correct* exception"

@@ -525,9 +525,9 @@ def test_endpoint_sets_process_title(
             ep.start_endpoint(*ep_args, reg_info=mock_reg_info, ep_info={})
 
     a, _k = mock_spt.setproctitle.call_args
-    assert a[0].startswith(
-        "Globus Compute Endpoint"
-    ), "Expect easily identifiable process name"
+    assert a[0].startswith("Globus Compute Endpoint"), (
+        "Expect easily identifiable process name"
+    )
     assert f"{ep_uuid}, {ep_dir.name}" in a[0], "Expect easily match process to ep conf"
     if not env:
         assert " - " not in a[0], "Default is not 'do not show env' for prod"

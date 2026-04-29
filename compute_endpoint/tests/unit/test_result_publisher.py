@@ -99,9 +99,9 @@ def test_rp_stops_if_unable_to_connect(mocker, randomstring, attempt_limit):
 def test_rp_connect_limit_very_high_sc30467(randomstring):
     queue_info = {"queue": randomstring(), **q_info}
     rp = ResultPublisher(queue_info=queue_info)
-    assert (
-        rp.connect_attempt_limit >= 5000
-    ), "Some very high limit as RMQ can be down for awhile; SC-30467"
+    assert rp.connect_attempt_limit >= 5000, (
+        "Some very high limit as RMQ can be down for awhile; SC-30467"
+    )
 
 
 def test_rp_new_channel_resets_delivery_index():
@@ -281,9 +281,9 @@ def test_rp_publish_enqueues_message(randomstring):
     msg = b"abc"
     f = rp.publish(msg)
 
-    assert (
-        not rp._awaiting_confirmation
-    ), "publish() *enqueues*, but doesn't upstream publish yet"
+    assert not rp._awaiting_confirmation, (
+        "publish() *enqueues*, but doesn't upstream publish yet"
+    )
 
     f_enqueued, msg_enqueued = rp._outstanding.get()
 

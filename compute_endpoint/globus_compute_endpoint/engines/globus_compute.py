@@ -126,9 +126,9 @@ class GlobusComputeEngine(GlobusComputeEngineBase):
         self.strategy = strategy
 
         self.container_type = container_type
-        assert (
-            self.container_type in VALID_CONTAINER_TYPES
-        ), f"{self.container_type} is not a valid container_type"
+        assert self.container_type in VALID_CONTAINER_TYPES, (
+            f"{self.container_type} is not a valid container_type"
+        )
         self.container_uri = container_uri
         self.container_cmd_options = container_cmd_options
 
@@ -240,9 +240,9 @@ class GlobusComputeEngine(GlobusComputeEngineBase):
                 options=self.container_cmd_options or "",
             )
         elif self.container_type == "custom":
-            assert (
-                self.container_cmd_options
-            ), "GCE.container_cmd_options is required for GCE.container_type=custom"
+            assert self.container_cmd_options, (
+                "GCE.container_cmd_options is required for GCE.container_type=custom"
+            )
             template = self.container_cmd_options.replace(
                 "{EXECUTOR_RUNDIR}", str(self.run_dir)
             )

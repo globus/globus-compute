@@ -19,6 +19,7 @@ from concurrent.futures import InvalidStateError
 import pika
 from globus_compute_common import messagepack
 from globus_compute_common.messagepack.message_types import Result
+
 from globus_compute_sdk.errors import TaskExecutionFailed
 from globus_compute_sdk.sdk.asynchronous.compute_future import ComputeFuture
 from globus_compute_sdk.sdk.client import Client

@@ -371,8 +371,7 @@ def version_command():
     type=click.Path(exists=True, dir_okay=False, path_type=pathlib.Path),
     default=None,
     help=(
-        "Specify a custom identity mapping configuration"
-        " (identity_mapping_config.json)"
+        "Specify a custom identity mapping configuration (identity_mapping_config.json)"
     ),
 )
 @optgroup.option(
@@ -1112,7 +1111,7 @@ def create_or_choose_auth_project(ac: AuthClient) -> str:
                 "Please select a project to contain new auth policy "
                 "(leave blank to create a new one):"
             ),
-            [f'id: {proj["id"]}, name: {proj["display_name"]}' for proj in projects],
+            [f"id: {proj['id']}, name: {proj['display_name']}" for proj in projects],
         )
         if proj_selected:
             return proj_selected.split()[1][:-1]
@@ -1359,9 +1358,7 @@ def _do_render_user_config(
 
     if parent_config_file is not None:
         try:
-            parent_config = load_config_yaml(
-                parent_config_file.read()
-            )  # type: ignore[assignment]
+            parent_config = load_config_yaml(parent_config_file.read())  # type: ignore[assignment]
         except Exception as e:
             raise ClickExceptionWithContext(
                 f"Invalid parent config data in {parent_config_file.name}."

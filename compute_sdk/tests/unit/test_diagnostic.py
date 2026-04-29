@@ -510,7 +510,7 @@ def test_diagnostic_base_dir_GC_HOME_or_config_param(
         else:
             with pytest.raises(SystemExit) as se:
                 do_diagnostic_base(diag_args)
-            assert se.type == SystemExit
+            assert se.type is SystemExit
             assert se.value.code == os.EX_NOINPUT
 
 

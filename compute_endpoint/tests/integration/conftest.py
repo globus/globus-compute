@@ -414,7 +414,6 @@ def ensure_task_queue(pika_conn_params, tod_session_num, request):
 
     with pika.BlockingConnection(pika_conn_params) as mq_conn:
         with mq_conn.channel() as chan:
-
             yield _do_ensure
 
             for q_name in queues_created:

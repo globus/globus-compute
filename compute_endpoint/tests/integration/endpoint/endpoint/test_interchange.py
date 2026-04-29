@@ -290,9 +290,9 @@ def test_hard_idle_honored(
         m[0][0].startswith("[possibly idle; shut down in ")
         for m in mock_spt.call_args_list
     )
-    assert (
-        num_updates == idle_limit - idle_soft_limit
-    ), "expect process title updated; reflects status"
+    assert num_updates == idle_limit - idle_soft_limit, (
+        "expect process title updated; reflects status"
+    )
 
 
 def test_shutdown_lost_task_race_condition_sc36175(

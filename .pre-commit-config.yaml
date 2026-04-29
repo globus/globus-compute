@@ -16,20 +16,15 @@ repos:
   rev: v3.21.2
   hooks:
     - id: pyupgrade
-      args: ["--py39-plus"]
-- repo: https://github.com/psf/black-pre-commit-mirror
-  rev: 26.3.1
+      args: ["--py310-plus"]
+- repo: https://github.com/astral-sh/ruff-pre-commit
+  rev: v0.15.12
   hooks:
-    - id: black
-- repo: https://github.com/PyCQA/isort
-  rev: 9.0.0a3
-  hooks:
-    - id: isort
-      # explicitly pass settings file so that isort does not try to deduce
-      # which settings to use based on a file's directory
-      args: ["--settings-path", ".isort.cfg"]
-- repo: https://github.com/PyCQA/flake8
-  rev: 7.3.0
-  hooks:
-    - id: flake8
-      additional_dependencies: ['flake8-bugbear==22.10.27']
+    - id: ruff-check
+      types_or: [ python ]
+      args: [ --select, I ]
+    - id: ruff-check
+      types_or: [ python ]
+      args: [ --fix ]
+    - id: ruff-format
+      types_or: [ python ]
