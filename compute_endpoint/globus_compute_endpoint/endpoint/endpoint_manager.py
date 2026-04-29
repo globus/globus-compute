@@ -145,6 +145,7 @@ class EndpointManager:
 
         self._reload_requested = False
         self._time_to_stop = False
+        self._restart_requested = False
 
         self._heartbeat_period: float = max(MINIMUM_HEARTBEAT, config.heartbeat_period)
 
@@ -304,6 +305,10 @@ class EndpointManager:
     def set_child_died(self, sig_num, curr_stack_fframe):
         self._wait_for_child = True
 
+    def request_restart(self, sig_num, curr_stack_frame):
+        self._restart_requested = True
+        self._time_to_stop = True
+
     def wait_for_children(self):
         try:
             self._wait_for_child = False
@@ -440,6 +445,7 @@ class EndpointManager:
         signal.signal(signal.SIGTERM, self.request_shutdown)
         signal.signal(signal.SIGINT, self.request_shutdown)
         signal.signal(signal.SIGQUIT, self.request_shutdown)
+        signal.signal(signal.SIGHUP, self.request_restart)
 
         signal.signal(signal.SIGCHLD, self.set_child_died)
 
@@ -554,6 +560,10 @@ class EndpointManager:
         if msg_out:
             # re-enable cursor visibility
             print("\033[?25h", end="", file=msg_out)
+
+        if self._restart_requested:
+            args = [sys.executable, *sys.argv]
+            os.execvpe(args[0], args=args, env=os.environ)
 
     def _event_loop(self):
         parent_identities: set[str] = set()
@@ -1014,10 +1024,12 @@ class EndpointManager:
             self._children[pid] = UserEndpointRecord(
                 ep_name=ep_name, local_user_info=user_record, arguments=proc_args_s
             )
+            log.info(f"****\naudit_r ====\n{self._audit_pipes.get(audit_r)}\n====\n")
             if audit_r:
                 os.close(audit_w)
                 self._audit_pipes[audit_r]["pid"] = pid
             log.info(f"Creating new user endpoint (pid: {pid}) [{proc_args_s}]")
+            log.info(f"****\nproc_args ****\n{proc_args}\n****\n")
             return
 
         # Reminder: from this point on, we are now the *child* process.
