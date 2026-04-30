@@ -12,7 +12,7 @@ class PamConfiguration:
         session.  If a particular MEP has different requirements, define those PAM
         requirements in ``/etc/pam.d/``, and specify the service name with this field.
 
-        See :ref:`MEP § PAM <pam>` for more information
+        See :ref:`Multi-user § PAM <pam>` for more information
     """
 
     enable: bool = True

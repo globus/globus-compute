@@ -218,6 +218,7 @@ class GlobusComputeEngineBase(ABC, RepresentationMixin):
         current configuration, complies with Globus's High Assurance policies. This
         must be evaluated on a case-by-case basis. Some example criteria:
 
+        # TODO rename this manager instance?
         * All manager-worker communication happens within one host machine
         * Network traffic is encrypted
         """
