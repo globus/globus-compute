@@ -7,11 +7,17 @@ from __future__ import annotations
 import logging
 import logging.config
 import logging.handlers
+import os
 import pathlib
 import re
 import sys
 from collections import defaultdict
 from datetime import datetime
+
+from globus_compute_sdk.sdk.compute_dir import (
+    COMPUTE_EP_DIR_ENV,
+    ensure_compute_dir,
+)
 
 log = logging.getLogger(__name__)
 
@@ -21,6 +27,7 @@ DEFAULT_FORMAT = (
     "%(threadName)s-%(thread)d %(name)s:%(lineno)d %(funcName)s "
     "%(message)s"
 )
+LOG_PATH_ENV = "GLOBUS_COMPUTE_LOG_PATH"
 
 _und = "\033[4m"
 _ital = "\033[3m"
@@ -269,3 +276,69 @@ def setup_logging(
         config = _get_stream_dict_config(debug, no_color)
 
     logging.config.dictConfig(config)
+
+
+def ensure_paths(ep_name: str, custom_paths: dict | None = None) -> pathlib.Path:
+    """
+    Ensures that both the UEP directory and the UEP log path are present and valid,
+    possibly creating them, then returns the Path to the log file.
+
+    :param ep_name:      The name of the user endpoint.  The default UEP directory
+                           is ~/.globus_compute/<ep_name> unless customized
+    :param custom_paths: An optional "paths" section from the jinja template
+                           where the user can customize the endpoint directory
+                           or the log path.  This defaults to
+                           ~/.globus_compute/<ep_name>/endpoint.log
+    """
+
+    # First, get the current values from the environment variables
+    ep_dir_str = os.environ.get(COMPUTE_EP_DIR_ENV, "")
+    log_path_str = os.environ.get(LOG_PATH_ENV, "")
+
+    # Customized values from jinja user config
+    custom_ep_str = custom_paths.get("endpoint_log", "") if custom_paths else ""
+    custom_log_str = custom_paths.get("endpoint_dir", "") if custom_paths else ""
+
+    # Possibly override ENV values with custom configs
+    if custom_ep_str:
+        ep_dir_str = custom_ep_str
+        print(f"ep_dir_str custom override to {ep_dir_str}")
+    else:
+        print(f"ep_dir_str DEFAULT {ep_dir_str}")
+
+    if custom_log_str:
+        log_path_str = custom_log_str
+        print(f"log_dir_str custom override to {log_path_str}")
+    else:
+        print(f"log_dir_str DEFAULT {log_path_str}")
+
+    # Use ep_name if nothing else is set
+    if not ep_dir_str:
+        if not ep_name:
+            raise ValueError("Endpoint name must be provided")
+        ep_dir_str = str((ensure_compute_dir() / ep_name).resolve())
+
+    ep_dir = pathlib.Path(os.path.expandvars(ep_dir_str)).expanduser()
+    if ep_dir.is_file():
+        raise ValueError(f"{COMPUTE_EP_DIR_ENV} can not be an existing file: {ep_dir}")
+
+    # Now update the ep_dir ENV with the final value
+    # Parent directory (default -> ~/.globus_compute) might have already
+    # been created but confirm anyway, as ep_dir may not be under ~/.globus_compute
+    ep_dir.mkdir(mode=0o700, parents=True, exist_ok=True)
+    os.environ[COMPUTE_EP_DIR_ENV] = str(ep_dir.resolve())
+
+    if log_path_str:
+        log_path = pathlib.Path(os.path.expandvars(log_path_str)).expanduser()
+        if log_path.is_dir():
+            raise ValueError(f"{LOG_PATH_ENV} can not be a directory: {log_path}")
+    else:
+        log_path = ep_dir / "endpoint.log"
+
+    # Update the log path ENV with the final value
+    log_path_str = str(log_path.resolve())
+    log_path.parent.mkdir(mode=0o700, parents=True, exist_ok=True)
+    os.environ[LOG_PATH_ENV] = log_path_str
+
+    logger.info(f"Endpoint log path has been set to {log_path_str}")
+    return log_path

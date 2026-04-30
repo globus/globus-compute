@@ -35,6 +35,8 @@ from globus_compute_endpoint.endpoint.rabbit_mq import (
 )
 from globus_compute_endpoint.endpoint.utils import _redact_url_creds
 from globus_compute_endpoint.exceptions import MessageSystemExit
+from globus_compute_endpoint.logging_config import LOG_PATH_ENV
+from globus_compute_sdk.sdk.compute_dir import COMPUTE_EP_DIR_ENV
 from globus_sdk import UserApp
 from pytest_mock import MockFixture
 
@@ -86,6 +88,15 @@ class MockPamError(Exception):
 
 def mock_ensure_compute_dir():
     return pathlib.Path(_mock_localuser_rec.pw_dir) / ".globus_compute"
+
+
+def mock_ensure_paths():
+    return mock_ensure_compute_dir() / "some_ep_name" / "endpoint.log"
+
+
+# @pytest.fixture(autouse=True)
+# def mock_log_path_patch(request, mocker):
+#     mocker.patch(f"{_MOCK_BASE}ensure_log_path", side_effect=mock_ensure_log_path)
 
 
 @pytest.fixture
@@ -248,6 +259,8 @@ def epmanager_as_user(
     mock_os.open.side_effect = (4, 5, AssertionError("open: unexpected?"))
 
     mock_os.waitpid.return_value = (0, 0)
+
+    mocker.patch(f"{_MOCK_BASE}ensure_paths", side_effect=mock_ensure_paths)
 
     mock_pwd = mocker.patch(f"{_MOCK_BASE}pwd")
     mock_pwd.getpwnam.side_effect = AssertionError(
@@ -1722,6 +1735,7 @@ def test_non_root_keeps_original_environment(
 
 def test_environment_default_path(successful_exec_from_mocked_root):
     mock_os, *_, em = successful_exec_from_mocked_root
+
     with pytest.raises(SystemExit) as pyexc:
         em._event_loop()
 
@@ -2258,6 +2272,14 @@ def test_respects_config_template_and_schema(mocker, successful_exec_from_mocked
     assert parsed_stdin["config"] == config
 
 
+def test_env_vars_passed_to_config(mocker, successful_exec_from_mocked_root):
+    mock_os, conf_dir, _, _, _, em = successful_exec_from_mocked_root
+
+    template_path = conf_dir / "my_template.yaml.j2"
+    schema_path = conf_dir / "my_schema.json"
+    expected_env = {"my_env": "my_val"}
+
+
 def test_includes_mapped_identity_in_user_config(
     mocker, successful_exec_from_mocked_root, ident
 ):
@@ -2276,6 +2298,76 @@ def test_includes_mapped_identity_in_user_config(
     a, _ = mock_render.call_args
     assert isinstance(a[3], MappedPosixIdentity)
     assert a[3].matched_identity == ident
+
+
+"""
+@pytest.mark.parametrize(
+    (
+        "home_env",
+        "ep_env",
+        "user_env",
+        "log_env",
+        "expected_ep_dir_str",
+        "expected_log_path_str",
+    ),
+    (
+        # ("/home/rob", None, "bob", "$HOME/a.b", "/home/rob/a.b"),
+        # ("/home/rob", None, "bob", "~/gc-$USER/a.b", "/home/rob/gc-bob/a.b"),
+        (
+            "/home/rob",
+            "$HOME/gc",
+            "bob",
+            None,
+            "/home/rob/gc",
+            "/home/rob/gc/endpoint.log",
+        ),
+        # ("/home/rob", "~/gc-${USER}", "bob", None, "/home/rob/gc-bob/endpoint.log"),
+        # ("/opt", None, "root", "~/a/b/gc.log   ", "/opt/a/b/gc.log"),
+        # ("/", None, "root", "~/a/b/gc.log   ", "/a/b/gc.log"),
+        # ("/home/jane", "/a/b/gc", "jane", "/tmp/gc.log", "/tmp/gc.log"),
+    ),
+)
+"""
+
+
+@pytest.mark.parametrize(
+    ("ep_log_config", "ep_dir_config"),
+    (
+        # [None, None],
+        [None, "/opt/other_ep"],
+        # ["/tmp/somewhere", None],
+        # ["/tmp/somewhere", "/opt/other_ep"],
+    ),
+)
+def test_ep_dir_log_path_envs_passed_to_render(
+    mocker,
+    successful_exec_from_mocked_root,
+    command_payload,
+    ep_log_config,
+    ep_dir_config,
+):
+    mock_os, conf_dir, *_, em = successful_exec_from_mocked_root
+
+    config = {"display_name": None, "paths": {}}
+    if ep_log_config:
+        config["paths"]["endpoint_log"] = ep_log_config
+    if ep_dir_config:
+        config["paths"]["endpoint_dir"] = ep_dir_config
+    if not config["paths"]:
+        del config["paths"]
+
+    config_str = yaml.dump(config)
+
+    mocker.patch(f"{_MOCK_BASE}render_config_user_template", return_value=config_str)
+    mock_ensure = mocker.patch(f"{_MOCK_BASE}ensure_log_path")
+
+    m = mock.Mock()
+    mock_os.fdopen.return_value.__enter__.return_value = m
+    with pytest.raises(SystemExit) as pyexc:
+        em._event_loop()
+
+    assert mock_ensure.call_args[0][0] == config["paths"]
+    assert pyexc.value.code == _GOOD_EC, "Q&D: verify we exec'ed, based on '+= 1'"
 
 
 @pytest.mark.parametrize("is_valid", (True, False))
@@ -2369,7 +2461,7 @@ def test_redirect_stdstreams_to_user_log(
 
     uep_name = command_payload["kwargs"]["name"]
     uep_dir = mock_ensure_compute_dir() / uep_name
-    ep_log = uep_dir / "endpoint.log"
+    ep_log = mock_ensure_paths()
 
     with pytest.raises(SystemExit) as pyexc:
         em._event_loop()
