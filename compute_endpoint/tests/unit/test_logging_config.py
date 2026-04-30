@@ -1,11 +1,17 @@
 import logging.config
 import os
-import pathlib
 import platform
 import typing as t
+from pathlib import Path
+from unittest import mock
 
 import pytest
-from globus_compute_endpoint.logging_config import _get_file_dict_config, setup_logging
+from globus_compute_endpoint.logging_config import (
+    LOG_PATH_ENV,
+    _get_file_dict_config,
+    ensure_log_path,
+    setup_logging,
+)
 from pytest_mock import MockFixture
 
 _MOCK_BASE = "globus_compute_endpoint.logging_config."
@@ -41,7 +47,7 @@ def test_verify_setup_logging_test_hookups_metatest(mocker):
 
 
 def test_file_config_rotates_log(fs):
-    logp = pathlib.Path("/some/path/some/file.log")
+    logp = Path("/some/path/some/file.log")
     conf = _get_file_dict_config(logp, False, False, True)
     file_handler = conf["handlers"]["logfile"]
 
@@ -50,7 +56,7 @@ def test_file_config_rotates_log(fs):
 
 
 def test_file_config_rotates_at_reasonable_size(fs):
-    logp = pathlib.Path("/some/path/some/file.log")
+    logp = Path("/some/path/some/file.log")
     conf = _get_file_dict_config(logp, False, False, True)
     file_handler = conf["handlers"]["logfile"]
 
@@ -62,10 +68,10 @@ def test_file_config_does_not_rotate_unrotatable_sc30480(anon_pipe):
     read_h, write_h = anon_pipe
     if platform.system() == "Darwin":
         # macOS doesn't have /proc, /dev is equivalent for this test
-        logp = pathlib.Path(f"/dev/fd/{write_h}")
+        logp = Path(f"/dev/fd/{write_h}")
     else:
         # Should be "linux", "Windows" should have other problems
-        logp = pathlib.Path(f"/proc/self/fd/{write_h}")
+        logp = Path(f"/proc/self/fd/{write_h}")
     conf = _get_file_dict_config(logp, False, False, True)
 
     file_handler = conf["handlers"]["logfile"]
@@ -85,3 +91,68 @@ def test_include_correct_loggers(logfile: t.Optional[str], mocker: MockFixture, 
     }
     loggers = mock_dictConfig.call_args[0][0]["loggers"]
     assert set(loggers) == expected, "Time to update this test?"
+
+
+@pytest.mark.parametrize(
+    ("log_path_str", "envs", "is_dir", "exists", "expected_path", "exc_msg"),
+    (
+        ["/a/a_dir", {}, True, True, None, f"{LOG_PATH_ENV} can not be a directory"],
+        ["/b/$XYZ/file.log", {"XYZ": "abc"}, False, False, "/b/abc/file.log", None],
+        ["/c/file.log", {}, False, True, "/c/file.log", "Permission denied"],
+        ["/d/file.log", {}, False, False, "/d/file.log", None],
+        [None, {}, False, False, None, None],
+    ),
+)
+def test_ensure_log_path(
+    fs, mock_ep_dir, log_path_str, envs, is_dir, exists, expected_path, exc_msg
+):
+    _, ep_dir = mock_ep_dir
+    if log_path_str is not None:
+        envs[LOG_PATH_ENV] = log_path_str
+        p = Path(log_path_str)
+        if is_dir:
+            p.mkdir(parents=True)
+        elif exists:
+            # create file but non-writable if file
+            p.parent.mkdir(parents=True)
+            p.touch(mode=0o400)
+
+    with mock.patch.dict(os.environ, envs):
+        if exc_msg is not None:
+            with pytest.raises(Exception) as actual_exc_msg:
+                ensure_log_path(ep_dir)
+            assert exc_msg in str(actual_exc_msg)
+        else:
+            result_path: Path = ensure_log_path(ep_dir)
+            if log_path_str is None:
+                # Default - use ep_dir
+                assert result_path == ep_dir / "endpoint.log"
+            else:
+                # Custom log_path
+                assert str(result_path.resolve()) == expected_path
+                result_path.write_text("I can write to log file")
+
+
+@pytest.mark.parametrize(
+    ("ep_path", "log_path_str"),
+    (
+        [Path("/gc/my_ep"), "/gc/my_ep/endpoint.log"],
+        [Path("/gc/my_ep"), "/other/endpoint.log"],
+        [None, "/other/endpoint.log"],
+        [Path("/gc/my_ep"), None],
+    ),
+)
+def test_ensure_log_path_creates_dirs(fs, ep_path: Path, log_path_str: str):
+    envs = {}
+    if log_path_str is not None:
+        envs[LOG_PATH_ENV] = log_path_str
+
+    with mock.patch.dict(os.environ, envs):
+        result_path: Path = ensure_log_path(ep_path)
+        if ep_path is not None:
+            assert ep_path.exists()
+            assert ep_path.is_dir()
+        if log_path_str is not None:
+            lp = Path(log_path_str)
+            assert lp.exists()
+            assert result_path == lp

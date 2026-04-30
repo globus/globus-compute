@@ -7,6 +7,7 @@ from __future__ import annotations
 import logging
 import logging.config
 import logging.handlers
+import os
 import pathlib
 import re
 import sys
@@ -21,6 +22,7 @@ DEFAULT_FORMAT = (
     "%(threadName)s-%(thread)d %(name)s:%(lineno)d %(funcName)s "
     "%(message)s"
 )
+LOG_PATH_ENV = "GLOBUS_COMPUTE_LOG_PATH"
 
 _und = "\033[4m"
 _ital = "\033[3m"
@@ -269,3 +271,34 @@ def setup_logging(
         config = _get_stream_dict_config(debug, no_color)
 
     logging.config.dictConfig(config)
+
+
+def ensure_log_path(ep_dir: pathlib.Path | None) -> pathlib.Path:
+    """
+    Gets the path where logs should be written to.  This defaults to
+    ~/.globus_compute/<EP_DIR>/endpoint.log if not specifically configured.
+
+    The path can be overridden via environment variable GLOBUS_COMPUTE_LOG_PATH
+
+    The file is created if it doesn't exist, which also validates permissions
+    """
+    log_dir = os.environ.get(LOG_PATH_ENV)
+    if log_dir and log_dir.strip():
+        # This expands both ~/... and $X e.g. ~/$MY_SUB_DIR/abc.log
+        log_path = pathlib.Path(os.path.expandvars(log_dir)).expanduser()
+        if log_path.is_dir():
+            raise ValueError(f"{LOG_PATH_ENV} can not be a directory: {log_path}")
+    else:
+        assert ep_dir, "ep_dir must be provided if LOG_PATH_ENV is not set"
+        log_path = ep_dir / "endpoint.log"
+
+    # Parent directory (default -> UEP directory) might have already been created
+    # but confirm anyway.  Note that ep_dir may not share parents with LOG_PATH_ENV
+    log_path.parent.mkdir(parents=True, exist_ok=True)
+    if ep_dir:
+        ep_dir.mkdir(mode=0o700, parents=True, exist_ok=True)
+
+    # Ensure we have permission to write to it.  Generate PermissionError otherwise
+    log_path.open("a")
+
+    return log_path
