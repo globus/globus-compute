@@ -1,0 +1,21 @@
+New Functionality
+^^^^^^^^^^^^^^^^^
+
+- For User Endpoints, Globus Compute's base directory (default ~/.globus_compute)
+  can be configured via the ``path: compute_dir`` parameter in
+  ``user_config_config_template.yaml.j2``.
+- User Endpoint log path can also be customized via ``path: endpoint_log``,
+  normally located at ``$HOME/.globus_compute/uep.<UUID>.<UUID>/endpoint.log``
+- The older configuration options ``log_dir``, ``stdout``, and ``stderr``
+  have been removed.  These have been unused since v0.0.1.
+
+Configuration Example:
+
+```
+path:
+  gc_dir: /opt/custom_compute_base_dir
+  endpoint_log: /var/log/globus_compute_uep.log
+```
+
+As this is a jinja template, these values can be rendered with runtime environment variables,
+for example {{ uep.HOME ~ '/another_dir' }} or {{ ['/opt', local.uname, 'ep.log'] | join('/') }}
