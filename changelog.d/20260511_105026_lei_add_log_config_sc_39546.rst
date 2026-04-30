@@ -1,0 +1,11 @@
+New Functionality
+^^^^^^^^^^^^^^^^^
+
+- User endpoint logs can be set to a custom path in user_config_template.yaml.j2 under
+  the ``log`` section:
+```
+log:
+  path: /my/custom/log.file
+```
+  The path can be customized to the running user using environment variables e.g.
+  `path: $HOME/.new_compute/all.log`

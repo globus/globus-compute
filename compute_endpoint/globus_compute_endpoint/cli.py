@@ -23,6 +23,10 @@ import click
 import daemon
 import lockfile
 from click import ClickException
+
+# from click._compat import get_text_stderr
+# from click.exceptions import UsageError
+# from click.utils import echo
 from click_option_group import optgroup
 from daemon.pidfile import PIDLockFile
 from globus_compute_endpoint.auth import get_globus_app_with_scopes
@@ -50,7 +54,11 @@ from globus_compute_endpoint.endpoint.utils import (
 )
 from globus_compute_endpoint.exception_handling import handle_auth_errors
 from globus_compute_endpoint.exceptions import MessageSystemExit
-from globus_compute_endpoint.logging_config import setup_logging
+from globus_compute_endpoint.logging_config import (
+    LOG_PATH_ENV,
+    ensure_log_path,
+    setup_logging,
+)
 from globus_compute_sdk import Client
 from globus_compute_sdk.sdk.auth.auth_client import ComputeAuthClient
 from globus_compute_sdk.sdk.auth.whoami import print_whoami_info
@@ -594,11 +602,18 @@ def start_endpoint(*, ep_dir: pathlib.Path, die_with_parent: bool, **_kwargs):
 @name_or_uuid_arg
 @common_options
 @handle_auth_errors
-def start_user_endpoint(*, ep_dir: pathlib.Path, **_kwargs):
+@click.option("--log-path", type=str, required=False, default=None)
+def start_user_endpoint(*, ep_dir: pathlib.Path, log_path: str | None, **_kwargs):
+    with open("/tmp/my.log", "a") as f:
+        f.write(f"ep_dir is {ep_dir} and log_path is {log_path}\n")
     state = CommandState.ensure()
+    custom_log_path = None
+    if log_path:
+        custom_log_path = pathlib.Path(log_path)
     _start_user_endpoint(
         ep_dir=ep_dir,
         endpoint_uuid=state.endpoint_uuid,
+        custom_log_path=custom_log_path,
     )
 
 
@@ -919,12 +934,14 @@ def _start_user_endpoint(
     *,
     ep_dir: pathlib.Path,
     endpoint_uuid: str | None,
+    custom_log_path: pathlib.Path | None = None,
 ):
     os.umask(0o077)
     state = CommandState.ensure()
+
     if ep_dir.is_dir():
         setup_logging(
-            logfile=ep_dir / "endpoint.log",
+            logfile=ensure_log_path(ep_dir),
             debug=state.debug,
             console_enabled=state.log_to_console,
             no_color=state.no_color,
@@ -968,7 +985,7 @@ def _start_user_endpoint(
 
             if not state.debug and ep_config.debug:
                 setup_logging(
-                    logfile=ep_dir / "endpoint.log",
+                    logfile=ensure_log_path(ep_dir),
                     debug=ep_config.debug,
                     console_enabled=state.log_to_console,
                     no_color=state.no_color,
@@ -1491,7 +1508,11 @@ def migrate_to_template_capable(ep_dir: pathlib.Path, yes: bool):
 
 def cli_run():
     """Entry point for setuptools to point to"""
-    app()
+    try:
+        # re-wrap app() call to print error message instead of just the help message
+        app()
+    except Exception as e:
+        raise ClickException(f"ERROR: {e}")
 
 
 if __name__ == "__main__":

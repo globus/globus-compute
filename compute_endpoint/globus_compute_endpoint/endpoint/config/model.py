@@ -69,6 +69,10 @@ class ProviderModel(BaseConfigModel):
     _validate_launcher = _validate_params("launcher")
 
 
+class LogModel(BaseConfigModel):
+    path: str = ""
+
+
 class EngineModel(BaseConfigModel):
     type: str = "GlobusComputeEngine"
     provider: t.Optional[ProviderModel]
@@ -126,6 +130,7 @@ class BaseEndpointConfigModel(BaseModel):
 
 class UserEndpointConfigModel(BaseEndpointConfigModel):
     engine: EngineModel
+    log: LogModel
     heartbeat_threshold: t.Optional[int]
     idle_heartbeats_soft: t.Optional[int]
     idle_heartbeats_hard: t.Optional[int]

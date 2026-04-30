@@ -3,9 +3,15 @@ import os
 import pathlib
 import platform
 import typing as t
+from unittest import mock
 
 import pytest
-from globus_compute_endpoint.logging_config import _get_file_dict_config, setup_logging
+from globus_compute_endpoint.logging_config import (
+    LOG_PATH_ENV,
+    _get_file_dict_config,
+    ensure_log_path,
+    setup_logging,
+)
 from pytest_mock import MockFixture
 
 _MOCK_BASE = "globus_compute_endpoint.logging_config."
@@ -85,3 +91,26 @@ def test_include_correct_loggers(logfile: t.Optional[str], mocker: MockFixture, 
     }
     loggers = mock_dictConfig.call_args[0][0]["loggers"]
     assert set(loggers) == expected, "Time to update this test?"
+
+
+@pytest.mark.parametrize(
+    ("env_path", "is_dir", "expected_path", "err_msg"),
+    (["/some_dir/a_dir", True, None, f"{LOG_PATH_ENV} can not be a directory"],),
+)
+def test_ensure_log_path(fs, mock_ep_dir, env_path, is_dir, expected_path, err_msg):
+    _, ep_dir = mock_ep_dir
+    env_vars = {}
+    if env_path is not None:
+        env_vars[LOG_PATH_ENV] = env_path
+
+    if is_dir:
+        pathlib.Path(env_path).mkdir(parents=True, exist_ok=True)
+
+    with mock.patch.dict(os.environ, env_vars):
+        if err_msg is not None:
+            with pytest.raises(ValueError) as actual_err_msg:
+                ensure_log_path(ep_dir)
+            assert err_msg in str(actual_err_msg)
+        else:
+            result_path = ensure_log_path(ep_dir)
+            assert result_path.stem == expected_path

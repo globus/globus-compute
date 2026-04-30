@@ -8,3 +8,4 @@ VERSION = __version__
 
 # app name to send as part of requests
 app_name = f"Globus Compute Endpoint v{__version__}"
+
