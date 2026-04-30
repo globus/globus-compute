@@ -4,7 +4,7 @@ from globus_compute_sdk.errors import VersionMismatch
 
 # single source of truth for package version,
 # see https://packaging.python.org/en/latest/single_source_version/
-__version__ = "4.9.0"
+__version__ = "4.10.1"
 
 
 def compare_versions(

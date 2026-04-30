@@ -1,5 +1,9 @@
 Bug Fixes
 ^^^^^^^^^
 
+<<<<<<< HEAD
 - Bumps parsl from `2026.2.23`_ to `2026.4.20`_ which includes a fix to
   PBSProProvider job status parsing
+=======
+- Bumps parsl from `2026.2.23`_ to `2026.4.20`_ which includes a fix to PBSProProvider job status parsing
+>>>>>>> 7efa146d (Bump versions and collect changelog for 4.10.1 release)

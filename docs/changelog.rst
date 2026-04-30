@@ -3,6 +3,42 @@ Changelog
 
 .. scriv-insert-here
 
+.. _changelog-4.10.1:
+
+globus-compute-sdk & globus-compute-endpoint v4.10.1
+------------------------------------------------------
+
+Bug Fixes
+^^^^^^^^^
+
+- Bumps parsl from `2026.2.23`_ to `2026.4.20`_ which includes a fix to PBSProProvider job status parsing
+
+Removed
+^^^^^^^
+
+- Removed the ability to register and start endpoints without templating support.
+
+- Removed the following deprecated endpoint config options related to non-templatable
+  endpoints:
+
+  - ``multi_user``
+  - ``force_mu_allow_same_user``
+  - ``detach_endpoint``
+
+Changed
+^^^^^^^
+
+- Newly created Multi-User Compute endpoints now default to public instead of
+  private visibility.  This flag can be toggled via the ``public`` param in
+  ``config.yaml``.  *Note* Visibility or the lack thereof is *not* a security
+  feature.  This is intended to help with default discoverability only, and
+  does not affect access/usage of the endpoint, which remain unchanged,
+  configured by identity mapping.
+
+- For some UEP startup errors, send more information to the SDK than an opaque
+  error code.  This should make some of the "422 SEMANTICALLY_INVALID"
+  responses from the API more usable.
+
 .. _changelog-4.9.0:
 
 globus-compute-sdk & globus-compute-endpoint v4.9.0
