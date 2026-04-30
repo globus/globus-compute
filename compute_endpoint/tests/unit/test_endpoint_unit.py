@@ -19,15 +19,13 @@ from unittest import mock
 
 import pytest
 import yaml
-from globus_compute_endpoint.endpoint import endpoint
+
+# from globus_compute_endpoint.endpoint import endpoint
 from globus_compute_endpoint.endpoint.config import (
     ManagerEndpointConfig,
     UserEndpointConfig,
 )
 from globus_compute_endpoint.endpoint.endpoint import Endpoint
-from globus_compute_endpoint.engines import (
-    ThreadPoolEngine,
-)
 from globus_compute_sdk import Client
 from globus_sdk import NetworkError
 
@@ -70,29 +68,6 @@ def mock_launch():
 
 
 @pytest.fixture
-def mock_get_config():
-    with mock.patch(f"{_mock_base}get_config") as m:
-        yield m
-
-
-@pytest.fixture
-def conf():
-    _conf = UserEndpointConfig(engine=ThreadPoolEngine())
-    _conf.source_content = "# test source content"
-    _conf.source_content += "\nengine:\n  type: ThreadPoolEngine"
-    yield _conf
-
-
-@pytest.fixture
-def mock_ep_data(fs, conf):
-    ep = endpoint.Endpoint()
-    ep_dir = pathlib.Path("/some/path/mock_endpoint")
-    ep_dir.mkdir(parents=True, exist_ok=True)
-    log_to_console = False
-    yield ep, ep_dir, log_to_console, conf
-
-
-@pytest.fixture
 def table_buf():
     buf = io.StringIO()
     partial_print = functools.partial(
@@ -107,14 +82,6 @@ def mock_ep_get():
     with mock.patch.object(Endpoint, "get_endpoints") as m:
         m.return_value = {}
         yield m
-
-
-@pytest.fixture
-def mock_ep_dir(fs, mock_ep_data, mock_get_config):
-    ep, ep_dir, *_, conf = mock_ep_data
-    mock_get_config.return_value = conf
-    ep._config_file_path(ep_dir).write_text(conf.source_content)
-    yield ep, ep_dir
 
 
 @pytest.fixture

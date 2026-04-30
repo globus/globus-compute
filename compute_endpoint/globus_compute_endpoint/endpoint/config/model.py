@@ -43,6 +43,11 @@ def _validate_params(field: str):
     return validator(field, allow_reuse=True)(inner)
 
 
+def _verify_not_empty(field: str, value: str):
+    if not value or not value.strip():
+        raise ValueError(f"{field} must not be empty")
+
+
 class BaseConfigModel(BaseModel):
     class Config:
         extra = "allow"
@@ -67,6 +72,12 @@ class ProviderModel(BaseConfigModel):
 
     _validate_type = _validate_import("type", parsl_providers)
     _validate_launcher = _validate_params("launcher")
+
+
+class LogModel(BaseConfigModel):
+    path: str
+
+    _validate_path = _verify_not_empty("log: path:", path)
 
 
 class EngineModel(BaseConfigModel):
@@ -126,6 +137,7 @@ class BaseEndpointConfigModel(BaseModel):
 
 class UserEndpointConfigModel(BaseEndpointConfigModel):
     engine: EngineModel
+    log: LogModel
     heartbeat_threshold: t.Optional[int]
     idle_heartbeats_soft: t.Optional[int]
     idle_heartbeats_hard: t.Optional[int]

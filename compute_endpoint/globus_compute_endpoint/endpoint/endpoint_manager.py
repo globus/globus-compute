@@ -57,6 +57,7 @@ from globus_compute_endpoint.endpoint.utils import (
     update_url_port,
 )
 from globus_compute_endpoint.exceptions import MessageSystemExit
+from globus_compute_endpoint.logging_config import LOG_PATH_ENV
 from globus_compute_sdk import Client
 from globus_compute_sdk.sdk.auth.auth_client import ComputeAuthClient
 from globus_compute_sdk.sdk.compute_dir import ensure_compute_dir
@@ -1046,7 +1047,11 @@ class EndpointManager:
             preexec_name = "UserEndpointProcess_Bootstrap(PreExec)"
             current_process().name = preexec_name
 
-            from globus_compute_endpoint.logging_config import LOG_TS_FMT, setup_logging
+            from globus_compute_endpoint.logging_config import (
+                LOG_TS_FMT,
+                ensure_log_path,
+                setup_logging,
+            )
 
             # We've closed all files (beyond std*), so log.* calls are not able to
             # access the parent's logs directly.  Now rely on stderr (not yet separated)
@@ -1192,7 +1197,7 @@ class EndpointManager:
             gc_dir: pathlib.Path = ensure_compute_dir()
             ep_dir = gc_dir / ep_name
             ep_dir.mkdir(mode=0o700, parents=True, exist_ok=True)
-            ep_log = ep_dir / "endpoint.log"
+            ep_log = ensure_log_path(ep_dir)
 
             exit_code += 1
             _conf = yaml.safe_load(user_config)
@@ -1227,7 +1232,15 @@ class EndpointManager:
             if audit_w:
                 stdin_data_dict["audit_fd"] = audit_w
 
+            log_info = _conf.get("log")
+            if log_info:
+                log_path = log_info.get("path")
+                if log_path:
+                    # Pass the logging path through $LOG_PATH_ENV
+                    env.setdefault(LOG_PATH_ENV, log_path)
+
             stdin_data = json.dumps(stdin_data_dict, separators=(",", ":"))
+
             exit_code += 1
 
             # Reminder: this is *os*.open, not *open*.  Descriptors will not be closed

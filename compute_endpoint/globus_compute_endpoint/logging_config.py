@@ -7,6 +7,7 @@ from __future__ import annotations
 import logging
 import logging.config
 import logging.handlers
+import os
 import pathlib
 import re
 import sys
@@ -266,3 +267,34 @@ def setup_logging(
         config = _get_stream_dict_config(debug, no_color)
 
     logging.config.dictConfig(config)
+
+
+LOG_PATH_ENV = "GLOBUS_COMPUTE_LOG_PATH"
+
+
+def ensure_log_path(ep_dir: pathlib.Path) -> pathlib.Path:
+    """
+    Gets the path where logs should be written to.  This defaults to
+    ~/.globus_compute/<EP_DIR>/endpoint.log if not specifically configured.
+
+    The path can be overridden via environment variable GLOBUS_COMPUTE_LOG_PATH
+
+    The file is created if it doesn't exist, which also validates permissions
+    """
+    if LOG_PATH_ENV in os.environ:
+        log_dir = os.environ[LOG_PATH_ENV].strip()
+        if not log_dir:
+            raise ValueError(f"{LOG_PATH_ENV} can not be an empty value")
+        # expandvars leaves the variable name in place e.g. "$MY_VAR/blah"
+        # if MY_VAR doesn't exist in os.environ.
+        log_path = pathlib.Path(os.path.expanduser(log_dir))
+        if log_path.exists():
+            raise ValueError(f"{LOG_PATH_ENV} can not be a directory: {log_path}")
+        log_path.parent.mkdir(parents=True, exist_ok=True)
+    else:
+        log_path = ep_dir / "endpoint.log"
+
+    # Ensure we have permission to write to it
+    log_path.touch(mode=0o600, exist_ok=True)
+
+    return log_path
