@@ -7,11 +7,14 @@ from __future__ import annotations
 import logging
 import logging.config
 import logging.handlers
+import os
 import pathlib
 import re
 import sys
 from collections import defaultdict
 from datetime import datetime
+
+from globus_compute_sdk.sdk.compute_dir import COMPUTE_EP_DIR_ENV
 
 log = logging.getLogger(__name__)
 
@@ -21,6 +24,7 @@ DEFAULT_FORMAT = (
     "%(threadName)s-%(thread)d %(name)s:%(lineno)d %(funcName)s "
     "%(message)s"
 )
+LOG_PATH_ENV = "GLOBUS_COMPUTE_LOG_PATH"
 
 _und = "\033[4m"
 _ital = "\033[3m"
@@ -269,3 +273,38 @@ def setup_logging(
         config = _get_stream_dict_config(debug, no_color)
 
     logging.config.dictConfig(config)
+
+
+def ensure_log_path() -> pathlib.Path:
+    """
+    Gets the path where logs should be written to and ensures the directory
+      structure is valid.  Note that this method does not verify write permissions
+      for the log file path itself, which is assumed to be done following this call.
+
+    The path is constructed based on the values in two optional environment
+     variables, GLOBUS_COMPUTE_ENDPOINT_DIR and GLOBUS_COMPUTE_LOG_PATH.
+
+    At least one of the envs must be set. GLOBUS_COMPUTE_LOG_PATH takes
+      precedence if both are available.
+    """
+    log_path_str = os.environ.get(LOG_PATH_ENV, "").strip()
+    ep_dir_str = os.environ.get(COMPUTE_EP_DIR_ENV, "").strip()
+
+    if log_path_str:
+        log_path = pathlib.Path(log_path_str)
+        if log_path.is_dir():
+            raise ValueError(f"{LOG_PATH_ENV} can not be a directory: {log_path}")
+    elif ep_dir_str:
+        log_path = pathlib.Path(ep_dir_str) / "endpoint.log"
+    else:
+        raise ValueError(
+            f"One of {COMPUTE_EP_DIR_ENV} or {LOG_PATH_ENV} must be available in env"
+        )
+
+    logger.info(f"Endpoint log path has been set to {log_path}")
+
+    # Parent directory (default -> UEP directory) might have already been created
+    # but confirm anyway
+    log_path.parent.mkdir(parents=True, exist_ok=True)
+
+    return log_path

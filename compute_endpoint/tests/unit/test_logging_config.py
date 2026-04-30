@@ -3,9 +3,16 @@ import os
 import pathlib
 import platform
 import typing as t
+from unittest import mock
 
 import pytest
-from globus_compute_endpoint.logging_config import _get_file_dict_config, setup_logging
+from globus_compute_endpoint.logging_config import (
+    LOG_PATH_ENV,
+    _get_file_dict_config,
+    ensure_log_path,
+    setup_logging,
+)
+from globus_compute_sdk.sdk.compute_dir import COMPUTE_EP_DIR_ENV
 from pytest_mock import MockFixture
 
 _MOCK_BASE = "globus_compute_endpoint.logging_config."
@@ -85,3 +92,49 @@ def test_include_correct_loggers(logfile: t.Optional[str], mocker: MockFixture, 
     }
     loggers = mock_dictConfig.call_args[0][0]["loggers"]
     assert set(loggers) == expected, "Time to update this test?"
+
+
+def test_ensure_log_path_no_env_error():
+    with mock.patch.dict(os.environ, {"random_env": "value"}):
+        with pytest.raises(ValueError) as actual_exc_msg:
+            ensure_log_path()
+        assert f"or {LOG_PATH_ENV} must be available" in str(actual_exc_msg)
+
+
+@pytest.mark.parametrize(
+    ("is_dir", "exc_msg"), ([True, "can not be a directory"], [False, None])
+)
+def test_ensure_log_path_dir_or_file(fs, is_dir, exc_msg):
+    a_path = pathlib.Path("/a/b/c/d")
+
+    with mock.patch.dict(os.environ, {LOG_PATH_ENV: str(a_path.resolve())}):
+        if exc_msg:
+            a_path.mkdir(parents=True)
+            with pytest.raises(ValueError) as actual_exc_msg:
+                ensure_log_path()
+            assert exc_msg in str(actual_exc_msg)
+        else:
+            # Should create the dir structure
+            result_path = ensure_log_path()
+            assert result_path == a_path
+            assert result_path.parent.exists()
+
+
+@pytest.mark.parametrize(
+    ("ep_env", "log_env", "expected_path_str"),
+    (
+        (None, "/a/b/c.txt", "/a/b/c.txt"),
+        ("/a/b/c", None, "/a/b/c/endpoint.log"),
+        ("/a/b/c", "/d/e/f.txt", "/d/e/f.txt"),
+    ),
+)
+def test_ensure_log_path_env_order(fs, ep_env, log_env, expected_path_str):
+    expected_path = pathlib.Path(expected_path_str)
+
+    with mock.patch.dict(
+        os.environ, {COMPUTE_EP_DIR_ENV: ep_env or "", LOG_PATH_ENV: log_env or ""}
+    ):
+        result_path = ensure_log_path()
+        assert result_path == expected_path
+        assert expected_path.parent.exists()
+        assert expected_path.parent.is_dir()
