@@ -873,7 +873,7 @@ Administrator Quickstart
       >
 
       ========== Core Endpoint begins: 1ed568ab-79ec-4f7c-be78-a704439b2266
-              >>> Multi-User Endpoint ID: 1ed568ab-79ec-4f7c-be78-a704439b2266 <<<
+              >>> Endpoint ID: 1ed568ab-79ec-4f7c-be78-a704439b2266 <<<
 
    Additionally, for even noisier output, there is ``--debug``.
 

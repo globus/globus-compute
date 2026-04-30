@@ -210,7 +210,7 @@ def _validate_user_opts(user_opts: dict, schema: dict | None) -> None:
     if not schema:
         return
 
-    import jsonschema  # Only load package when called by EP manager
+    import jsonschema  # Only load package when called by Core EP
 
     try:
         jsonschema.validate(instance=user_opts, schema=schema)
@@ -304,7 +304,7 @@ def render_config_user_template(
     # N.B. Performing rendering, a mildly complicated action, *after*
     # having dropped privileges.  Take security seriously ...
 
-    import jinja2  # Only load package when called by EP manager
+    import jinja2  # Only load package when called by Core Endpoint
     from jinja2.sandbox import SandboxedEnvironment
 
     _user_opts = user_opts or {}
@@ -315,6 +315,8 @@ def render_config_user_template(
         "parent_config": parent_config,
         "mapped_identity": _parse_mapped_identity(mapped_identity),
         "user_runtime": _sanitize_user_json(user_runtime or {}),
+        # Inject all env vars into UEP, already sanitized if CEP was privileged
+        "env": os.environ,
     }
     reserved_template_vars = {
         "_GC": R,

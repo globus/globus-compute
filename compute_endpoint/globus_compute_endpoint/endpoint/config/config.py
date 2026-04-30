@@ -12,7 +12,7 @@ from globus_compute_sdk.sdk.utils.uuid_like import (
     as_optional_uuid,
     as_uuid,
 )
-from pydantic import ConfigDict, validate_call
+from pydantic import BaseModel, ConfigDict, validate_call
 
 from .pam import PamConfiguration
 
@@ -191,12 +191,11 @@ class UserEndpointConfig(BaseConfig):
            max_blocks: 1
 
     Please see the |BaseConfig| class for a list of options that both
-    |ManagerEndpointConfig| and |UserEndpointConfig| classes share.
+    |CoreEndpointConfig| and |UserEndpointConfig| classes share.
 
     :param engine: The GlobusComputeEngine for this endpoint to execute functions.
         The currently known engines are ``GlobusComputeEngine``, ``ProcessPoolEngine``,
         and ``ThreadPoolEngine``.  See :ref:`uep-conf` for more information.
-
 
     :param heartbeat_threshold: Seconds since the last heartbeat message from the
         Globus Compute web service after which the connection is assumed to be
@@ -243,10 +242,6 @@ class UserEndpointConfig(BaseConfig):
         idle_heartbeats_hard: int = 5760,  # Two days, divided by `heartbeat_period`
         endpoint_setup: str | None = None,
         endpoint_teardown: str | None = None,
-        # Logging info
-        log_dir: str | None = None,
-        stdout: str = "./endpoint.log",
-        stderr: str = "./endpoint.log",
         **kwargs,
     ) -> None:
         super().__init__(**kwargs)
@@ -260,7 +255,6 @@ class UserEndpointConfig(BaseConfig):
 
         self.endpoint_setup = endpoint_setup
         self.endpoint_teardown = endpoint_teardown
-
         # Logging info
         self.log_dir = log_dir
         self.stdout = stdout
@@ -312,13 +306,13 @@ class CoreEndpointConfig(BaseConfig):
     whether there is an ``engine`` block in its ``config.yaml`` file:
 
     .. code-block:: yaml
-       :caption: ``config.yaml`` for Managers
+       :caption: ``config.yaml`` for Core endpoints
 
        # this file left empty; with no engine block, Compute interprets this
        # as a core endpoint
 
     .. code-block:: yaml
-       :caption: ``config.yaml`` for task-processing endpoints (i.e., non-Managers)
+       :caption: ``config.yaml`` for task-processing endpoints (i.e., non-Core)
 
        engine:
          ...
@@ -338,7 +332,7 @@ class CoreEndpointConfig(BaseConfig):
        identity_mapping_config_path: /path/to/this/idmap_conf.json
 
     Please see the |BaseConfig| class for a list of options that both
-    |ManagerEndpointConfig| and |UserEndpointConfig| classes share.
+    |CoreEndpointConfig| and |UserEndpointConfig| classes share.
 
     :param public: Whether all users can discover this endpoint via the `Globus
         Compute web user interface <https://app.globus.org/compute>`_ and API.
@@ -384,7 +378,7 @@ class CoreEndpointConfig(BaseConfig):
         start request for the user-endpoint for this grace period.
 
     .. |BaseConfig| replace:: :class:`BaseConfig <globus_compute_endpoint.endpoint.config.config.BaseConfig>`
-    .. |ManagerEndpointConfig| replace:: :class:`ManagerEndpointConfig <globus_compute_endpoint.endpoint.config.config.ManagerEndpointConfig>`
+    .. |CoreEndpointConfig| replace:: :class:`CoreEndpointConfig <globus_compute_endpoint.endpoint.config.config.CoreEndpointConfig>`
     .. |UserEndpointConfig| replace:: :class:`UserEndpointConfig <globus_compute_endpoint.endpoint.config.config.UserEndpointConfig>`
     .. |PamConfiguration| replace:: :class:`PamConfiguration <globus_compute_endpoint.endpoint.config.pam.PamConfiguration>`
 

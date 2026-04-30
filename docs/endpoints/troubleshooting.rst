@@ -69,7 +69,7 @@ mapping succeeded.
     ]
 
     # an info-level line containing "Globus effective identity"
-    2026-04-10 21:54:39,313397 INFO MainProcess-112 MainThread-281472913129504 globus_compute_endpoint.endpoint.endpoint_manager:777 _event_loop Command process successfully forked for 'alice' (Globus effective identity: 40322b9a-ccff-4e94-a6f6-4aa684bb3121).
+    2026-08-10 21:54:39,313397 INFO MainProcess-112 MainThread-281472913129504 globus_compute_endpoint.endpoint.core_endpoint:777 _event_loop Command process successfully forked for 'alice' (Globus effective identity: 40322b9a-ccff-4e94-a6f6-4aa684bb3121).
 
 
 

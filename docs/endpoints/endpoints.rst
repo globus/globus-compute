@@ -1289,7 +1289,7 @@ Audit Logging
 -------------
 
 Audit logging is available only to High-Assurance endpoints, and is enabled by
-the ``audit_log_path`` |ManagerEndpointConfig| item:
+the ``audit_log_path`` |CoreEndpointConfig| item:
 
 .. code-block:: yaml
    :caption: Example ``config.yaml`` showing the ``audit_log_path``
@@ -1584,7 +1584,7 @@ reach out to our Team directly by submitting a `support ticket`_.
 .. _MPIExecutor: https://parsl.readthedocs.io/en/stable/stubs/parsl.executors.MPIExecutor.html
 .. |SimpleLauncher| replace:: ``SimpleLauncher``
 .. _SimpleLauncher: https://parsl.readthedocs.io/en/stable/stubs/parsl.launchers.SimpleLauncher.html
-.. |ManagerEndpointConfig| replace:: :class:`ManagerEndpointConfig <globus_compute_endpoint.endpoint.config.config.ManagerEndpointConfig>`
+.. |CoreEndpointConfig| replace:: :class:`CoreEndpointConfig <globus_compute_endpoint.endpoint.config.config.CoreEndpointConfig>`
 .. _Web UI: https://app.globus.org/compute
 .. _Jinja template: https://jinja.palletsprojects.com/en/stable/
 .. _Globus Auth: https://www.globus.org/platform/services/auth

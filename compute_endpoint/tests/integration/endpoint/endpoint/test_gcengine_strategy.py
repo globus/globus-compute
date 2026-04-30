@@ -72,6 +72,7 @@ def test_engine_submit_init_0(gc_engine_scaling):
     assert isinstance(future, concurrent.futures.Future)
     assert future.result() == param * 2
 
+    # TODO rename these manager instances?
     assert num_outstanding() == 2, "Expected 1 manager + interchange"
 
     # With 0 tasks and excess workers we should expect scale_down
