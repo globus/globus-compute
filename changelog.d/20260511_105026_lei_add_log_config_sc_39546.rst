@@ -1,0 +1,29 @@
+New Functionality
+^^^^^^^^^^^^^^^^^
+
+- Environment variables can now be referenced in the User Config jinja2
+  template via ``_GC.env.XXX``.  For identity mapping endpoints,
+  ``_GC.env.HOME`` ($HOME) and ``_GC.env.USER`` (uname) are available. for
+  single user endpoints all environment variables from the endpoint process are
+  available to the template
+- For User Endpoints, Globus Compute's base directory (default ~/.globus_compute)
+  can be configured via the optional ``paths: gc_dir`` parameter in
+  ``user_config_config_template.yaml.j2``
+- The User Endpoint log path can also be customized via ``paths: endpoint_log``,
+  normally located at ``$HOME/.globus_compute/uep.<UUID>.<UUID>/endpoint.log``
+
+Configuration Example:
+
+```
+paths:
+  gc_dir: {{ _GC.env.HOME }}/compute_endpoints
+  endpoint_log: /tmp/{{ _GC.env.USER }}/user_endpoints.log
+```
+
+For more information, please see :ref:`endpoint-log-paths`
+
+Removed
+^^^^^^^
+
+- The older log config options ``log_dir``, ``stdout``, and ``stderr``
+  have been removed.  These have been unused since v0.0.1.
