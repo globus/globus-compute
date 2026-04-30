@@ -133,6 +133,23 @@ rough equivalent to the ``ProcessPoolEngine`` example would be:
        type: LocalProvider
        max_blocks: 4
 
+Log Path
+--------
+
+By default, User endpoint logs are appended to ``endpoint.log`` in
+``~/.globus_compute/uep.UUID/``.
+
+The log file path can be customized in user_config_template.yaml.j2 under the ``log`` section:
+
+.. code-block:: yaml
+   :caption: ``~/.globus_compute/my_first_cluster_setup/user_config_template.yaml.j2``
+
+   log:
+     path: /custom/all-user-endpoints/log.file
+
+  The path can also be set using environment variables based on the user e.g.
+  ``path: $HOME/.new_compute/all.log``
+
 Retries
 ^^^^^^^
 
