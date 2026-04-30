@@ -211,29 +211,31 @@ will probably not behave as expected.  Example:
 
 These will be injected into the user endpoint process as environment variables.
 
-Two additional environment variables are automatically injected into the UEP
+Three additional environment variables are automatically injected into the UEP
 process as part of the endpoint lifecycle:
 
-* ``GLOBUS_COMPUTE_ENDPOINT_DIR`` - The path of the UEP logs and configurations,
-  the expanded, resolved path customizable by ``paths: endpoint_dir`` in
-  ``user_config_template.yaml.j2``, default ``$HOME/.globus_compute/uep.<UUID>.<UUID>``
-* ``GLOBUS_COMPUTE_LOG_PATH`` - The path that the UEP will write log output to,
+* ``GLOBUS_COMPUTE_ENDPOINT_NAME`` The name of the user endpoint.  For identity
+  mapping endpoints, this is auto generated in the format UEP.<CEP_UUID>.<UEP_UUID>.
+  For non identity mapping (single-user) endpoints, this will be the endpoint name
+  specified when doing the initial configure e.g. ``gce configure my_custom_ep_name``.
+* ``GLOBUS_COMPUTE_ENDPOINT_DIR`` - The path of the directory where UEP logs and
+  configurations are stored.  This is the expanded, resolved path customizable by
+  ``paths: endpoint_dir`` in ``user_config_template.yaml.j2``.
+  (default ``$HOME/.globus_compute/<endpoint_name>``)
+* ``GLOBUS_COMPUTE_LOG_PATH`` - The destination that the UEP will write log output to,
   the expanded, resolved path customizable by ``paths: endpoint_log``, default
   ``$GLOBUS_COMPUTE_ENDPOINT_DIR/endpoint.log``
 
-For more information on the ``paths`` configuration see :ref:`endpoint-paths`
+If :ref:`user_runtime <reserved-template-variables>` is set (automatic if submitting
+tasks via the Globus Compute SDK):
 
-* ``GLOBUS_COMPUTE_ENDPOINT_NAME`` - The name of the endpoint
-
-** if user_runtime is set....
-
-* ``GC_USER_PYTHON_VERSION`` - A dotted-decimal Python version (e.g., ``3.13.7``) that
-  specifies which version of Python was used to submit tasks to this endpoint
-* ``GC_USER_SDK_VERSION`` - A dotted-decimal ``globus-compute-sdk`` version (e.g.,
-  ``4.8.0``) that specifies what version of the `Globus Compute SDK`_ the submission
-  used
+* ``GC_USER_PYTHON_VERSION`` and ``GC_USER_SDK_VERSION`` as described in
+  :ref:`Advanced Environment Customization <manager_export_env>`
 
 
+For more information on customizing the values of ``GLOBUS_COMPUTE_ENDPOINT_DIR``
+and ``GLOBUS_COMPUTE_LOG_PATH`` in the ``paths`` configuration section see
+:ref:`endpoint-paths`
 
 
 .. _config-dir:
@@ -746,6 +748,8 @@ and writing a custom ``globus-compute-endpoint`` wrapper:
    exec /usr/sbin/globus-compute-endpoint "$@"
 
 (The use of ``exec`` is not critical, but keeps the process tree tidy.)
+
+.. _manager_export_env:
 
 The manager endpoint process exports the following two environment variables that
 shim‑authors may use to fine‑tune customizations:

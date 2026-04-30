@@ -239,6 +239,21 @@ def mock_props():
 
 
 @pytest.fixture
+def mock_config_paths():
+    def _inner_config(ep_dir: str | None, ep_log: str | None):
+        base_config = {}
+        if ep_dir or ep_log:
+            base_config["paths"] = {}
+            if ep_dir:
+                base_config["paths"]["endpoint_dir"] = ep_dir
+            if ep_log:
+                base_config["paths"]["endpoint_log"] = ep_log
+        return base_config, yaml.dump(base_config)
+
+    return _inner_config
+
+
+@pytest.fixture
 def epmanager_as_user(
     mocker,
     conf_dir,
@@ -317,6 +332,7 @@ def epmanager_as_root(
     mock_os.pipe.return_value = 40, 41
     mock_os.dup2.side_effect = (0, 1, 2, AssertionError("dup2: unexpected?"))
     mock_os.open.side_effect = (4, 5, AssertionError("open: unexpected?"))
+
     mock_os.environ = {"Some": "test", "environ": "with", "debug": "1"}
 
     mock_os.waitpid.return_value = (0, 0)
@@ -2277,14 +2293,6 @@ def test_respects_config_template_and_schema(mocker, successful_exec_from_mocked
     assert parsed_stdin["config"] == config
 
 
-def test_env_vars_passed_to_config(mocker, successful_exec_from_mocked_root):
-    mock_os, conf_dir, _, _, _, em = successful_exec_from_mocked_root
-
-    template_path = conf_dir / "my_template.yaml.j2"
-    schema_path = conf_dir / "my_schema.json"
-    expected_env = {"my_env": "my_val"}
-
-
 def test_includes_mapped_identity_in_user_config(
     mocker, successful_exec_from_mocked_root, ident
 ):
@@ -2305,36 +2313,6 @@ def test_includes_mapped_identity_in_user_config(
     assert a[3].matched_identity == ident
 
 
-"""
-@pytest.mark.parametrize(
-    (
-        "home_env",
-        "ep_env",
-        "user_env",
-        "log_env",
-        "expected_ep_dir_str",
-        "expected_log_path_str",
-    ),
-    (
-        # ("/home/rob", None, "bob", "$HOME/a.b", "/home/rob/a.b"),
-        # ("/home/rob", None, "bob", "~/gc-$USER/a.b", "/home/rob/gc-bob/a.b"),
-        (
-            "/home/rob",
-            "$HOME/gc",
-            "bob",
-            None,
-            "/home/rob/gc",
-            "/home/rob/gc/endpoint.log",
-        ),
-        # ("/home/rob", "~/gc-${USER}", "bob", None, "/home/rob/gc-bob/endpoint.log"),
-        # ("/opt", None, "root", "~/a/b/gc.log   ", "/opt/a/b/gc.log"),
-        # ("/", None, "root", "~/a/b/gc.log   ", "/a/b/gc.log"),
-        # ("/home/jane", "/a/b/gc", "jane", "/tmp/gc.log", "/tmp/gc.log"),
-    ),
-)
-"""
-
-
 @pytest.mark.parametrize(
     ("ep_log_config", "ep_dir_config"),
     (["/a/b", "/opt/other_ep"], ["/a/b", None], [None, "/opt/e.log"], [None, None]),
@@ -2343,20 +2321,13 @@ def test_ep_dir_log_path_envs_passed_to_render(
     mocker,
     successful_exec_from_mocked_root,
     command_payload,
+    mock_config_paths,
     ep_log_config,
     ep_dir_config,
 ):
     mock_os, conf_dir, *_, em = successful_exec_from_mocked_root
 
-    config = {"display_name": None, "paths": {}}
-    if ep_log_config:
-        config["paths"]["endpoint_log"] = ep_log_config
-    if ep_dir_config:
-        config["paths"]["endpoint_dir"] = ep_dir_config
-    if not config["paths"]:
-        del config["paths"]
-
-    config_str = yaml.dump(config)
+    config, config_str = mock_config_paths(ep_dir_config, ep_log_config)
 
     mocker.patch(f"{_MOCK_BASE}render_config_user_template", return_value=config_str)
     mock_ensure = mocker.patch(f"{_MOCK_BASE}ensure_paths")
@@ -2372,6 +2343,65 @@ def test_ep_dir_log_path_envs_passed_to_render(
     else:
         assert mock_ensure.call_args[0][1] is None
     assert pyexc.value.code == _GOOD_EC, "Q&D: verify we exec'ed, based on '+= 1'"
+
+
+@pytest.mark.parametrize(
+    ("home_env", "user_env", "ep_log_config", "ep_dir_config", "result_log_path_str"),
+    (
+        ["/a/b", "foo", "~/a.log", "/opt/other_ep", "/a/b/a.log"],
+        ["/a/b", "foo", "/tmp/$USER/a.log", None, "/tmp/foo/a.log"],
+        ["/a/b", "foo", None, "/opt/other_ep", "/opt/other_ep/endpoint.log"],
+        ["/a/b", "foo", None, None, "/a/b/.globus_compute/some_ep_name/endpoint.log"],
+    ),
+)
+def test_ep_dir_log_path_env_set(
+    mocker,
+    successful_exec_from_mocked_root,
+    command_payload,
+    mock_config_paths,
+    home_env,
+    user_env,
+    ep_log_config,
+    ep_dir_config,
+    result_log_path_str,
+):
+    mock_os, conf_dir, *_, em = successful_exec_from_mocked_root
+
+    config, config_str = mock_config_paths(ep_dir_config, ep_log_config)
+
+    mocker.patch(f"{_MOCK_BASE}render_config_user_template", return_value=config_str)
+
+    m = mock.Mock()
+    mock_os.fdopen.return_value.__enter__.return_value = m
+
+    env_dict = {"HOME": home_env, "USER": user_env}
+
+    mock_logging_os = mocker.patch(f"globus_compute_endpoint.logging_config.os")
+    moe = mock.MagicMock()
+    moe.__getitem__.side_effect = env_dict.__getitem__
+    moe.__setitem__.side_effect = env_dict.__setitem__
+    moe.get.side_effect = env_dict.get
+    mock_logging_os.environ = moe
+    mock_logging_os.path = os.path
+
+    with pytest.raises(SystemExit) as pyexc:
+        with mock.patch.dict(os.environ, env_dict):
+            em._event_loop()
+    assert pyexc.value.code == _GOOD_EC, "Q&D: verify we exec'ed, based on '+= 1'"
+
+    assert moe.__setitem__.call_args_list[0].args[0] == COMPUTE_EP_DIR_ENV
+    if ep_dir_config:
+        assert moe.__setitem__.call_args_list[0].args[1] == ep_dir_config
+    else:
+        # If no config set going in, it should still set a valid value.
+        # Exact value check in test_logging_config.py::test_ensure_paths*
+        assert moe.__setitem__.call_args_list[0].args[1]
+
+    assert moe.__setitem__.call_args_list[1].args[0] == LOG_PATH_ENV
+    if ep_log_config:
+        assert moe.__setitem__.call_args_list[1].args[1] == result_log_path_str
+    else:
+        assert moe.__setitem__.call_args_list[1].args[1]
 
 
 @pytest.mark.parametrize("is_valid", (True, False))
