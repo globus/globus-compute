@@ -3,9 +3,16 @@ import os
 import pathlib
 import platform
 import typing as t
+from unittest import mock
 
 import pytest
-from globus_compute_endpoint.logging_config import _get_file_dict_config, setup_logging
+from globus_compute_endpoint.logging_config import (
+    LOG_PATH_ENV,
+    _get_file_dict_config,
+    ensure_log_path,
+    setup_logging,
+)
+from globus_compute_sdk.sdk.compute_dir import COMPUTE_EP_DIR_ENV
 from pytest_mock import MockFixture
 
 _MOCK_BASE = "globus_compute_endpoint.logging_config."
@@ -85,3 +92,44 @@ def test_include_correct_loggers(logfile: t.Optional[str], mocker: MockFixture, 
     }
     loggers = mock_dictConfig.call_args[0][0]["loggers"]
     assert set(loggers) == expected, "Time to update this test?"
+
+
+@pytest.mark.parametrize(
+    ("log_path", "envs", "is_dir", "exists", "expected_path", "exc_msg"),
+    (
+        ["/a/a_dir", {}, True, True, None, f"{LOG_PATH_ENV} can not be a directory"],
+        ["/b/$XYZ/file.log", {"XYZ": "abc"}, False, False, "/b/abc/file.log", None],
+        ["/c/file.log", {}, False, True, "/c/file.log", "Permission denied"],
+        ["/d/file.log", {}, False, False, "/d/file.log", None],
+        [None, {}, False, False, None, None],
+    ),
+)
+def test_ensure_log_path(
+    fs, mock_ep_dir, log_path, envs, is_dir, exists, expected_path, exc_msg
+):
+    _, ep_dir = mock_ep_dir
+    if log_path:
+        envs[LOG_PATH_ENV] = log_path
+        p = pathlib.Path(log_path)
+        if is_dir:
+            p.mkdir(parents=True)
+        elif exists:
+            # create file but non-writable if file
+            p.parent.mkdir(parents=True)
+            p.touch(mode=0o400)
+    envs[COMPUTE_EP_DIR_ENV] = str(ep_dir.resolve())
+
+    with mock.patch.dict(os.environ, envs):
+        if exc_msg is not None:
+            with pytest.raises(Exception) as actual_exc_msg:
+                ensure_log_path()
+            assert exc_msg in str(actual_exc_msg)
+        else:
+            result_path: pathlib.Path = ensure_log_path()
+            if log_path is None:
+                # Default - use ep_dir
+                assert result_path == ep_dir / "endpoint.log"
+            else:
+                # Custom log_path
+                assert str(result_path.resolve()) == expected_path
+                result_path.write_text("I can write to log file")

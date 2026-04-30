@@ -130,7 +130,8 @@ def test_configs_repr_default_kwargs():
 def test_userconfig_repr_nondefault_kwargs(
     randomstring, kw, cls, get_random_of_datatype
 ):
-    if kw == "engine":
+    # Skip optional sections
+    if kw in ["engine", "paths"]:
         return
 
     val = get_random_of_datatype(cls)

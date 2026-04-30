@@ -11,6 +11,7 @@ import sys
 from unittest import mock
 
 import pytest
+from globus_compute_sdk.sdk.compute_dir import COMPUTE_DIR_ENV
 from globus_compute_sdk.sdk.diagnostic import cat, do_diagnostic_base
 from globus_compute_sdk.sdk.hardware_report import (
     mem_info,
@@ -485,7 +486,7 @@ def test_diagnostic_base_dir_GC_HOME_or_config_param(
         compute_dir = "home/gc_home"
     base_dir_absolute = (tmp_path / compute_dir).absolute()
     env = os.environ.copy()
-    env["GLOBUS_COMPUTE_USER_DIR"] = str(base_dir_absolute)
+    env[COMPUTE_DIR_ENV] = str(base_dir_absolute)
     with mock.patch.dict(os.environ, env):
         test_config = mock_endpoint_config_dir_data(base_dir_absolute, ep_names)
         print(f"test_config base={test_config.values()}")

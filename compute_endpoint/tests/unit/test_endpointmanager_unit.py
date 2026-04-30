@@ -88,6 +88,10 @@ def mock_ensure_compute_dir():
     return pathlib.Path(_mock_localuser_rec.pw_dir) / ".globus_compute"
 
 
+def mock_ensure_log_path():
+    return mock_ensure_compute_dir() / "some_ep_name" / "endpoint.log"
+
+
 @pytest.fixture
 def mock_log():
     with mock.patch(f"{_MOCK_BASE}log", spec=logging.Logger) as m:
@@ -249,6 +253,8 @@ def epmanager_as_user(
 
     mock_os.waitpid.return_value = (0, 0)
 
+    mocker.patch(f"{_MOCK_BASE}ensure_log_path", side_effect=mock_ensure_log_path)
+
     mock_pwd = mocker.patch(f"{_MOCK_BASE}pwd")
     mock_pwd.getpwnam.side_effect = AssertionError(
         "getpwnam: unprivileged should not care"
@@ -321,6 +327,7 @@ def epmanager_as_root(
 
     mocker.patch(f"{_MOCK_BASE}is_privileged", return_value=True)
     mocker.patch(f"{_MOCK_BASE}ensure_compute_dir", side_effect=mock_ensure_compute_dir)
+    mocker.patch(f"{_MOCK_BASE}ensure_log_path", side_effect=mock_ensure_log_path)
 
     ep_uuid, _ = mock_client
 
@@ -2346,7 +2353,7 @@ def test_redirect_stdstreams_to_user_log(
 
     uep_name = command_payload["kwargs"]["name"]
     uep_dir = mock_ensure_compute_dir() / uep_name
-    ep_log = uep_dir / "endpoint.log"
+    ep_log = mock_ensure_log_path()
 
     with pytest.raises(SystemExit) as pyexc:
         em._event_loop()
