@@ -6,7 +6,6 @@ import io
 import json
 import logging
 import os
-import pathlib
 import platform
 import pwd
 import queue
@@ -24,6 +23,7 @@ import uuid
 from concurrent.futures import Future
 from contextlib import contextmanager
 from datetime import datetime
+from pathlib import Path
 
 import setproctitle
 import yaml
@@ -57,6 +57,7 @@ from globus_compute_endpoint.endpoint.utils import (
     update_url_port,
 )
 from globus_compute_endpoint.exceptions import MessageSystemExit
+from globus_compute_endpoint.logging_config import LOG_PATH_ENV
 from globus_compute_sdk import Client
 from globus_compute_sdk.sdk.auth.auth_client import ComputeAuthClient
 from globus_compute_sdk.sdk.compute_dir import ensure_compute_dir
@@ -120,7 +121,7 @@ T_CMD_START_ARGS = t.Tuple[
 class EndpointManager:
     def __init__(
         self,
-        conf_dir: pathlib.Path,
+        conf_dir: Path,
         endpoint_uuid: str | None,
         config: ManagerEndpointConfig,
         reg_info: dict,
@@ -282,7 +283,7 @@ class EndpointManager:
         self._heartbeat_publisher = ResultPublisher(queue_info=hbq_info)
 
     @staticmethod
-    def get_metadata(ep_dir: pathlib.Path, config: ManagerEndpointConfig) -> dict:
+    def get_metadata(ep_dir: Path, config: ManagerEndpointConfig) -> dict:
         user_config_template = load_user_config_template(
             Endpoint.user_config_template_path(ep_dir, config)
         )
@@ -1046,7 +1047,11 @@ class EndpointManager:
             preexec_name = "UserEndpointProcess_Bootstrap(PreExec)"
             current_process().name = preexec_name
 
-            from globus_compute_endpoint.logging_config import LOG_TS_FMT, setup_logging
+            from globus_compute_endpoint.logging_config import (
+                LOG_TS_FMT,
+                ensure_log_path,
+                setup_logging,
+            )
 
             # We've closed all files (beyond std*), so log.* calls are not able to
             # access the parent's logs directly.  Now rely on stderr (not yet separated)
@@ -1127,7 +1132,7 @@ class EndpointManager:
 
             upath: str = env.get("PATH", "")
             if not upath:
-                pybindir = pathlib.Path(sys.executable).parent
+                pybindir = Path(sys.executable).parent
                 default_path = ("/usr/local/bin", "/usr/bin", "/bin", pybindir)
                 upath = ":".join(map(str, default_path))
 
@@ -1189,13 +1194,30 @@ class EndpointManager:
             startup_proc_title = f"Endpoint starting up for {uname} [{args_title}]"
             setproctitle.setproctitle(startup_proc_title)
 
-            gc_dir: pathlib.Path = ensure_compute_dir()
-            ep_dir = gc_dir / ep_name
-            ep_dir.mkdir(mode=0o700, parents=True, exist_ok=True)
-            ep_log = ep_dir / "endpoint.log"
-
             exit_code += 1
             _conf = yaml.safe_load(user_config)
+
+            ep_log = None
+
+            # Override with custom value from user config if present
+            # This sets two environment vars used by paths: (gc_dir|endpoint_log)
+            if path_info := _conf.get("paths"):
+                if log_path_val := path_info.get("endpoint_log"):
+                    env["GLOBUS_COMPUTE_LOG_PATH"] = log_path_val
+                    ep_log = ensure_log_path(None)
+                    log.info(f"Setting custom endpoint log path to {ep_log}")
+                if gc_dir_val := path_info.get("gc_dir"):
+                    log.info(f"Setting Compute base path to {gc_dir_val}")
+                    env["GLOBUS_COMPUTE_USER_DIR"] = gc_dir_val
+
+            # ensure_compute_dir picks up possibly updated GLOBUS_COMPUTE_USER_DIR
+            gc_dir: Path = ensure_compute_dir()
+            ep_dir: Path = gc_dir / ep_name
+            ep_dir.mkdir(mode=0o700, parents=True, exist_ok=True)
+
+            if not ep_log:
+                # Default (not set via paths:) log path
+                ep_log = ensure_log_path(gc_dir / ep_name)
 
             _ha_key = "high_assurance"
             if _ha_key in _conf:
@@ -1228,6 +1250,7 @@ class EndpointManager:
                 stdin_data_dict["audit_fd"] = audit_w
 
             stdin_data = json.dumps(stdin_data_dict, separators=(",", ":"))
+
             exit_code += 1
 
             # Reminder: this is *os*.open, not *open*.  Descriptors will not be closed

@@ -188,6 +188,7 @@ class UserEndpointConfig(BaseConfig):
         The currently known engines are ``GlobusComputeEngine``, ``ProcessPoolEngine``,
         and ``ThreadPoolEngine``.  See :ref:`uep-conf` for more information.
 
+    :param paths: User Endpoint directory and log path related configuration group
 
     :param heartbeat_threshold: Seconds since the last heartbeat message from the
         Globus Compute web service after which the connection is assumed to be
@@ -214,12 +215,6 @@ class UserEndpointConfig(BaseConfig):
 
     :param endpoint_teardown: Command(s) to be run during the endpoint
         shutdown process
-
-    :param log_dir: path to the top-level directory where logs should be written
-
-    :param stdout: Path where the endpoint's stdout should be written
-
-    :param stderr: Path where the endpoint's stderr should be written
     """
 
     def __init__(
@@ -233,10 +228,7 @@ class UserEndpointConfig(BaseConfig):
         idle_heartbeats_hard: int = 5760,  # Two days, divided by `heartbeat_period`
         endpoint_setup: str | None = None,
         endpoint_teardown: str | None = None,
-        # Logging info
-        log_dir: str | None = None,
-        stdout: str = "./endpoint.log",
-        stderr: str = "./endpoint.log",
+        paths: dict | None = None,
         **kwargs,
     ) -> None:
         super().__init__(**kwargs)
@@ -250,11 +242,7 @@ class UserEndpointConfig(BaseConfig):
 
         self.endpoint_setup = endpoint_setup
         self.endpoint_teardown = endpoint_teardown
-
-        # Logging info
-        self.log_dir = log_dir
-        self.stdout = stdout
-        self.stderr = stderr
+        self.paths = paths
 
     @property
     def engine(self) -> GlobusComputeEngineBase | None:
@@ -263,6 +251,14 @@ class UserEndpointConfig(BaseConfig):
     @engine.setter
     def engine(self, val: GlobusComputeEngineBase | None):
         self._engine = val
+
+    @property
+    def paths(self) -> dict | None:
+        return self._paths
+
+    @paths.setter
+    def paths(self, val: dict | None):
+        self._paths = val
 
     @property
     def heartbeat_threshold(self):

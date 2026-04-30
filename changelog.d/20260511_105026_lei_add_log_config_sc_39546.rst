@@ -1,0 +1,25 @@
+New Functionality
+^^^^^^^^^^^^^^^^^
+
+- For User Endpoints, Globus Compute's base directory (default ~/.globus_compute)
+  can be configured via the optional ``paths: gc_dir`` parameter in
+  ``user_config_config_template.yaml.j2``.
+- User Endpoint log path can also be customized via ``paths: endpoint_log``,
+  normally located at ``$HOME/.globus_compute/uep.<UUID>.<UUID>/endpoint.log``
+
+Configuration Example:
+
+```
+paths:
+  gc_dir: {{ _GC.env.HOME }}/compute_endpoints
+  endpoint_log: /tmp/{{ _GC.env.USER }}/user_endpoints.log
+```
+
+For more information, please see :ref:`endpoint-log-paths`
+
+Removed
+^^^^^^^
+
+- The older log config options ``log_dir``, ``stdout``, and ``stderr``
+  have been removed.  These have been unused since v0.0.1.
+
