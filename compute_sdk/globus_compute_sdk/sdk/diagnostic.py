@@ -28,7 +28,7 @@ from globus_compute_sdk.sdk._environments import (
     get_web_service_url,
 )
 from globus_compute_sdk.sdk.client import _ComputeWebClient
-from globus_compute_sdk.sdk.compute_dir import ensure_compute_dir
+from globus_compute_sdk.sdk.compute_dir import COMPUTE_DIR_ENV, ensure_compute_dir
 from globus_compute_sdk.sdk.executor import _RESULT_WATCHERS
 from globus_compute_sdk.sdk.hardware_report import hardware_commands_list
 from globus_compute_sdk.sdk.utils import display_name
@@ -645,7 +645,7 @@ def do_diagnostic_base(diagnostic_args):
         help=(
             "Gather endpoint configuration and log info from the specified"
             " parent directory instead of the default ~/.globus_compute or"
-            " what is set in $GLOBUS_COMPUTE_USER_DIR"
+            f" what is set in ${COMPUTE_DIR_ENV}"
         ),
     )
     parser.add_argument(

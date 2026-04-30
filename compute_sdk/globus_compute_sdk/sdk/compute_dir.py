@@ -3,6 +3,8 @@ from __future__ import annotations
 import os
 from pathlib import Path
 
+COMPUTE_DIR_ENV = "GLOBUS_COMPUTE_USER_DIR"
+
 
 def get_compute_dir() -> Path:
     """
@@ -12,7 +14,7 @@ def get_compute_dir() -> Path:
     """
     # This is either set by the user via GLOBUS_COMPUTE_USER_DIR
     #  or by the cli argument --config-dir via overriding the env var
-    if env_dir := os.environ.get("GLOBUS_COMPUTE_USER_DIR"):
+    if env_dir := os.environ.get(COMPUTE_DIR_ENV):
         return Path(env_dir)
     else:
         return Path.home() / ".globus_compute"
