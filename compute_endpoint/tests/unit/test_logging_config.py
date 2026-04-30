@@ -1,3 +1,4 @@
+import json
 import logging.config
 import os
 import pathlib
@@ -109,7 +110,7 @@ def test_ensure_paths_no_name_provided(fs, mock_ensure_compute, ep_dir_env):
     if ep_dir_env:
         env_dict[COMPUTE_EP_DIR_ENV] = ep_dir_env
 
-    with mock.patch.dict(os.environ, env_dict):
+    with mock.patch.dict(os.environ, env_dict, clear=True):
         if ep_dir_env:
             # If the environment variable is set, ep_name is not required
             assert f"{ep_dir_env}/endpoint.log" == str(ensure_paths("").resolve())
@@ -168,7 +169,9 @@ def test_ensure_paths_ep_dir_not_file(fs, is_file, exc_msg):
     else:
         a_path.mkdir(parents=True)
 
-    with mock.patch.dict(os.environ, {COMPUTE_EP_DIR_ENV: str(a_path.resolve())}):
+    with mock.patch.dict(
+        os.environ, {COMPUTE_EP_DIR_ENV: str(a_path.resolve())}, clear=True
+    ):
         if exc_msg:
             with pytest.raises(ValueError) as actual_exc_msg:
                 ensure_paths("ep1")
@@ -217,7 +220,7 @@ def test_ensure_paths_expand_set(fs, ep_name, ep_config, log_config, exp_ep, exp
         paths["endpoint_log"] = log_config
         env_dict[LOG_PATH_ENV] = log_config
 
-    with mock.patch.dict(os.environ, env_dict):
+    with mock.patch.dict(os.environ, env_dict, clear=True):
         path_result = ensure_paths(ep_name, paths)
         assert str(path_result.resolve()) == exp_log
         if ep_config:
@@ -271,8 +274,20 @@ def test_ensure_paths_config_overrides_env(
 def test_ensure_paths_default_uses_name_and_compute_dir(fs, mock_ensure_compute):
     ep_name = "ep1"
     expected_log_path = MOCK_COMPUTE / ep_name / "endpoint.log"
-    with mock.patch.dict(os.environ, {"HOME": "/home/foo"}):
+    with mock.patch.dict(os.environ, {"HOME": "/home/foo"}, clear=True):
         log_result_path = ensure_paths(ep_name)
         # Have to use str(..resolve()) as (expected_log_path == log_result_path) == False
         assert str(expected_log_path.resolve()) == str(log_result_path.resolve())
         assert str(expected_log_path.parent.resolve()) == os.environ[COMPUTE_EP_DIR_ENV]
+
+
+def test_ensure_paths_log_not_writable_raises(fs):
+    file_name = "/b.log"
+    ro_file = pathlib.Path(file_name)
+    ro_file.touch()
+    ro_file.chmod(0o400)
+
+    with mock.patch.dict(os.environ, {LOG_PATH_ENV: file_name}, clear=True):
+        with pytest.raises(PermissionError) as exc:
+            ensure_paths("foo")
+        assert "is not writable" in str(exc.value)

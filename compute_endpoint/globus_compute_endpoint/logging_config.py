@@ -287,7 +287,8 @@ def ensure_paths(ep_name: str | None, custom_paths: dict | None = None) -> pathl
                            is ~/.globus_compute/<ep_name> unless customized
     :param custom_paths: An optional "paths" section from the jinja template
                            where the user can customize the endpoint directory
-                           or the log path.  This defaults to
+                           or the log path.  These default to
+                           ~/.globus_compute/<ep_name>
                            ~/.globus_compute/<ep_name>/endpoint.log
     """
 
@@ -313,19 +314,21 @@ def ensure_paths(ep_name: str | None, custom_paths: dict | None = None) -> pathl
         ep_dir_str = str((ensure_compute_dir() / ep_name).resolve())
 
     ep_dir = pathlib.Path(os.path.expandvars(ep_dir_str)).expanduser()
-    if ep_dir.is_file():
+    if ep_dir.exists() and ep_dir.is_file():
         raise ValueError(f"{COMPUTE_EP_DIR_ENV} can not be an existing file: {ep_dir}")
-    logger.info(f"Endpoint directory for {ep_name} set to {ep_dir}")
+
+    uep_desc = f" for UEP {ep_name}" if ep_name else ""
+    logger.info(f"Endpoint directory{uep_desc} set to {ep_dir}")
 
     # Now update the ep_dir ENV with the final value
-    # Parent directory (default -> ~/.globus_compute) might have already
-    # been created but confirm anyway, as ep_dir may not be under ~/.globus_compute
+    # Parent directory (default -> ~/.globus_compute but could be anywhere)
+    # might have already been created but confirm anyway
     ep_dir.mkdir(mode=0o700, parents=True, exist_ok=True)
     os.environ[COMPUTE_EP_DIR_ENV] = str(ep_dir.resolve())
 
     if log_path_str:
         log_path = pathlib.Path(os.path.expandvars(log_path_str)).expanduser()
-        if log_path.is_dir():
+        if log_path.exists() and log_path.is_dir():
             raise ValueError(f"{LOG_PATH_ENV} can not be a directory: {log_path}")
     else:
         log_path = ep_dir / "endpoint.log"
@@ -333,7 +336,14 @@ def ensure_paths(ep_name: str | None, custom_paths: dict | None = None) -> pathl
     # Update the log path ENV with the final value
     log_path_str = str(log_path.resolve())
     log_path.parent.mkdir(mode=0o700, parents=True, exist_ok=True)
-    os.environ[LOG_PATH_ENV] = log_path_str
-
-    logger.info(f"Endpoint log path has been set to {log_path_str}")
-    return log_path
+    try:
+        with open(log_path, "a"):
+            os.environ[LOG_PATH_ENV] = log_path_str
+            log.info(f"{LOG_PATH_ENV} has been set to {os.environ[LOG_PATH_ENV]}")
+            return log_path
+    except PermissionError as e:
+        msg = f"Endpoint log path {log_path_str} is not writable!\n{e}"
+        log.error(msg)
+        if sys.stderr.isatty():
+            print(msg, file=sys.stderr)
+        raise PermissionError(msg)
