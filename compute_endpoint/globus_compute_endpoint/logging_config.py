@@ -7,11 +7,17 @@ from __future__ import annotations
 import logging
 import logging.config
 import logging.handlers
+import os
 import pathlib
 import re
 import sys
 from collections import defaultdict
 from datetime import datetime
+
+from globus_compute_sdk.sdk.compute_dir import (
+    COMPUTE_EP_DIR_ENV,
+    ensure_compute_dir,
+)
 
 log = logging.getLogger(__name__)
 
@@ -21,6 +27,7 @@ DEFAULT_FORMAT = (
     "%(threadName)s-%(thread)d %(name)s:%(lineno)d %(funcName)s "
     "%(message)s"
 )
+LOG_PATH_ENV = "GLOBUS_COMPUTE_LOG_PATH"
 
 _und = "\033[4m"
 _ital = "\033[3m"
@@ -269,3 +276,77 @@ def setup_logging(
         config = _get_stream_dict_config(debug, no_color)
 
     logging.config.dictConfig(config)
+
+
+def ensure_paths(ep_name: str | None, custom_paths: dict | None = None) -> pathlib.Path:
+    """
+    Use jinja2 user config values from paths.endpoint_dir and paths.endpoint_log
+    as the UEP directory and UEP log path respectively.
+
+    Ensures that both the directory and the log path are present and valid,
+    possibly creating parent directories as well, then returns the Path to the
+    log file.
+
+    If no custom config was provided, the endpoint directory is constructed
+    from ensure_compute_dir() and ep_name, with the log path default of
+    "$GLOBUS_COMPUTE_ENDPOINT_DIR/endpoint.log"
+
+    Note that this method expands user and env vars in the configuration
+    strings i.e. ~/abc, $HOME/abc -> /home/some_user/abc and updates the env
+    vars in place with the expanded values
+
+    :param ep_name:      The name of the user endpoint.  The default UEP directory
+                           is ~/.globus_compute/<ep_name> unless customized
+    :param custom_paths: An optional "paths" section from the jinja template
+                           where the user can customize the endpoint directory
+                           or the log path.  These default to
+                           ~/.globus_compute/<ep_name>
+                           ~/.globus_compute/<ep_name>/endpoint.log
+    """
+
+    # First, get the current values from the environment variables
+    ep_dir_str = os.environ.get(COMPUTE_EP_DIR_ENV, "")
+    log_path_str = os.environ.get(LOG_PATH_ENV, "")
+
+    # Customized values from jinja user config
+    custom_paths = custom_paths or {}
+    # Possibly override ENV values with custom configs
+    ep_dir_str = custom_paths.get("endpoint_dir") or ep_dir_str
+    log_path_str = custom_paths.get("endpoint_log") or log_path_str
+
+    # Use ep_name if nothing else is set
+    if not ep_dir_str:
+        if not ep_name:
+            raise ValueError("Endpoint name must be provided")
+        ep_dir_str = str((ensure_compute_dir() / ep_name).resolve())
+
+    ep_dir = pathlib.Path(os.path.expandvars(ep_dir_str)).expanduser()
+    if ep_dir.exists() and not ep_dir.is_dir():
+        raise ValueError(f"{COMPUTE_EP_DIR_ENV} can not be an existing file: {ep_dir}")
+
+    uep_desc = f" for UEP {ep_name}" if ep_name else ""
+    logger.info(f"Endpoint directory{uep_desc} set to {ep_dir}")
+
+    # Now update the ep_dir ENV with the final value
+    # Parent directory (default -> ~/.globus_compute but could be anywhere)
+    # might have already been created but confirm anyway
+    ep_dir = ep_dir.resolve()
+    ep_dir.mkdir(mode=0o700, parents=True, exist_ok=True)
+    os.environ[COMPUTE_EP_DIR_ENV] = str(ep_dir)
+
+    if log_path_str:
+        log_path = pathlib.Path(os.path.expandvars(log_path_str)).expanduser()
+        if log_path.exists() and log_path.is_dir():
+            raise ValueError(f"{LOG_PATH_ENV} can not be a directory: {log_path}")
+    else:
+        log_path = ep_dir / "endpoint.log"
+
+    # Update the log path ENV with the final value and ensure parent is created
+    # Testing of the path's write access is left to the caller in endpoint_manager.py
+    log_path = log_path.resolve()
+    log_path.parent.mkdir(mode=0o700, parents=True, exist_ok=True)
+
+    os.environ[LOG_PATH_ENV] = str(log_path)
+    log.info(f"{LOG_PATH_ENV} has been set to {log_path_str}")
+
+    return log_path
