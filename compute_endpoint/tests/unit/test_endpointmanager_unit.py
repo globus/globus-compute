@@ -355,7 +355,7 @@ def command_payload(ident):
                 "python": {
                     "version": "3.4.2",
                 },
-                "globus_compute_sdk_version": "2.90.2",
+                "globus_compute_sdk_version": "4.10.0",
             },
         },
     }
@@ -1822,6 +1822,27 @@ def test_start_endpoint_children_correct_command(successful_exec_from_mocked_roo
     assert a[0] == "globus-compute-endpoint", "Sanity check"
     assert k["args"][0] == a[0], "Expect transparency for admin"
     assert k["args"][1] == "_start-user-endpoint", "trust CLI does the work"
+
+
+def test_start_endpoint_children_backward_compatible_command(
+    command_payload, successful_exec_from_mocked_root, mock_props
+):
+    mock_os, *_, em = successful_exec_from_mocked_root
+
+    # arbitrary version less than 4.10.0
+    command_payload["kwargs"]["user_runtime"]["globus_compute_sdk_version"] = "0.0.0"
+    queue_item = (1, mock_props, json.dumps(command_payload).encode())
+    em._command_queue.get.side_effect = [queue_item, queue.Empty()]
+
+    with pytest.raises(SystemExit) as pyexc:
+        em._event_loop()
+
+    assert pyexc.value.code == _GOOD_EC, "Q&D: verify we exec'ed, based on '+= 1'"
+    a, k = mock_os.execvpe.call_args
+    assert a[0] == "globus-compute-endpoint", "Sanity check"
+    assert k["args"][0] == a[0], "Expect transparency for admin"
+    assert k["args"][1] == "start", "Expect older CLI commmand name"
+    assert k["args"][-1] == "--die-with-parent", "Expect differentiating flag"
 
 
 def test_start_endpoint_children_have_own_session(successful_exec_from_mocked_root):
