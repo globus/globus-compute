@@ -35,6 +35,8 @@ from globus_compute_endpoint.endpoint.rabbit_mq import (
 )
 from globus_compute_endpoint.endpoint.utils import _redact_url_creds
 from globus_compute_endpoint.exceptions import MessageSystemExit
+from globus_compute_endpoint.logging_config import LOG_PATH_ENV
+from globus_compute_sdk.sdk.compute_dir import COMPUTE_EP_DIR_ENV
 from globus_sdk import UserApp
 from pytest_mock import MockFixture
 
@@ -86,6 +88,16 @@ class MockPamError(Exception):
 
 def mock_ensure_compute_dir():
     return pathlib.Path(_mock_localuser_rec.pw_dir) / ".globus_compute"
+
+
+def mock_ensure_paths():
+    return mock_ensure_compute_dir() / "some_ep_name" / "endpoint.log"
+
+
+@pytest.fixture
+def mock_ensure_path_patch():
+    with mock.patch(f"{_MOCK_BASE}ensure_paths", return_value=mock_ensure_paths()) as m:
+        yield m
 
 
 @pytest.fixture
@@ -227,6 +239,21 @@ def mock_props():
 
 
 @pytest.fixture
+def mock_config_paths():
+    def _inner_config(ep_dir: str | None, ep_log: str | None):
+        base_config = {}
+        if ep_dir or ep_log:
+            base_config["paths"] = {}
+            if ep_dir:
+                base_config["paths"]["endpoint_dir"] = ep_dir
+            if ep_log:
+                base_config["paths"]["endpoint_log"] = ep_log
+        return base_config, yaml.dump(base_config)
+
+    return _inner_config
+
+
+@pytest.fixture
 def epmanager_as_user(
     mocker,
     conf_dir,
@@ -248,6 +275,8 @@ def epmanager_as_user(
     mock_os.open.side_effect = (4, 5, AssertionError("open: unexpected?"))
 
     mock_os.waitpid.return_value = (0, 0)
+
+    mocker.patch(f"{_MOCK_BASE}ensure_paths", side_effect=mock_ensure_paths)
 
     mock_pwd = mocker.patch(f"{_MOCK_BASE}pwd")
     mock_pwd.getpwnam.side_effect = AssertionError(
@@ -374,6 +403,7 @@ def successful_exec_from_mocked_root(
     mock_props,
     ident,
     command_payload,
+    mock_ensure_path_patch,
 ):
     conf_dir, mock_conf, mock_client, mock_os, mock_pwd, em = epmanager_as_root
 
@@ -400,6 +430,7 @@ def successful_exec_from_mocked_user(
     mock_props,
     ident,
     command_payload,
+    mock_ensure_path_patch,
 ):
     conf_dir, mock_conf, mock_client, mock_os, mock_pwd, em = epmanager_as_user
 
@@ -2263,6 +2294,38 @@ def test_includes_mapped_identity_in_user_config(
     assert a[3].matched_identity == ident
 
 
+@pytest.mark.parametrize(
+    ("ep_log_config", "ep_dir_config"),
+    (["/a/b", "/opt/other_ep"], ["/a/b", None], [None, "/opt/e.log"], [None, None]),
+)
+def test_ep_dir_log_path_envs_passed_to_render(
+    mocker,
+    successful_exec_from_mocked_root,
+    command_payload,
+    mock_config_paths,
+    ep_log_config,
+    ep_dir_config,
+):
+    mock_os, conf_dir, *_, em = successful_exec_from_mocked_root
+
+    config, config_str = mock_config_paths(ep_dir_config, ep_log_config)
+
+    mocker.patch(f"{_MOCK_BASE}render_config_user_template", return_value=config_str)
+    mock_ensure = mocker.patch(f"{_MOCK_BASE}ensure_paths")
+
+    m = mock.Mock()
+    mock_os.fdopen.return_value.__enter__.return_value = m
+    with pytest.raises(SystemExit) as pyexc:
+        em._event_loop()
+
+    assert pyexc.value.code == _GOOD_EC, "Q&D: verify we exec'ed, based on '+= 1'"
+
+    (passed_name, passed_paths), _ = mock_ensure.call_args
+    assert passed_name == command_payload["kwargs"]["name"]
+    # If there are no custom configs the arg should also be None
+    assert passed_paths == config.get("paths")
+
+
 @pytest.mark.parametrize("is_valid", (True, False))
 def test_pipe_size_limit(mocker, mock_log, successful_exec_from_mocked_root, is_valid):
     *_, em = successful_exec_from_mocked_root
@@ -2354,7 +2417,7 @@ def test_redirect_stdstreams_to_user_log(
 
     uep_name = command_payload["kwargs"]["name"]
     uep_dir = mock_ensure_compute_dir() / uep_name
-    ep_log = uep_dir / "endpoint.log"
+    ep_log = mock_ensure_paths()
 
     with pytest.raises(SystemExit) as pyexc:
         em._event_loop()

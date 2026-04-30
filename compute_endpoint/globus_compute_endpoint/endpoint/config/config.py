@@ -12,9 +12,10 @@ from globus_compute_sdk.sdk.utils.uuid_like import (
     as_optional_uuid,
     as_uuid,
 )
-from pydantic import ConfigDict, validate_call
+from pydantic import BaseModel, ConfigDict, validate_call
 
 from .pam import PamConfiguration
+from .path_config import PathConfiguration
 
 MINIMUM_HEARTBEAT: float = 5.0
 log = logging.getLogger(__name__)
@@ -197,6 +198,8 @@ class UserEndpointConfig(BaseConfig):
         The currently known engines are ``GlobusComputeEngine``, ``ProcessPoolEngine``,
         and ``ThreadPoolEngine``.  See :ref:`uep-conf` for more information.
 
+    :param paths: User Endpoint directory and log path related configuration group
+        See |PathConfiguration| or :ref:`endpoint-paths` for more information.
 
     :param heartbeat_threshold: Seconds since the last heartbeat message from the
         Globus Compute web service after which the connection is assumed to be
@@ -224,11 +227,7 @@ class UserEndpointConfig(BaseConfig):
     :param endpoint_teardown: Command(s) to be run during the endpoint
         shutdown process
 
-    :param log_dir: path to the top-level directory where logs should be written
-
-    :param stdout: Path where the endpoint's stdout should be written
-
-    :param stderr: Path where the endpoint's stderr should be written
+    .. |PathConfiguration| replace:: :class:`PathConfiguration <globus_compute_endpoint.endpoint.config.path_config.PathConfiguration>`
     """
 
     @validate_call(config=ConfigDict(arbitrary_types_allowed=True))
@@ -243,10 +242,7 @@ class UserEndpointConfig(BaseConfig):
         idle_heartbeats_hard: int = 5760,  # Two days, divided by `heartbeat_period`
         endpoint_setup: str | None = None,
         endpoint_teardown: str | None = None,
-        # Logging info
-        log_dir: str | None = None,
-        stdout: str = "./endpoint.log",
-        stderr: str = "./endpoint.log",
+        paths: PathConfiguration | None = None,
         **kwargs,
     ) -> None:
         super().__init__(**kwargs)
@@ -260,11 +256,7 @@ class UserEndpointConfig(BaseConfig):
 
         self.endpoint_setup = endpoint_setup
         self.endpoint_teardown = endpoint_teardown
-
-        # Logging info
-        self.log_dir = log_dir
-        self.stdout = stdout
-        self.stderr = stderr
+        self.paths = paths
 
     @property
     def engine(self) -> GlobusComputeEngineBase | None:
