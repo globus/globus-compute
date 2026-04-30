@@ -8,8 +8,9 @@ from unittest import mock
 import pytest
 from globus_compute_endpoint.endpoint.config import (
     BaseConfig,
-    ManagerEndpointConfig,
+    CoreEndpointConfig,
     PamConfiguration,
+    PathConfiguration,
     UserEndpointConfig,
 )
 from globus_compute_endpoint.endpoint.config.dispatch import (
@@ -19,7 +20,7 @@ from globus_compute_endpoint.endpoint.config.dispatch import (
     ProviderDispatcher,
 )
 from pydantic import TypeAdapter, ValidationError
-from tests.unit.conftest import known_manager_config_opts, known_user_config_opts
+from tests.unit.conftest import known_core_config_opts, known_user_config_opts
 
 _MOCK_BASE = "globus_compute_endpoint.endpoint.config."
 
@@ -56,23 +57,23 @@ def test_mep_config_verifies_path_like_fields(config_dict_mep, field: str):
     conf_p = pathlib.Path("/some/path/not exists file")
     config_dict_mep[field] = conf_p
     with pytest.raises(ValueError) as pyt_e:
-        ManagerEndpointConfig(**config_dict_mep)
+        CoreEndpointConfig(**config_dict_mep)
 
     e_str = str(pyt_e.value)
     assert "not found" in e_str
     assert str(conf_p) in e_str, "expect location in exc to help human out"
 
     del config_dict_mep[field]
-    ManagerEndpointConfig(**config_dict_mep)  # doesn't raise; conditional validation
+    CoreEndpointConfig(**config_dict_mep)  # doesn't raise; conditional validation
 
 
 def test_mep_config_privileged_verifies_idmapping(config_dict_mep):
     p = config_dict_mep["identity_mapping_config_path"]
-    ManagerEndpointConfig(**config_dict_mep)  # Verify for test: doesn't raise!
+    CoreEndpointConfig(**config_dict_mep)  # Verify for test: doesn't raise!
 
     p.unlink(missing_ok=True)
     with pytest.raises(ValueError) as pyt_e:
-        ManagerEndpointConfig(**config_dict_mep)
+        CoreEndpointConfig(**config_dict_mep)
 
     assert "not found" in str(pyt_e)
     assert str(p) in str(pyt_e), "Expect invalid path shared"
@@ -87,9 +88,9 @@ def test_mep_public(public: t.Any):
         ta_bool.validate_python(public)
     except ValidationError:
         with pytest.raises(ValidationError):
-            ManagerEndpointConfig(public=public)
+            CoreEndpointConfig(public=public)
     else:
-        c = ManagerEndpointConfig(public=public)
+        c = CoreEndpointConfig(public=public)
         assert c.public is bool(public), "Verify that public is set to what we expect"
 
 
@@ -121,15 +122,14 @@ def test_provider_container_compatibility(
 def test_configs_repr_default_kwargs():
     assert repr(UserEndpointConfig()) == "UserEndpointConfig()"
     defs = f"pam={PamConfiguration(enable=False)!r}"
-    assert repr(ManagerEndpointConfig()) == f"ManagerEndpointConfig({defs})", (
-        "mep is on base"
-    )
+    assert repr(CoreEndpointConfig()) == f"CoreEndpointConfig({defs})", "mep is on base"
 
 
 @pytest.mark.parametrize("kw,cls", known_user_config_opts.items())
 def test_userconfig_repr_nondefault_kwargs(
     randomstring, kw, cls, get_random_of_datatype
 ):
+    # Skip optional sections
     if kw == "engine":
         return
 
@@ -144,7 +144,7 @@ def test_userconfig_repr_nondefault_kwargs(
         assert f"{kw}={repr(val)}" in repr_c
 
 
-@pytest.mark.parametrize("kw,cls", known_manager_config_opts.items())
+@pytest.mark.parametrize("kw,cls", known_core_config_opts.items())
 def test_managerconfig_repr_nondefault_kwargs(
     randomstring, fs, kw, cls, get_random_of_datatype
 ):
@@ -152,7 +152,7 @@ def test_managerconfig_repr_nondefault_kwargs(
     if cls == os.PathLike:
         val = pathlib.Path(val)
 
-    repr_c = repr(ManagerEndpointConfig(**{kw: val}))
+    repr_c = repr(CoreEndpointConfig(**{kw: val}))
 
     assert f"{kw}={repr(val)}" in repr_c
 
@@ -236,8 +236,8 @@ def test_dispatcher_excludes_none():
     "cls",
     (
         BaseConfig,
+        CoreEndpointConfig,
         UserEndpointConfig,
-        ManagerEndpointConfig,
     ),
 )
 def test_config_init_validated_with_pydantic(cls):

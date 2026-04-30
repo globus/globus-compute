@@ -1,7 +1,7 @@
 from .config import (  # noqa: F401
     BaseConfig,
     Config,
-    ManagerEndpointConfig,
+    CoreEndpointConfig,
     UserEndpointConfig,
 )
 from .dispatch import (  # noqa: F401
@@ -12,3 +12,4 @@ from .dispatch import (  # noqa: F401
     TypeDispatcher,
 )
 from .pam import PamConfiguration  # noqa: F401
+from .path_config import PathConfiguration  # noqa: F401

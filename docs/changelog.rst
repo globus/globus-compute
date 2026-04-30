@@ -3830,7 +3830,7 @@ New Functionality
 
 .. |DillCodeSource| replace:: :class:`~globus_compute_sdk.serialize.DillCodeSource`
 
-.. |audit_log_path| replace:: :class:`audit_log_path <globus_compute_endpoint.endpoint.config.config.ManagerEndpointConfig>`
+.. |audit_log_path| replace:: :class:`audit_log_path <globus_compute_endpoint.endpoint.config.config.CoreEndpointConfig>`
 .. |detach_endpoint| replace:: :class:`detach_endpoint <globus_compute_endpoint.endpoint.config.config.UserEndpointConfig>`
 .. |GlobusComputeEngine| replace:: :class:`~globus_compute_endpoint.engines.GlobusComputeEngine`
 .. |ThreadPoolEngine| replace:: :class:`~globus_compute_endpoint.engines.thread_pool.ThreadPoolEngine`

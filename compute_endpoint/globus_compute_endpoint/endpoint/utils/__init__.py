@@ -146,7 +146,7 @@ def send_endpoint_startup_failure_to_amqp(amqp_creds: dict, msg: str | None = No
     Non-exhaustive possible exceptions:
       - ``ImportError`` - for example, expects ``pika``
       - ``KeyError`` - If the ``amqp_creds`` data structure does not match; see, for
-           example, ``endpoint_manager.py`` for the expected data structure.
+           example, ``core_endpoint.py`` for the expected data structure.
       - pika connection errors, if unable to open a connection or send a message
     """
     import pika

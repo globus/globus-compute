@@ -20,7 +20,7 @@ import yaml
 from globus_compute_endpoint.auth import get_globus_app_with_scopes
 from globus_compute_endpoint.endpoint.config import (
     BaseConfig,
-    ManagerEndpointConfig,
+    CoreEndpointConfig,
     UserEndpointConfig,
 )
 from globus_compute_endpoint.endpoint.config.utils import get_config
@@ -59,7 +59,7 @@ class Endpoint:
 
     @staticmethod
     def user_config_template_path(
-        endpoint_dir: pathlib.Path, config: ManagerEndpointConfig | None = None
+        endpoint_dir: pathlib.Path, config: CoreEndpointConfig | None = None
     ) -> pathlib.Path:
         if config and config.user_config_template_path:
             return pathlib.Path(config.user_config_template_path)
@@ -67,7 +67,7 @@ class Endpoint:
 
     @staticmethod
     def user_config_schema_path(
-        endpoint_dir: pathlib.Path, config: ManagerEndpointConfig | None = None
+        endpoint_dir: pathlib.Path, config: CoreEndpointConfig | None = None
     ) -> pathlib.Path:
         if config and config.user_config_schema_path:
             return pathlib.Path(config.user_config_schema_path)
@@ -75,7 +75,7 @@ class Endpoint:
 
     @staticmethod
     def identity_mapping_config_path(
-        endpoint_dir: pathlib.Path, config: ManagerEndpointConfig
+        endpoint_dir: pathlib.Path, config: CoreEndpointConfig
     ) -> pathlib.Path:
         return (
             config.identity_mapping_config_path
@@ -311,7 +311,7 @@ class Endpoint:
 
         if id_mapping:
             config = get_config(conf_dir)
-            assert isinstance(config, ManagerEndpointConfig)  # mypy...
+            assert isinstance(config, CoreEndpointConfig)  # mypy...
             idmap_conf_path = Endpoint.identity_mapping_config_path(conf_dir, config)
             print(f"\n\tIdentity mapping configuration: {idmap_conf_path}")
 
@@ -326,7 +326,7 @@ class Endpoint:
     @staticmethod
     def migrate_to_template_capable(conf_dir: pathlib.Path):
         og_config_obj = get_config(conf_dir)
-        if isinstance(og_config_obj, ManagerEndpointConfig):
+        if isinstance(og_config_obj, CoreEndpointConfig):
             raise ValueError(f"Endpoint '{conf_dir.name}' is already template capable.")
 
         if Endpoint.check_pidfile(conf_dir)["active"]:

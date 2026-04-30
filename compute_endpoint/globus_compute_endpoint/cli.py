@@ -28,7 +28,7 @@ from daemon.pidfile import PIDLockFile
 from globus_compute_endpoint.auth import get_globus_app_with_scopes
 from globus_compute_endpoint.boot_persistence import disable_on_boot, enable_on_boot
 from globus_compute_endpoint.endpoint.config import (
-    ManagerEndpointConfig,
+    CoreEndpointConfig,
     UserEndpointConfig,
 )
 from globus_compute_endpoint.endpoint.config.utils import (
@@ -38,8 +38,8 @@ from globus_compute_endpoint.endpoint.config.utils import (
     load_user_config_template,
     render_config_user_template,
 )
+from globus_compute_endpoint.endpoint.core_endpoint import CoreEndpoint
 from globus_compute_endpoint.endpoint.endpoint import Endpoint
-from globus_compute_endpoint.endpoint.endpoint_manager import EndpointManager
 from globus_compute_endpoint.endpoint.identity_mapper import MappedPosixIdentity
 from globus_compute_endpoint.endpoint.utils import has_pyprctl as _has_multi_user
 from globus_compute_endpoint.endpoint.utils import (
@@ -50,12 +50,20 @@ from globus_compute_endpoint.endpoint.utils import (
 )
 from globus_compute_endpoint.exception_handling import handle_auth_errors
 from globus_compute_endpoint.exceptions import MessageSystemExit
-from globus_compute_endpoint.logging_config import setup_logging
+from globus_compute_endpoint.logging_config import (
+    ensure_log_path,
+    setup_logging,
+)
 from globus_compute_sdk import Client
 from globus_compute_sdk.sdk.auth.auth_client import ComputeAuthClient
 from globus_compute_sdk.sdk.auth.whoami import print_whoami_info
 from globus_compute_sdk.sdk.batch import create_user_runtime
-from globus_compute_sdk.sdk.compute_dir import ensure_compute_dir, get_compute_dir
+from globus_compute_sdk.sdk.compute_dir import (
+    COMPUTE_DIR_ENV,
+    COMPUTE_EP_DIR_ENV,
+    ensure_compute_dir,
+    get_compute_dir,
+)
 from globus_compute_sdk.sdk.utils.gare import gare_handler
 from globus_sdk import MISSING, AuthClient, GlobusAPIError, MissingType, NetworkError
 
@@ -106,7 +114,7 @@ class CommandState:
 def config_dir_callback(ctx, param, value) -> pathlib.Path:
     try:
         if value:
-            os.environ["GLOBUS_COMPUTE_USER_DIR"] = value
+            os.environ[COMPUTE_DIR_ENV] = value
         return ensure_compute_dir()
     except (FileExistsError, PermissionError) as e:
         raise ClickException(str(e))
@@ -461,13 +469,13 @@ def configure_endpoint(
     """
     if not _has_multi_user:
         raise ClickException(
-            "Unable to configure new endpoints; Manager Endpoint Processes are not"
+            "Unable to configure new endpoints; Core Endpoint Processes are not"
             " supported on this system"
         )
 
     if endpoint_config is not None:
         warnings.warn(
-            "--endpoint-config is deprecated; use --manager-config instead."
+            "--endpoint-config is deprecated; use --core-config instead."
             " If you want to configure user endpoint processes, use --template-config.",
             DeprecationWarning,
             stacklevel=2,
@@ -477,7 +485,7 @@ def configure_endpoint(
             manager_config = pathlib.Path(endpoint_config)
         else:
             warnings.warn(
-                "Both --endpoint-config and --manager-config were provided;"
+                "Both --endpoint-config and --core-config were provided;"
                 " --endpoint-config will be ignored.",
                 UserWarning,
                 stacklevel=2,
@@ -577,7 +585,7 @@ def configure_endpoint(
 )
 def start_endpoint(*, ep_dir: pathlib.Path, die_with_parent: bool, **_kwargs):
     state = CommandState.ensure()
-    # for backward compatibility with EndpointManager versions that run
+    # for backward compatibility with CoreEndpoint versions that run
     # `gce start --die-with-parent` instead of `gce _start-user-endpoint`.
     # deprecated; to be removed in 6 months (roughly Oct 2026)
     if die_with_parent:
@@ -586,7 +594,7 @@ def start_endpoint(*, ep_dir: pathlib.Path, die_with_parent: bool, **_kwargs):
             endpoint_uuid=state.endpoint_uuid,
         )
     else:
-        _start_endpoint_manager(
+        _start_core_endpoint(
             ep_dir=ep_dir,
             endpoint_uuid=state.endpoint_uuid,
         )
@@ -789,7 +797,7 @@ class _SendMessageOnErrorExit(contextlib.AbstractContextManager):
 
 
 def _do_register_endpoint(
-    ep_dir: pathlib.Path, ep_config: ManagerEndpointConfig, ep_uuid: str | None
+    ep_dir: pathlib.Path, ep_config: CoreEndpointConfig, ep_uuid: str | None
 ) -> dict:
     gcc = Client(
         local_compute_services=ep_config.local_compute_services,
@@ -801,7 +809,7 @@ def _do_register_endpoint(
         reg_info = gcc.register_endpoint(
             name=ep_dir.name,
             endpoint_id=ep_uuid or Endpoint.get_endpoint_id(ep_dir),
-            metadata=EndpointManager.get_metadata(ep_dir, ep_config),
+            metadata=CoreEndpoint.get_metadata(ep_dir, ep_config),
             public=ep_config.public,
             multi_user=is_privileged(),
             display_name=ep_config.display_name,
@@ -846,7 +854,7 @@ def _do_register_endpoint(
     return reg_info
 
 
-def _start_endpoint_manager(
+def _start_core_endpoint(
     *,
     ep_dir: pathlib.Path,
     endpoint_uuid: str | None,
@@ -896,7 +904,7 @@ def _start_endpoint_manager(
         pid_stale_after_s = ep_config.heartbeat_period * 3
         _pidfile_check(pid_path, pid_stale_after_s)
 
-        if not isinstance(ep_config, ManagerEndpointConfig):
+        if not isinstance(ep_config, CoreEndpointConfig):
             raise ClickException(
                 f"Configuration for endpoint {ep_dir.name} contains an `engine` field;"
                 " endpoint will not start. (Hint: move the `engine` block to"
@@ -931,7 +939,7 @@ def _start_endpoint_manager(
         pid_path = Endpoint.pid_path(ep_dir)
         stk.enter_context(_pidfile(pid_path, ep_config.heartbeat_period * 3))
 
-        epm = EndpointManager(ep_dir, endpoint_uuid, ep_config, reg_info)
+        epm = CoreEndpoint(ep_dir, endpoint_uuid, ep_config, reg_info)
         epm.start()
 
 
@@ -943,8 +951,11 @@ def _start_user_endpoint(
     os.umask(0o077)
     state = CommandState.ensure()
     if ep_dir.is_dir():
+        if not os.environ.get(COMPUTE_EP_DIR_ENV):
+            # If not already set for us, use the endpoint dir
+            os.environ[COMPUTE_EP_DIR_ENV] = str(ep_dir.resolve())
         setup_logging(
-            logfile=ep_dir / "endpoint.log",
+            logfile=ensure_log_path(),
             debug=state.debug,
             console_enabled=state.log_to_console,
             no_color=state.no_color,
@@ -974,7 +985,7 @@ def _start_user_endpoint(
             raise ClickException(
                 "Missing or invalid endpoint information from stdin. (Hint: this"
                 " command is not meant to be invoked manually; it should only be run"
-                " by an endpoint manager process.)"
+                " by a core endpoint process.)"
             ) from e
 
     with contextlib.ExitStack() as stk:
@@ -988,7 +999,7 @@ def _start_user_endpoint(
 
             if not state.debug and ep_config.debug:
                 setup_logging(
-                    logfile=ep_dir / "endpoint.log",
+                    logfile=ensure_log_path(),
                     debug=ep_config.debug,
                     console_enabled=state.log_to_console,
                     no_color=state.no_color,
@@ -1055,7 +1066,7 @@ def restart_endpoint(*, ep_dir: pathlib.Path, **_kwargs):
     """Restarts an endpoint"""
     state = CommandState.ensure()
     _do_stop_endpoint(ep_dir=ep_dir)
-    _start_endpoint_manager(
+    _start_core_endpoint(
         ep_dir=ep_dir,
         endpoint_uuid=state.endpoint_uuid,
     )
@@ -1388,14 +1399,14 @@ def _do_render_user_config(
     if parent_ep_dir is None and template_file is None:
         raise ClickException("Must provide at least one of --endpoint or --template.")
 
-    parent_config = ManagerEndpointConfig()
+    parent_config = CoreEndpointConfig()
     user_config_template: str
     user_config_template_path: pathlib.Path
     user_config_schema = {}
 
     if parent_ep_dir is not None:
         parent_config = get_config(parent_ep_dir)  # type: ignore[assignment]
-        if not isinstance(parent_config, ManagerEndpointConfig):
+        if not isinstance(parent_config, CoreEndpointConfig):
             raise ClickException(
                 f"Endpoint {parent_ep_dir.name} does not support templating."
             )
@@ -1416,7 +1427,7 @@ def _do_render_user_config(
             raise ClickExceptionWithContext(
                 f"Invalid parent config data in {parent_config_file.name}."
             ) from e
-        if not isinstance(parent_config, ManagerEndpointConfig):
+        if not isinstance(parent_config, CoreEndpointConfig):
             raise ClickException("Provided parent config does not support templating.")
 
     if template_file is not None:
