@@ -1021,6 +1021,26 @@ def test_config_yaml_display_none(run_line, gc_dir, display_name):
     assert conf.display_name is None, conf.display_name
 
 
+@pytest.mark.parametrize("die_with_parent", [True, False])
+def test_start_ep_handles_die_with_parent(
+    run_line, make_endpoint_dir, ep_name, die_with_parent, mocker
+):
+    mock__start_user_endpoint = mocker.patch(f"{_MOCK_BASE}_start_user_endpoint")
+    mock__start_endpoint_manager = mocker.patch(f"{_MOCK_BASE}_start_endpoint_manager")
+
+    make_endpoint_dir()
+
+    cmd = f"start {ep_name}" + (" --die-with-parent" if die_with_parent else "")
+    run_line(cmd)
+
+    if die_with_parent:
+        assert mock__start_user_endpoint.called, "Only the UEP should start"
+        assert not mock__start_endpoint_manager.called, "Only the UEP should start"
+    else:
+        assert not mock__start_user_endpoint.called, "Only the manager should start"
+        assert mock__start_endpoint_manager.called, "Only the manager should start"
+
+
 def test_start_ep_incorrect_config_yaml(
     run_line, mock_command_ensure, make_endpoint_dir, ep_name
 ):
