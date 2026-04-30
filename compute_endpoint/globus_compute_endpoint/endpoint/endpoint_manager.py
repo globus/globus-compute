@@ -60,6 +60,7 @@ from globus_compute_endpoint.exceptions import MessageSystemExit
 from globus_compute_sdk import Client
 from globus_compute_sdk.sdk.auth.auth_client import ComputeAuthClient
 from globus_compute_sdk.sdk.compute_dir import ensure_compute_dir
+from packaging.version import Version
 
 if t.TYPE_CHECKING:
     from pika.spec import BasicProperties
@@ -1140,6 +1141,26 @@ class EndpointManager:
             os.umask(umask)
             exit_code += 1
 
+            user_opts = kwargs.get("user_opts", {})
+            user_runtime = kwargs.get("user_runtime", {})
+            user_config = render_config_user_template(
+                self._config,
+                template_str,
+                self.user_config_template_path,
+                ident,
+                user_config_schema,
+                user_opts,
+                user_runtime,
+            )
+
+            if py_version := user_runtime.get("python", {}).get("version"):
+                env.setdefault("GC_USER_PYTHON_VERSION", py_version)
+            if gce_version := user_runtime.get("globus_compute_sdk_version"):
+                env.setdefault("GC_USER_SDK_VERSION", gce_version)
+                if Version(gce_version) < Version("4.10.0"):
+                    proc_args[1] = "start"
+                    proc_args.append("--die-with-parent")
+
             # some Q&D verification for admin debugging purposes
             if not shutil.which(proc_args[0]):
                 log.warning(
@@ -1167,23 +1188,6 @@ class EndpointManager:
             ep_dir = gc_dir / ep_name
             ep_dir.mkdir(mode=0o700, parents=True, exist_ok=True)
             ep_log = ep_dir / "endpoint.log"
-
-            user_opts = kwargs.get("user_opts", {})
-            user_runtime = kwargs.get("user_runtime", {})
-            user_config = render_config_user_template(
-                self._config,
-                template_str,
-                self.user_config_template_path,
-                ident,
-                user_config_schema,
-                user_opts,
-                user_runtime,
-            )
-
-            if py_version := user_runtime.get("python", {}).get("version"):
-                env.setdefault("GC_USER_PYTHON_VERSION", py_version)
-            if gce_version := user_runtime.get("globus_compute_sdk_version"):
-                env.setdefault("GC_USER_SDK_VERSION", gce_version)
 
             exit_code += 1
             _conf = yaml.safe_load(user_config)
