@@ -36,7 +36,7 @@ from globus_compute_endpoint.cli import (
     create_or_choose_auth_project,
 )
 from globus_compute_endpoint.endpoint.config import (
-    ManagerEndpointConfig,
+    CoreEndpointConfig,
     UserEndpointConfig,
 )
 from globus_compute_endpoint.endpoint.config.utils import load_config_yaml
@@ -115,7 +115,7 @@ def mock_ep(gc_dir, ep_name):
 
 @pytest.fixture
 def mock_mep():
-    with mock.patch(f"{_MOCK_BASE}EndpointManager") as m:
+    with mock.patch(f"{_MOCK_BASE}CoreEndpoint") as m:
         m.return_value = m
         yield m
 
@@ -146,7 +146,7 @@ def mock_get_config():
 
 @pytest.fixture
 def mock_load_config_yaml_mep():
-    conf = ManagerEndpointConfig()
+    conf = CoreEndpointConfig()
     with mock.patch(f"{_MOCK_BASE}load_config_yaml") as m:
         m.return_value = conf
         yield m
@@ -154,7 +154,7 @@ def mock_load_config_yaml_mep():
 
 @pytest.fixture
 def mock_get_config_mep():
-    conf = ManagerEndpointConfig()
+    conf = CoreEndpointConfig()
     with mock.patch(f"{_MOCK_BASE}get_config") as m:
         m.return_value = conf
         yield m
@@ -392,7 +392,7 @@ def test_start_endpoint_already_running(
     mock_command_ensure.detach = detach
     with redirect_stderr(f):
         with pytest.raises(MessageSystemExit) as pyt_e:
-            cli._start_endpoint_manager(ep_dir=ep_dir, endpoint_uuid=None)
+            cli._start_core_endpoint(ep_dir=ep_dir, endpoint_uuid=None)
     pid_path.unlink()
 
     serr = f.getvalue()
@@ -415,7 +415,7 @@ def test_start_endpoint_stale(
     os.utime(pid_path, (stale_time, stale_time))
     f = io.StringIO()
     with redirect_stderr(f):
-        cli._start_endpoint_manager(ep_dir=ep_dir, endpoint_uuid=None)
+        cli._start_core_endpoint(ep_dir=ep_dir, endpoint_uuid=None)
 
     serr = f.getvalue()
     assert "Previous endpoint instance" in serr, "Expect 'who' in warning"
@@ -549,7 +549,7 @@ def test__do_register_endpoint_data_passthrough(
     mock_client.register_endpoint.side_effect = FakeGlobusAPIError(HTTPStatus.CONFLICT)
 
     ep_dir = make_manager_endpoint_dir()
-    ep_conf = ManagerEndpointConfig()
+    ep_conf = CoreEndpointConfig()
     ep_conf.allowed_functions = [uuid.uuid4() for _ in range(random.randint(1, 10))]
     ep_conf.authentication_policy = str(uuid.uuid4())
     ep_conf.subscription_id = str(uuid.uuid4())
@@ -630,7 +630,7 @@ def test__do_register_endpoint_registration_blocked(
     f = io.StringIO()
     with redirect_stdout(f):
         with pytest.raises((GlobusAPIError, MessageSystemExit)) as pyexc:
-            cli._do_register_endpoint(ep_dir, ManagerEndpointConfig(), ep_uuid)
+            cli._do_register_endpoint(ep_dir, CoreEndpointConfig(), ep_uuid)
         stdout_msg = f.getvalue()
 
     assert mock_log.warning.called
@@ -655,7 +655,7 @@ def test__do_register_endpoint_provided_endpoint_id(
 ):
     ep_dir = make_manager_endpoint_dir(ep_uuid=ep_uuid if with_json else None)
 
-    cli._do_register_endpoint(ep_dir, ManagerEndpointConfig(), ep_uuid)
+    cli._do_register_endpoint(ep_dir, CoreEndpointConfig(), ep_uuid)
 
     _a, k = mock_client.register_endpoint.call_args
     assert k["endpoint_id"] == ep_uuid
@@ -672,7 +672,7 @@ def test__do_register_endpoint_sends_data_during_registration(
 ):
     conf_dir = make_manager_endpoint_dir()
 
-    mock_conf = ManagerEndpointConfig()
+    mock_conf = CoreEndpointConfig()
     mock_conf.public = public
     mock_conf.source_content = "foo: bar"
 
@@ -728,7 +728,7 @@ def test__do_register_endpoint_handles_network_error_scriptably(
     mock_client.register_endpoint.side_effect = NetworkError(some_err, Exception())
 
     with pytest.raises(MessageSystemExit) as pyexc:
-        cli._do_register_endpoint(conf_dir, ManagerEndpointConfig(), ep_uuid)
+        cli._do_register_endpoint(conf_dir, CoreEndpointConfig(), ep_uuid)
 
     assert pyexc.value.code == os.EX_TEMPFAIL, "Expecting meaningful exit code"
     assert mock_log.debug.called
@@ -1009,19 +1009,19 @@ def test_configure_ep_manager_config_precedence(
 ):
     ep_config_arg = randomstring(5)
     gc_dir.mkdir(parents=True, exist_ok=True)
-    manager_config_arg = gc_dir / randomstring(4)
-    manager_config_arg.touch()
+    core_config_arg = gc_dir / randomstring(4)
+    core_config_arg.touch()
 
     with pytest.warns(UserWarning, match="--endpoint-config will be ignored"):
         run_line(
-            f"configure {randomstring()} --manager-config {manager_config_arg}"
+            f"configure {randomstring()} --core-config {core_config_arg}"
             f" --endpoint-config {ep_config_arg}",
             assert_exit_code=0,
         )
 
     assert (
         mock_ep.configure_endpoint.call_args.kwargs["endpoint_config"]
-        == manager_config_arg
+        == core_config_arg
     )
 
 
@@ -1047,7 +1047,7 @@ def test_configure_ep_config_options(
     if manager_config:
         manager_config = gc_dir / manager_config
         manager_config.touch()
-        cmd += f" --manager-config {manager_config}"
+        cmd += f" --coer-config {manager_config}"
     if template_config:
         template_config = gc_dir / template_config
         template_config.touch()
@@ -1112,7 +1112,7 @@ def test_start_ep_handles_die_with_parent(
     run_line, make_endpoint_dir, ep_name, die_with_parent, mocker
 ):
     mock__start_user_endpoint = mocker.patch(f"{_MOCK_BASE}_start_user_endpoint")
-    mock__start_endpoint_manager = mocker.patch(f"{_MOCK_BASE}_start_endpoint_manager")
+    mock__start_core_endpoint = mocker.patch(f"{_MOCK_BASE}_start_core_endpoint")
 
     make_endpoint_dir()
 
@@ -1121,10 +1121,10 @@ def test_start_ep_handles_die_with_parent(
 
     if die_with_parent:
         assert mock__start_user_endpoint.called, "Only the UEP should start"
-        assert not mock__start_endpoint_manager.called, "Only the UEP should start"
+        assert not mock__start_core_endpoint.called, "Only the UEP should start"
     else:
         assert not mock__start_user_endpoint.called, "Only the manager should start"
-        assert mock__start_endpoint_manager.called, "Only the manager should start"
+        assert mock__start_core_endpoint.called, "Only the manager should start"
 
 
 def test_start_ep_incorrect_config_yaml(
@@ -1166,8 +1166,8 @@ def test_start_ep_config_py_takes_precedence(
 ):
     conf_py = make_manager_endpoint_dir() / "config.py"
     conf_py.write_text(
-        "from globus_compute_endpoint.endpoint.config import ManagerEndpointConfig"
-        "\nconfig = ManagerEndpointConfig()"
+        "from globus_compute_endpoint.endpoint.config import CoreEndpointConfig"
+        "\nconfig = CoreEndpointConfig()"
     )
 
     run_line(f"start {ep_name}")
@@ -1281,7 +1281,7 @@ def test_name_or_uuid_decorator(tmp_path, mocker, run_line, name, uuid):
         # dummy config.yaml so that Endpoint._get_ep_dirs finds this
         (ep_conf_dir / "config.yaml").write_text("")
 
-    mock__start_epm = mocker.patch(f"{_MOCK_BASE}_start_endpoint_manager")
+    mock__start_epm = mocker.patch(f"{_MOCK_BASE}_start_core_endpoint")
 
     run_line(f"-c {gc_conf_dir} start {name}")
     run_line(f"-c {gc_conf_dir} start {uuid}")
@@ -1935,7 +1935,7 @@ def test_render_user_config_file_options(
                 out += json.dumps(v)
             elif isinstance(v, str):
                 out += v
-            elif isinstance(v, ManagerEndpointConfig):
+            elif isinstance(v, CoreEndpointConfig):
                 out += yaml.safe_dump({"display_name": v.display_name})
             elif isinstance(v, MappedPosixIdentity):
                 out += json.dumps(
@@ -2058,8 +2058,8 @@ def test__do_render_user_config_checks_template_capable(
     mock_load_config_yaml, mock_get_config, parent_ep_dir, parent_config_file
 ):
     e = "test setup: mocked config should never be template capable"
-    assert not isinstance(mock_get_config.return_value, ManagerEndpointConfig), e
-    assert not isinstance(mock_load_config_yaml.return_value, ManagerEndpointConfig), e
+    assert not isinstance(mock_get_config.return_value, CoreEndpointConfig), e
+    assert not isinstance(mock_load_config_yaml.return_value, CoreEndpointConfig), e
 
     with pytest.raises(ClickException, match="does not support templating"):
         _do_render_user_config(

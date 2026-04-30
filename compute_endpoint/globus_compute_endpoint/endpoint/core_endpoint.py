@@ -32,7 +32,7 @@ from globus_compute_common.messagepack import pack
 from globus_compute_common.messagepack.message_types import EPStatusReport
 from globus_compute_endpoint import __version__
 from globus_compute_endpoint.auth import get_globus_app_with_scopes
-from globus_compute_endpoint.endpoint.config import ManagerEndpointConfig
+from globus_compute_endpoint.endpoint.config import CoreEndpointConfig
 from globus_compute_endpoint.endpoint.config.config import MINIMUM_HEARTBEAT
 from globus_compute_endpoint.endpoint.config.utils import (
     load_user_config_schema,
@@ -118,15 +118,15 @@ T_CMD_START_ARGS = t.Tuple[
 ]
 
 
-class EndpointManager:
+class CoreEndpoint:
     def __init__(
         self,
         conf_dir: pathlib.Path,
         endpoint_uuid: str | None,
-        config: ManagerEndpointConfig,
+        config: CoreEndpointConfig,
         reg_info: dict,
     ):
-        log.debug("Endpoint Manager initialization")
+        log.debug("Core Endpoint initialization")
 
         self.conf_dir = conf_dir
         self._config = config
@@ -267,7 +267,7 @@ class EndpointManager:
         json_file.write_text(json.dumps(ep_info))
         log.debug(f"Registration info written to {json_file}")
 
-        # * == "manager endpoint"; not important until it is, so let it be subtle
+        # * == "core endpoint"; not important until it is, so let it be subtle
         ptitle = f"Globus Compute Endpoint *({endpoint_uuid}, {conf_dir.name})"
         if config.environment:
             ptitle += f" - {config.environment}"
@@ -283,7 +283,7 @@ class EndpointManager:
         self._heartbeat_publisher = ResultPublisher(queue_info=hbq_info)
 
     @staticmethod
-    def get_metadata(ep_dir: pathlib.Path, config: ManagerEndpointConfig) -> dict:
+    def get_metadata(ep_dir: pathlib.Path, config: CoreEndpointConfig) -> dict:
         user_config_template = load_user_config_template(
             Endpoint.user_config_template_path(ep_dir, config)
         )
@@ -377,7 +377,7 @@ class EndpointManager:
         try:
             with open(self._config.audit_log_path, "ab", buffering=0) as audit_f:
                 nowtz = datetime.now().astimezone().isoformat()
-                msg = f"{nowtz} uid={uid} pid={pid} eid={eid} Begin MEP session =====\n"
+                msg = f"{nowtz} uid={uid} pid={pid} eid={eid} Begin CEP session =====\n"
                 audit_f.write(msg.encode())
                 del msg, nowtz
                 while not self._audit_log_handler_stop:
@@ -392,7 +392,7 @@ class EndpointManager:
                         cb(key.fd, audit_f)
 
                 nowtz = datetime.now().astimezone().isoformat()
-                msg = f"{nowtz} uid={uid} pid={pid} eid={eid} End MEP session -----\n"
+                msg = f"{nowtz} uid={uid} pid={pid} eid={eid} End CEP session -----\n"
                 audit_f.write(msg.encode())
         finally:
             self._time_to_stop = True
@@ -472,7 +472,7 @@ class EndpointManager:
         return f
 
     def start(self):
-        log.info(f"\n\n========== Endpoint Manager begins: {self._endpoint_uuid_str}")
+        log.info(f"\n\n========== Core Endpoint begins: {self._endpoint_uuid_str}")
 
         msg_out = None
         if sys.stdout.isatty():
@@ -559,7 +559,7 @@ class EndpointManager:
 
         log.info(
             "Shutdown complete."
-            f"\n---------- Endpoint Manager ends: {self._endpoint_uuid_str}\n\n"
+            f"\n---------- Core Endpoint ends: {self._endpoint_uuid_str}\n\n"
         )
         if msg_out:
             # re-enable cursor visibility
@@ -978,8 +978,8 @@ class EndpointManager:
             p_uname = self._mu_user.pw_name
             if uname == p_uname or uid == os.getuid():
                 raise InvalidUserError(
-                    "Requested UID is same as Manager Endpoint UID on a user-mapped"
-                    " Manager Endpoint. To allow the same UID to run tasks, consider:"
+                    "Requested UID is same as Core Endpoint UID on a user-mapped"
+                    " Core Endpoint. To allow the same UID to run tasks, consider:"
                     "\n * using a non-root user,"
                     "\n * removing privileges from the UID, or"
                     "\n * removing the identity mapping configuration file"
@@ -1141,7 +1141,7 @@ class EndpointManager:
                 default_path = ("/usr/local/bin", "/usr/bin", "/bin", pybindir)
                 upath = ":".join(map(str, default_path))
 
-            # only set if env cleared / MEP privileged
+            # only set if env cleared / CEP privileged
             env.setdefault("HOME", udir)
             env.setdefault("USER", uname)
             env.setdefault("PATH", upath)
@@ -1210,7 +1210,7 @@ class EndpointManager:
             _ha_key = "high_assurance"
             if _ha_key in _conf:
                 log.error(f"`{_ha_key}` may not be specified in template")
-                raise ValueError("Error generating template; contact MEP administrator")
+                raise ValueError("Error generating template; contact EP administrator")
 
             if self._config.high_assurance:
                 user_config = f"{_ha_key}: true\n{user_config}"
@@ -1218,7 +1218,7 @@ class EndpointManager:
             if bool(_conf.get(_ha_key)) ^ self._config.high_assurance:
                 # final check that the configuration HAness aligns
                 log.error(f"Unknown error generating correct template: `{_ha_key}`")
-                raise ValueError("Error generating template; contact MEP administrator")
+                raise ValueError("Error generating template; contact EP administrator")
 
             ep_info: dict = {"posix_ppid": os.getppid()}
             if ident.matched_identity:
@@ -1278,9 +1278,9 @@ class EndpointManager:
                 if os.dup2(log_f.fileno(), 2) != 2:
                     raise OSError(f"Unable to redirect stderr to {ep_log}")
 
-            # After the last os.dup2(), std* streams are sent to user's EP log file
-            # and not the MEP's logs.  Use the exit_code as an avenue to share "what
-            # went wrong where" to the parent process (the MEP).
+            # After the last os.dup2(), std* streams are sent to the user EP log file
+            # and not the Core EP log.  Use the exit_code as an avenue to share "what
+            # went wrong where" to the parent process (the CEP).
             exit_code += 1
 
             if _conf.get("debug") is True:

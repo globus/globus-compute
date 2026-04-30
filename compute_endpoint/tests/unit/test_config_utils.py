@@ -15,7 +15,7 @@ import pytest
 import yaml
 from click import ClickException
 from globus_compute_endpoint.endpoint.config import (
-    ManagerEndpointConfig,
+    CoreEndpointConfig,
     UserEndpointConfig,
 )
 from globus_compute_endpoint.endpoint.config.utils import (
@@ -30,7 +30,7 @@ from globus_compute_endpoint.endpoint.config.utils import (
 from globus_compute_endpoint.endpoint.endpoint import Endpoint
 from globus_compute_endpoint.endpoint.identity_mapper import MappedPosixIdentity
 from tests.conftest import randomstring_impl
-from tests.unit.conftest import known_manager_config_opts, known_user_config_opts
+from tests.unit.conftest import known_core_config_opts, known_user_config_opts
 
 _MOCK_BASE = "globus_compute_endpoint.endpoint.config.utils."
 
@@ -101,8 +101,8 @@ def _get_cls_kwds(cls: type) -> set[str]:
 def test_config_opts_accounted_for_in_tests():
     kwds = _get_cls_kwds(UserEndpointConfig)
     assert set(known_user_config_opts) == kwds
-    kwds = _get_cls_kwds(ManagerEndpointConfig)
-    assert set(known_manager_config_opts) == kwds
+    kwds = _get_cls_kwds(CoreEndpointConfig)
+    assert set(known_core_config_opts) == kwds
 
 
 def test_extra_opts_disallowed():
@@ -133,26 +133,28 @@ def test_load_user_endpoint_config_full(get_random_of_datatype):
         kw: get_random_of_datatype(tval) for kw, tval in known_user_config_opts.items()
     }
     conf["engine"] = {"type": "ThreadPoolEngine"}
+    conf["paths"] = {"endpoint_dir": "/my/dir", "endpoint_log": "/other/t.log"}
     serde_yaml = yaml.safe_dump(conf)
     conf = load_config_yaml(serde_yaml)
     assert isinstance(conf, UserEndpointConfig)
+    assert conf.paths.endpoint_dir == "/my/dir"
+    assert conf.paths.endpoint_log == "/other/t.log"
 
 
 def test_load_manager_endpoint_config_minimal():
     conf = {}
     serde_yaml = yaml.safe_dump(conf)
     conf = load_config_yaml(serde_yaml)
-    assert isinstance(conf, ManagerEndpointConfig)
+    assert isinstance(conf, CoreEndpointConfig)
 
 
 def test_load_manager_endpoint_config_full(get_random_of_datatype):
     conf = {
-        kw: get_random_of_datatype(tval)
-        for kw, tval in known_manager_config_opts.items()
+        kw: get_random_of_datatype(tval) for kw, tval in known_core_config_opts.items()
     }
     serde_yaml = yaml.safe_dump(conf)
     conf = load_config_yaml(serde_yaml)
-    assert isinstance(conf, ManagerEndpointConfig)
+    assert isinstance(conf, CoreEndpointConfig)
 
 
 def test_load_config_yaml_shutdowns_engine_on_user_config_error(
