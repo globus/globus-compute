@@ -315,6 +315,8 @@ def render_config_user_template(
         "parent_config": parent_config,
         "mapped_identity": _parse_mapped_identity(mapped_identity),
         "user_runtime": _sanitize_user_json(user_runtime or {}),
+        # Inject all env vars into UEP, already sanitized if CEP was privileged
+        "env": os.environ,
     }
     reserved_template_vars = {
         "_GC": R,

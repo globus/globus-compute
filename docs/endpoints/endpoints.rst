@@ -211,6 +211,30 @@ will probably not behave as expected.  Example:
 
 These will be injected into the user endpoint process as environment variables.
 
+Two additional environment variables are automatically injected into the UEP
+process as part of the endpoint lifecycle:
+
+* ``GLOBUS_COMPUTE_ENDPOINT_DIR`` - The path of the UEP logs and configurations,
+  the expanded, resolved path customizable by ``paths: endpoint_dir`` in
+  ``user_config_template.yaml.j2``, default ``$HOME/.globus_compute/uep.<UUID>.<UUID>``
+* ``GLOBUS_COMPUTE_LOG_PATH`` - The path that the UEP will write log output to,
+  the expanded, resolved path customizable by ``paths: endpoint_log``, default
+  ``$GLOBUS_COMPUTE_ENDPOINT_DIR/endpoint.log``
+
+For more information on the ``paths`` configuration see :ref:`endpoint-paths`
+
+* ``GLOBUS_COMPUTE_ENDPOINT_NAME`` - The name of the endpoint
+
+** if user_runtime is set....
+
+* ``GC_USER_PYTHON_VERSION`` - A dotted-decimal Python version (e.g., ``3.13.7``) that
+  specifies which version of Python was used to submit tasks to this endpoint
+* ``GC_USER_SDK_VERSION`` - A dotted-decimal ``globus-compute-sdk`` version (e.g.,
+  ``4.8.0``) that specifies what version of the `Globus Compute SDK`_ the submission
+  used
+
+
+
 
 .. _config-dir:
 
