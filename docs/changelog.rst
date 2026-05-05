@@ -3,6 +3,16 @@ Changelog
 
 .. scriv-insert-here
 
+.. _changelog-4.10.2:
+
+globus-compute-sdk & globus-compute-endpoint v4.10.2
+----------------------------------------------------
+
+Bug Fixes
+^^^^^^^^^
+
+- Addressed an inter-version issue introduced in 4.10.1 (since yanked)
+
 .. _changelog-4.10.1:
 
 globus-compute-sdk & globus-compute-endpoint v4.10.1
@@ -11,7 +21,8 @@ globus-compute-sdk & globus-compute-endpoint v4.10.1
 Bug Fixes
 ^^^^^^^^^
 
-- Bumps parsl from `2026.2.23`_ to `2026.4.20`_ which includes a fix to PBSProProvider job status parsing
+- Bumps parsl from `2026.2.23`_ to `2026.4.20`_ which includes a fix to
+  PBSProProvider job status parsing
 
 Removed
 ^^^^^^^
