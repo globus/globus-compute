@@ -566,12 +566,28 @@ def configure_endpoint(
 @mep_start_options
 @common_options
 @handle_auth_errors
-def start_endpoint(*, ep_dir: pathlib.Path, **_kwargs):
+@click.option(
+    "--die-with-parent",
+    hidden=True,
+    type=click.BOOL,
+    is_flag=True,
+    default=False,
+)
+def start_endpoint(*, ep_dir: pathlib.Path, die_with_parent: bool, **_kwargs):
     state = CommandState.ensure()
-    _start_endpoint_manager(
-        ep_dir=ep_dir,
-        endpoint_uuid=state.endpoint_uuid,
-    )
+    # for backward compatibility with EndpointManager versions that run
+    # `gce start --die-with-parent` instead of `gce _start-user-endpoint`.
+    # deprecated; to be removed in 6 months (roughly Oct 2026)
+    if die_with_parent:
+        _start_user_endpoint(
+            ep_dir=ep_dir,
+            endpoint_uuid=state.endpoint_uuid,
+        )
+    else:
+        _start_endpoint_manager(
+            ep_dir=ep_dir,
+            endpoint_uuid=state.endpoint_uuid,
+        )
 
 
 @app.command(name="_start-user-endpoint", hidden=True)

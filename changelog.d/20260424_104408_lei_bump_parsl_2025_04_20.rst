@@ -1,5 +1,0 @@
-Bug Fixes
-^^^^^^^^^
-
-- Bumps parsl from `2026.2.23`_ to `2026.4.20`_ which includes a fix to
-  PBSProProvider job status parsing
