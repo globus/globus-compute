@@ -497,6 +497,8 @@ uninstall the service:
       # ...
 
 
+.. _exit_code_table_admins:
+
 Common Startup Errors
 =====================
 
