@@ -5,6 +5,11 @@ Contact and Support
 
 If you need help with Globus Compute, there are several ways to get support or ask questions.
 
+Troubleshooting
+---------------
+
+For common issues and frequently asked questions, please refer to our :ref:`Troubleshooting and FAQ page <troubleshooting>`.
+
 GitHub Issues
 -------------
 

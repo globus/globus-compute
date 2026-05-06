@@ -23,6 +23,7 @@ In the mental model of Globus Compute, Endpoints are the remote instance:
    templates
    endpoint_examples
    config_reference
+   troubleshooting
 
 
 .. |nbsp| unicode:: 0xA0
