@@ -1,0 +1,6 @@
+New Functionality
+^^^^^^^^^^^^^^^^^
+
+- The ``globus-compute-diagnostic`` and ``globus-idm-validator`` tools, which are
+  installed alongside the endpoint, are now available on the PATH after installing
+  the ``globus-compute-agent`` package.

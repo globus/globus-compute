@@ -87,6 +87,10 @@ install -m 755 "%{_builddir}/@PACKAGE_SOURCE_DIR@"/package_shim.sh "${RPM_BUILD_
 sed -i "${RPM_BUILD_ROOT}%{_sbindir}/%{package_executable}" -e "s|@VIRTUAL_ENV@|%{VIRTUAL_ENV}|"
 ln -sf "%{package_executable}" "${RPM_BUILD_ROOT}%{_sbindir}/%{package_alias}"
 
+for entrypoint in @PKG_ENTRY_POINTS@; do
+    ln -sf "%{VIRTUAL_ENV}/bin/${entrypoint}" "${RPM_BUILD_ROOT}%{_sbindir}/${entrypoint}"
+done
+
 %pre
 
 %post
@@ -104,6 +108,7 @@ ln -sf "%{package_executable}" "${RPM_BUILD_ROOT}%{_sbindir}/%{package_alias}"
 %{VIRTUAL_ENV}/*
 %{_sbindir}/%{package_executable}
 %{_sbindir}/%{package_alias}
+%{expand:%%(for ep in @PKG_ENTRY_POINTS@; do echo "%{_sbindir}/$ep"; done)}
 
 %changelog
 * Mon May 02 2024 Globus Toolkit <support@globus.org> - @PACKAGE_VERSION@-%{release}

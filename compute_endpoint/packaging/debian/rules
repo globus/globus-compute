@@ -72,6 +72,9 @@ override_dh_auto_install:
 	rm -rf $(DEST_VIRTUAL_ENV)/systemd \
 	  $(DEST_VIRTUAL_ENV)/lib/python*/site-packages/tests; \
 	sed -i "$(DEST_VIRTUAL_ENV)/bin/activate" -e "s|^VIRTUAL_ENV=.*|VIRTUAL_ENV=$(VIRTUAL_ENV)|"; \
+	for entrypoint in @PKG_ENTRY_POINTS@; do \
+		ln -sf "$(VIRTUAL_ENV)/bin/$$entrypoint" "$(DEST_ROOT)$(_sbindir)/$$entrypoint"; \
+	done; \
 	ln -s "python$$($(PYTHON3) -c 'import sys; print("{}.{}".format(*sys.version_info))')" "$(DEST_VIRTUAL_ENV)/lib/python"; \
 	:
 
