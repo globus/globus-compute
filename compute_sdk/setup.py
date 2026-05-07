@@ -18,7 +18,8 @@ REQUIRES = [
     # packaging, allowing version parsing
     # set a version floor but no ceiling as the library offers a stable API under CalVer
     "packaging>=21.1",
-    "pika>=1.2",
+    # May 2026: Parsl 1.4.0 just released; has an as-yet undiagnosed iteration bug
+    "pika>=1.2,<1.4",
     "tblib==1.7.0",
     "texttable>=1.6.7",
     # 3 below for color highlighting related console print
