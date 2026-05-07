@@ -380,6 +380,7 @@ def test_start_endpoint_existing_ep(
     mock_mep.start.assert_called_once()
 
 
+@pytest.mark.parametrize("detach", (False, True))
 def test_start_endpoint_already_running(
     mock_command_ensure,
     gc_dir,
@@ -387,12 +388,14 @@ def test_start_endpoint_already_running(
     mock_client,
     ep_name,
     mock_send_endpoint_startup_failure_to_amqp,
+    detach,
 ):
     """Check to ensure endpoint already active message prints to console"""
     ep_dir = make_manager_endpoint_dir()
     pid_path = Endpoint.pid_path(ep_dir)
     pid_path.write_text("12345")
     f = io.StringIO()
+    mock_command_ensure.detach = detach
     with redirect_stderr(f):
         with pytest.raises(MessageSystemExit) as pyt_e:
             cli._start_endpoint_manager(ep_dir=ep_dir, endpoint_uuid=None)
