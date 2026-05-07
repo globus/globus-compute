@@ -663,36 +663,42 @@ def _do_logout_endpoints(force: bool) -> None:
         log.info("Logout succeeded and all cached credentials were revoked")
 
 
+def _pidfile_check(pid_path: pathlib.Path, stale_after_s: int | float):
+    if not pid_path.exists():
+        return
+
+    pid_mtime = pid_path.stat().st_mtime
+    _now = time.time()
+
+    now_human = time.ctime(_now)
+    mtime_human = time.ctime(pid_mtime)
+    p_content = pid_path.read_text().strip()
+    pid = p_content.split(maxsplit=1)[0]
+    log.info(
+        f"\n        PID path: {pid_path} (PID: {pid})"
+        f"\n   Last modified: {pid_mtime:.3f} ({mtime_human})"
+        f"\n    Current time: {_now:.3f} ({now_human})"
+        f"\nPID file content:\n{p_content}"
+    )
+    if _now - pid_mtime <= stale_after_s:
+        msg = (
+            "Another instance of this endpoint is running.  (Perhaps on"
+            " another login node?)  Refusing to start.  If this is not"
+            " correct, then remove the PID file before starting again."
+        )
+        log.error(msg)
+        raise MessageSystemExit(os.EX_CANTCREAT, msg)
+
+    else:
+        log.warning(
+            "Previous endpoint instance failed to shutdown cleanly.  Removing PID file."
+        )
+        pid_path.unlink(missing_ok=True)
+
+
 @contextlib.contextmanager
 def _pidfile(pid_path: pathlib.Path, stale_after_s: int | float):
-    if pid_path.exists():
-        pid_mtime = pid_path.stat().st_mtime
-        _now = time.time()
-
-        now_human = time.ctime(_now)
-        mtime_human = time.ctime(pid_mtime)
-        log.info(
-            f"\n       PID path: {pid_path} (PID: {pid_path.read_text().strip()})"
-            f"\n  Last modified: {pid_mtime:.3f} ({mtime_human})"
-            f"\n   Current time: {_now:.3f} ({now_human})"
-        )
-        if _now - pid_mtime <= stale_after_s:
-            msg = (
-                "Another instance of this endpoint is running.  (Perhaps on"
-                " another login node?)  Refusing to start.  If this is not"
-                " correct, then remove the PID file before starting again."
-            )
-            log.error(msg)
-            raise MessageSystemExit(os.EX_CANTCREAT, msg)
-
-        else:
-            log.warning(
-                "Previous endpoint instance failed to shutdown cleanly."
-                "  Removing PID file."
-            )
-            pid_path.unlink(missing_ok=True)
-
-        del _now, stale_after_s, pid_mtime, now_human, mtime_human
+    _pidfile_check(pid_path, stale_after_s)
 
     shutting_down = threading.Event()
 
@@ -865,6 +871,10 @@ def _start_endpoint_manager(
             )
             log.critical(msg)
             raise
+
+        pid_path = Endpoint.pid_path(ep_dir)
+        pid_stale_after_s = ep_config.heartbeat_period * 3
+        _pidfile_check(pid_path, pid_stale_after_s)
 
         if not isinstance(ep_config, ManagerEndpointConfig):
             raise ClickException(
