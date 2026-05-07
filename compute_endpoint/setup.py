@@ -35,7 +35,8 @@ REQUIRES = [
     # of different features and functions
     # pin exact versions because it does not use semver
     "parsl==2026.4.20",
-    "pika>=1.2.0",
+    # May 2026: Parsl 1.4.0 just released; has an as-yet undiagnosed iteration bug
+    "pika>=1.2,<1.4",
     "pyprctl<0.2.0",
     "setproctitle>=1.3.2,<1.4",
     "pyyaml>=6.0,<7.0",
