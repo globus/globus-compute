@@ -28,6 +28,11 @@ PIP_NAME_S := $(shell echo $(PIP_NAME_D) | tr '-' '\n' | cut -c1 | tr -d '\n')
 SDK_NAME_D := $(shell cd ../../compute_sdk; "$(VENV_PY)" setup.py --name)
 SDK_NAME_U := $(shell echo $(SDK_NAME_D) | tr '-' '_')
 
+# Need to manually link all setup.py entry_points as part of the install.
+# Does not include gce, which is specially handled as an alias to the package_shim
+# to ensure it picks up on any customizations (see PIP_NAME_S)
+PKG_ENTRY_POINTS := globus-compute-diagnostic globus-idm-validator
+
 PKG_VERSION := $(shell cd ../; "$(VENV_PY)" setup.py --version | tr '-' '~')
 PKG_WHEEL := $(PIP_NAME_U)-$(PKG_VERSION)-py$(PY_MAJOR_VERSION)-none-any.whl
 PKG_SOURCE_DIR := $(PIP_NAME_U)-$(PKG_VERSION)
@@ -73,6 +78,7 @@ show_vars:   ##-For debugging, show the Makefile variables; will install a venv
 	@echo "PIP_NAME_S           : $(PIP_NAME_S)"
 	@echo "PKG_NAME             : $(PKG_NAME)"
 	@echo "PKG_VERSION          : $(PKG_VERSION)"
+	@echo "PKG_ENTRY_POINTS     : $(PKG_ENTRY_POINTS)"
 	@echo "PREREQS_DIR          : $(PREREQS_DIR)"
 	@echo "PREREQS_TARBALL_NAME : $(PREREQS_TARBALL_NAME)"
 	@echo "PKG_SOURCE_DIR       : $(PKG_SOURCE_DIR)"
@@ -201,6 +207,7 @@ _setup_dist_for_deb:
 	    -e "s/@PIP_NAME_D@/$(PIP_NAME_D)/g" \
 	    -e "s/@PIP_NAME_S@/$(PIP_NAME_S)/g" \
 	    -e "s/@VIRTUALENV@/$(VIRTUALENV)/g" \
+	    -e "s/@PKG_ENTRY_POINTS@/$(PKG_ENTRY_POINTS)/g" \
 	)
 
 setup_dist_for_deb: dist _setup_dist_for_deb  ##-Place Debian-build required files in dist/
@@ -238,6 +245,7 @@ _setup_dist_for_rpm:
 	    -e "s/@PREREQS_TARBALL_NAME@/$(PREREQS_TARBALL_NAME)/g" \
 	    -e "s/@PIP_NAME_D@/$(PIP_NAME_D)/g" \
 	    -e "s/@PIP_NAME_S@/$(PIP_NAME_S)/g" \
+	    -e "s/@PKG_ENTRY_POINTS@/$(PKG_ENTRY_POINTS)/g" \
 	    -e "s/@PACKAGE_SOURCE_DIR@/$(PKG_SOURCE_DIR)/" \
 	    -e "s/@PREREQS_DIR@/$(PREREQS_DIR)/" \
 	    < ../fedora/$(PKG_NAME).spec.in > ./$(PKG_NAME).spec \
