@@ -1,5 +1,0 @@
-Bug Fixes
-^^^^^^^^^
-
-- Address an issue with ``--detach`` that would fail to start but also shut
-  down an already running endpoint
