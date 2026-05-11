@@ -163,18 +163,10 @@ def _get_file_dict_config(
                 file_handler.pop("backupCount", None)
 
     log_handlers = ["logfile"]
-    if console_enabled:
-        log_handlers.append("console")
 
-    return {
+    log_config = {
         "version": 1,
         "formatters": {
-            "streamfmt": {
-                "()": ComputeConsoleFormatter,
-                "debug": debug,
-                "no_color": no_color,
-                "datefmt": LOG_TS_FMT,
-            },
             "filefmt": {
                 "()": DatetimeFormatter,
                 "format": DEFAULT_FORMAT,
@@ -182,11 +174,6 @@ def _get_file_dict_config(
             },
         },
         "handlers": {
-            "console": {
-                "class": "logging.StreamHandler",
-                "level": "DEBUG",
-                "formatter": "streamfmt",
-            },
             "logfile": file_handler,
         },
         "loggers": {
@@ -204,6 +191,22 @@ def _get_file_dict_config(
             },
         },
     }
+
+    if console_enabled:
+        log_config["formatters"]["streamfmt"] = {  # type: ignore[index]
+            "()": ComputeConsoleFormatter,
+            "debug": debug,
+            "no_color": no_color,
+            "datefmt": LOG_TS_FMT,
+        }
+        log_config["handlers"]["console"] = {  # type: ignore[index]
+            "class": "logging.StreamHandler",
+            "level": "DEBUG",
+            "formatter": "streamfmt",
+        }
+        log_handlers.append("console")
+
+    return log_config
 
 
 def _get_stream_dict_config(debug: bool, no_color: bool) -> dict:
