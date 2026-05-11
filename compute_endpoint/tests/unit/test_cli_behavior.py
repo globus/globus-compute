@@ -1356,23 +1356,67 @@ def test_happy_path_exit_no_amqp_msg(
     ),
 )
 def test_fail_exit_sends_amqp_msg(
-    mocker,
     run_line,
     mock_ep,
     make_endpoint_dir,
+    mock_send_endpoint_startup_failure_to_amqp,
     ep_name,
     ec,
     exit_exc,
     mock_load_config_yaml,
 ):
-    mock_send = mocker.patch(f"{_MOCK_BASE}send_endpoint_startup_failure_to_amqp")
     make_endpoint_dir()
 
     stdin = json.dumps({"amqp_creds": {"some": "data"}, "ep_info": {}, "config": ""})
     mock_ep.start_endpoint.side_effect = exit_exc
     run_line(f"_start-user-endpoint {ep_name}", assert_exit_code=ec, stdin=stdin)
+
     assert mock_ep.start_endpoint.called
-    assert mock_send.called
+    assert mock_send_endpoint_startup_failure_to_amqp.called
+
+
+@pytest.mark.parametrize(
+    "exit_exc",
+    (
+        SystemExit("Death!"),
+        SystemExit(5),
+        RuntimeError("fool!"),
+        MemoryError("Oh no!"),
+        AssertionError("mistake"),
+        Exception("Generally no good."),
+    ),
+)
+@pytest.mark.parametrize("o_tty", (False, True))
+@pytest.mark.parametrize("e_tty", (False, True))
+def test_file_exit_conditionally_emits_why_to_stdstream(
+    mock_client,
+    mock_mep,
+    make_manager_endpoint_dir,
+    mock_send_endpoint_startup_failure_to_amqp,
+    ep_name,
+    exit_exc,
+    o_tty,
+    e_tty,
+):
+    make_manager_endpoint_dir(ep_name)
+    mock_mep.start.side_effect = exit_exc
+
+    # click.CliRunner swaps in its own std streams, so can't use run_line
+    stdo, stde = io.StringIO(), io.StringIO()
+    stdo.isatty = lambda: o_tty
+    stde.isatty = lambda: e_tty
+    with pytest.raises(exit_exc.__class__) as pyt_e:
+        with redirect_stdout(stdo), redirect_stderr(stde):
+            cli.app.main(args=("start", ep_name), prog_name=cli.app.name)
+
+    if e_tty:
+        assert type(pyt_e.value).__name__ in stde.getvalue()
+        assert str(pyt_e.value) in stde.getvalue()
+        assert "Failed to start" in stde.getvalue()
+    else:
+        assert (type(pyt_e.value).__name__ in stdo.getvalue()) is o_tty
+        assert (str(pyt_e.value) in stdo.getvalue()) is o_tty
+        assert ("Failed to start" in stdo.getvalue()) is o_tty
 
 
 @pytest.mark.parametrize("force", [True, False])

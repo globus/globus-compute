@@ -674,12 +674,13 @@ def _pidfile_check(pid_path: pathlib.Path, stale_after_s: int | float):
     mtime_human = time.ctime(pid_mtime)
     p_content = pid_path.read_text().strip()
     pid = p_content.split(maxsplit=1)[0]
-    log.info(
+    stderr_msg = (
         f"\n        PID path: {pid_path} (PID: {pid})"
         f"\n   Last modified: {pid_mtime:.3f} ({mtime_human})"
         f"\n    Current time: {_now:.3f} ({now_human})"
         f"\nPID file content:\n{p_content}"
     )
+    log.info(stderr_msg)
     if _now - pid_mtime <= stale_after_s:
         msg = (
             "Another instance of this endpoint is running.  (Perhaps on"
@@ -687,7 +688,8 @@ def _pidfile_check(pid_path: pathlib.Path, stale_after_s: int | float):
             " correct, then remove the PID file before starting again."
         )
         log.error(msg)
-        raise MessageSystemExit(os.EX_CANTCREAT, msg)
+        stderr_msg += f"\n\n{msg}"
+        raise MessageSystemExit(os.EX_CANTCREAT, stderr_msg)
 
     else:
         log.warning(
@@ -760,12 +762,28 @@ class _SendMessageOnErrorExit(contextlib.AbstractContextManager):
             # normal, system exit
             return
 
+        msg = f"Failed to start or unexpected error:\n  ({exc_type.__name__}) {exc_val}"
         if self.reg_info:
-            msg = (
-                f"Failed to start or unexpected error:\n  ({exc_type.__name__})"
-                f" {exc_val}"
-            )
             send_endpoint_startup_failure_to_amqp(self.reg_info, msg=msg)
+
+        if sys.version_info < (3, 12):
+            if "console" not in getattr(logging, "_handlers", {}):
+                out = None
+                if sys.stderr.isatty():
+                    out = sys.stderr
+                elif sys.stdout.isatty():
+                    out = sys.stdout
+                if out:
+                    print(msg, file=out)
+        else:
+            if not logging.getHandlerByName("console"):
+                out = None
+                if sys.stderr.isatty():
+                    out = sys.stderr
+                elif sys.stdout.isatty():
+                    out = sys.stdout
+                if out:
+                    print(msg, file=out)
 
 
 def _do_register_endpoint(
