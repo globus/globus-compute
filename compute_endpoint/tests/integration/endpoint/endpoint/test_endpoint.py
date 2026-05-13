@@ -4,6 +4,7 @@ import random
 import shutil
 from unittest import mock
 
+import psutil
 import pytest
 import requests
 import responses
@@ -155,6 +156,33 @@ def test_endpoint_teardown_execution(mocker, tmp_path, randomstring):
 
     info_txt = "\n".join(a[0] for a, _k in mock_log.info.call_args_list)
     assert tmp_file_content in info_txt
+
+
+def test_endpoint_psutil_timeout(conf_dir, mocker, ep_uuid):
+    mocker.patch.object(shutil, "rmtree")
+
+    endpoint.Endpoint.configure_endpoint(conf_dir, None)
+
+    mock_gcc = mocker.Mock()
+    mocker.patch(f"{_MOCK_BASE}Endpoint.get_funcx_client").return_value = mock_gcc
+
+    mock_gcc.get_endpoint_status.return_value = {"status": "online"}
+    mocker.patch(
+        f"{_MOCK_BASE}Endpoint.check_pidfile",
+        return_value={"exists": "True", "active": True},
+    )
+    pid_path = endpoint.Endpoint.pid_path(conf_dir)
+    pid_path.write_text("12345")
+
+    mock_psutil = mocker.patch(f"{_MOCK_BASE}psutil.Process")
+    mock_psutil.return_value.wait.side_effect = psutil.TimeoutExpired(10)
+
+    with pytest.raises(SystemExit), mock.patch(f"{_MOCK_BASE}log") as mock_log:
+        endpoint.Endpoint.delete_endpoint(
+            conf_dir, ep_config=None, force=True, ep_uuid=ep_uuid
+        )
+    a, _k = mock_log.warning.call_args
+    assert "Please try deleting the endpoint again" in a[0], "expecting rephrasing"
 
 
 @pytest.mark.parametrize("web_svc_ok", (True, False))
