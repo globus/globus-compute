@@ -661,7 +661,14 @@ class Endpoint:
 
             # Give parent process chance to clean itself up
             parent.terminate()
-            parent.wait(timeout=grace_period_s)
+            try:
+                parent.wait(timeout=grace_period_s)
+            except psutil.TimeoutExpired:
+                log.warning(
+                    f"Encountered timeout attempting to stop endpoint {ep_name},"
+                    " Please try deleting the endpoint again with the --force flag"
+                )
+                sys.exit(-1)
 
             # After grace period, give children 1 second, before pulling the plug
             terminated, alive = psutil.wait_procs(processes, timeout=grace_period_s)

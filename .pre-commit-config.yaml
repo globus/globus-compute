@@ -22,7 +22,7 @@ repos:
   hooks:
     - id: ruff-check
       types_or: [ python ]
-      args: [ --select, I ]
+      args: [ --fix, --select, I ]
     - id: ruff-check
       types_or: [ python ]
       args: [ --fix, --select, I ]
