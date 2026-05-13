@@ -25,6 +25,6 @@ repos:
       args: [ --select, I ]
     - id: ruff-check
       types_or: [ python ]
-      args: [ --fix ]
+      args: [ --fix, --select, I ]
     - id: ruff-format
       types_or: [ python ]
