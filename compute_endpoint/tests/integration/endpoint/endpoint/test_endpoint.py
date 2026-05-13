@@ -4,6 +4,7 @@ import random
 import shutil
 from unittest import mock
 
+import psutil
 import pytest
 import requests
 import responses
@@ -155,6 +156,25 @@ def test_endpoint_teardown_execution(mocker, tmp_path, randomstring):
 
     info_txt = "\n".join(a[0] for a, _k in mock_log.info.call_args_list)
     assert tmp_file_content in info_txt
+
+
+def test_endpoint_psutil_timeout(conf_dir, mocker, ep_uuid):
+    mocker.patch.object(endpoint.Endpoint, "stop_endpoint")
+    mocker.patch.object(shutil, "rmtree")
+
+    endpoint.Endpoint.configure_endpoint(conf_dir, None)
+
+    mock_gcc = mocker.Mock()
+    mocker.patch(f"{_MOCK_BASE}Endpoint.get_funcx_client").return_value = mock_gcc
+
+    mock_gcc.get_endpoint_status.return_value = {"status": "online"}
+
+    mock_psutil = mocker.patch(f"{_MOCK_BASE}psutil.Process")
+    mock_psutil.return_value.wait.side_effect = psutil.TimeoutExpired()
+
+    endpoint.Endpoint.delete_endpoint(
+        conf_dir, ep_config=None, force=True, ep_uuid=ep_uuid
+    )
 
 
 @pytest.mark.parametrize("web_svc_ok", (True, False))
