@@ -31,7 +31,7 @@ SDK_NAME_U := $(shell echo $(SDK_NAME_D) | tr '-' '_')
 # Need to manually link all setup.py entry_points as part of the install.
 # Does not include gce, which is specially handled as an alias to the package_shim
 # to ensure it picks up on any customizations (see PIP_NAME_S)
-PKG_ENTRY_POINTS := globus-compute-diagnostic globus-idm-validator
+PKG_ENTRY_POINTS := globus-compute-diagnostic
 
 PKG_VERSION := $(shell cd ../; "$(VENV_PY)" setup.py --version | tr '-' '~')
 PKG_WHEEL := $(PIP_NAME_U)-$(PKG_VERSION)-py$(PY_MAJOR_VERSION)-none-any.whl
