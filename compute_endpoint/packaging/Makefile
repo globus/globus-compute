@@ -28,10 +28,13 @@ PIP_NAME_S := $(shell echo $(PIP_NAME_D) | tr '-' '\n' | cut -c1 | tr -d '\n')
 SDK_NAME_D := $(shell cd ../../compute_sdk; "$(VENV_PY)" setup.py --name)
 SDK_NAME_U := $(shell echo $(SDK_NAME_D) | tr '-' '_')
 
-# Need to manually link all setup.py entry_points as part of the install.
-# Does not include gce, which is specially handled as an alias to the package_shim
-# to ensure it picks up on any customizations (see PIP_NAME_S)
-PKG_ENTRY_POINTS := globus-compute-diagnostic globus-idm-validator
+# Need to manually link any setup.py entry_points as part of the install.
+# Does not include:
+#  - gce -- specially handled as an alias to the package_shim to ensure it picks up on
+#    any customizations (see PIP_NAME_S)
+#  - globus-idm-validator -- Packaged by GCS as well so don't conflict; it's a niche
+#    enough tool that we can document it, but let admins find it if they need it.
+PKG_ENTRY_POINTS := globus-compute-diagnostic
 
 PKG_VERSION := $(shell cd ../; "$(VENV_PY)" setup.py --version | tr '-' '~')
 PKG_WHEEL := $(PIP_NAME_U)-$(PKG_VERSION)-py$(PY_MAJOR_VERSION)-none-any.whl
