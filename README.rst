@@ -55,4 +55,3 @@ Documentation
 =============
 
 Complete documentation for Globus Compute is available `here <https://globus-compute.readthedocs.io>`_
-
