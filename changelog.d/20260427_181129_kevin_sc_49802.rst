@@ -1,6 +1,0 @@
-Bug Fixes
-^^^^^^^^^
-
-- Address issue with ``--detach`` where a daemonization-time race-condition
-  resulted in file descriptors being incorrectly closed by the garbage
-  collector.

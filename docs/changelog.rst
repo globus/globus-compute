@@ -3,6 +3,28 @@ Changelog
 
 .. scriv-insert-here
 
+.. _changelog-4.11.0:
+
+globus-compute-sdk & globus-compute-endpoint v4.11.0
+----------------------------------------------------
+
+New Functionality
+^^^^^^^^^^^^^^^^^
+
+- The ``globus-compute-diagnostic`` and ``globus-idm-validator`` tools, which
+  are installed alongside the endpoint, are now available on the PATH after
+  installing the ``globus-compute-agent`` package.
+
+Bug Fixes
+^^^^^^^^^
+
+- Address issue with ``--detach`` where a daemonization-time race-condition
+  resulted in file descriptors being incorrectly closed by the garbage
+  collector.
+
+- Address an issue with ``--detach`` that would fail to start but also shut
+  down an already running endpoint
+
 .. _changelog-4.10.2:
 
 globus-compute-sdk & globus-compute-endpoint v4.10.2
@@ -16,7 +38,7 @@ Bug Fixes
 .. _changelog-4.10.1:
 
 globus-compute-sdk & globus-compute-endpoint v4.10.1
-------------------------------------------------------
+----------------------------------------------------
 
 Bug Fixes
 ^^^^^^^^^
