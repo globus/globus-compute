@@ -391,7 +391,6 @@ class Client:
 
         with self._request_lock:
             r = self._compute_web_client.v2.get_task(task_id)
-        print(f"Response string: {r}")
         logger.debug("Response string: %s", r)
         return self._update_task_table(r.text, tid)
 
