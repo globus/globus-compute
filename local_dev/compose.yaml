@@ -14,4 +14,4 @@ services:
       - ./docker_data/.globus_compute:/home/${LOCAL_USER:-${USER}}/.globus_compute
       - ./docker_data/.globus_compute_root:/root/.globus_compute
     command: bash -c "socat TCP-LISTEN:${WEB_SVC_PORT:-5000},fork TCP:host.docker.internal:${WEB_SVC_PORT:-5000} & \
-                      socat TCP-LISTEN:${AMQP_SVC_PORT:-5672},fork TCP:host.docker.internal:${WEB_SVC_PORT:-5672}"
+                      socat TCP-LISTEN:${AMQP_SVC_PORT:-5672},fork TCP:host.docker.internal:${AMQP_SVC_PORT:-5672}"
