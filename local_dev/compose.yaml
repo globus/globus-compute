@@ -9,6 +9,9 @@ services:
       args:
         LOCAL_USER: ${LOCAL_USER:-${USER}}
         PYTHON_VERSION: ${PYTHON_VERSION:-3.11}
+        GLOBUS_COMPUTE_COMMON_DIR: ${GLOBUS_COMPUTE_COMMON_DIR:-}
+      additional_contexts:
+        globus_compute_common: ${GLOBUS_COMPUTE_COMMON_DIR:-.}
     volumes:
       - ../:/opt/globus-compute
       - ./docker_data/.globus_compute:/home/${LOCAL_USER:-${USER}}/.globus_compute
