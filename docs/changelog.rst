@@ -3,6 +3,16 @@ Changelog
 
 .. scriv-insert-here
 
+.. _changelog-4.12.0:
+
+globus-compute-sdk & globus-compute-endpoint v4.12.0
+----------------------------------------------------
+
+Changed
+^^^^^^^
+
+- Minor changes to console output
+
 .. _changelog-4.11.0:
 
 globus-compute-sdk & globus-compute-endpoint v4.11.0
