@@ -3,92 +3,100 @@ from __future__ import annotations
 import pathlib
 import typing as t
 import uuid
-from types import ModuleType
 
-from globus_compute_common.pydantic_v1 import (
-    BaseModel,
-    FilePath,
-    root_validator,
-    validator,
-)
 from globus_compute_endpoint import engines
 from globus_compute_endpoint.endpoint.config.pam import PamConfiguration
+from globus_compute_endpoint.engines.base import GlobusComputeEngineBase
 from parsl import addresses as parsl_addresses
 from parsl import launchers as parsl_launchers
 from parsl import providers as parsl_providers
+from parsl.launchers.base import Launcher as ParslLauncherBase
+from parsl.providers.base import ExecutionProvider as ParslProviderBase
+from pydantic import (
+    BaseModel,
+    ConfigDict,
+    FilePath,
+    ValidateAs,
+    model_validator,
+)
 
 
-def _validate_import(field: str, package: ModuleType):
-    def inner(cls, module: str):
-        cls = getattr(package, module, None)
-        if cls is None:
-            raise ValueError(f"{module} could not be found")
-        return cls
+def _check_import(module: t.ModuleType):
+    def inner(obj_name: str):
+        obj = getattr(module, obj_name, None)
+        if obj is None:
+            raise ValueError(f"{obj_name} could not be found")
+        return obj
 
-    return validator(field, allow_reuse=True)(inner)
+    return inner
 
 
-def _validate_params(field: str):
-    def inner(cls, model: t.Optional[BaseModel]):
-        if not isinstance(model, BaseModel):
-            return model
+def _materialize_model_from_type(model: t.Optional[BaseModel]):
+    if not isinstance(model, BaseModel):
+        return model
 
-        fields = model.dict(exclude_none=True)
-        cls = fields.pop("type")
-        try:
-            return cls(**fields)
-        except Exception as err:
-            raise ValueError(str(err)) from err
-
-    return validator(field, allow_reuse=True)(inner)
+    fields = model.model_dump(exclude_none=True)
+    _type = fields.pop("type")
+    try:
+        return _type(**fields)
+    except Exception as err:
+        raise ValueError(str(err)) from err
 
 
 class BaseConfigModel(BaseModel):
-    class Config:
-        extra = "allow"
+    model_config = ConfigDict(extra="allow", arbitrary_types_allowed=True)
 
 
 class AddressModel(BaseConfigModel):
-    type: str
-
-    _validate_type = _validate_import("type", parsl_addresses)
+    type: t.Annotated[
+        t.Callable[..., str],
+        ValidateAs(str, _check_import(parsl_addresses)),
+    ]
 
 
 class LauncherModel(BaseConfigModel):
-    type: str
-
-    _validate_type = _validate_import("type", parsl_launchers)
+    type: t.Annotated[
+        t.Type[ParslLauncherBase], ValidateAs(str, _check_import(parsl_launchers))
+    ]
 
 
 class ProviderModel(BaseConfigModel):
-    type: str
-    launcher: t.Optional[LauncherModel]
-    persistent_volumes: t.Optional[t.List[t.Tuple[str, str]]]  # KubernetesProvider
-
-    _validate_type = _validate_import("type", parsl_providers)
-    _validate_launcher = _validate_params("launcher")
+    type: t.Annotated[
+        t.Type[ParslProviderBase], ValidateAs(str, _check_import(parsl_providers))
+    ]
+    launcher: t.Annotated[
+        t.Optional[ParslLauncherBase],
+        ValidateAs(t.Optional[LauncherModel], _materialize_model_from_type),
+    ] = None
+    persistent_volumes: t.Optional[t.List[t.Tuple[str, str]]] = (
+        None  # KubernetesProvider
+    )
 
 
 class EngineModel(BaseConfigModel):
-    type: str = "GlobusComputeEngine"
-    provider: t.Optional[ProviderModel]
-    strategy: t.Optional[str]
-    address: t.Optional[t.Union[str, AddressModel]]
-    worker_ports: t.Optional[t.Tuple[int, int]]
-    worker_port_range: t.Optional[t.Tuple[int, int]]
-    interchange_port_range: t.Optional[t.Tuple[int, int]]
-    max_retries_on_system_failure: t.Optional[int]
-    allowed_serializers: t.Optional[t.List[str]]
+    type: t.Annotated[
+        t.Type[GlobusComputeEngineBase], ValidateAs(str, _check_import(engines))
+    ] = "GlobusComputeEngine"
+    provider: t.Annotated[
+        t.Optional[ParslProviderBase],
+        ValidateAs(t.Optional[ProviderModel], _materialize_model_from_type),
+    ] = None
+    address: t.Annotated[
+        t.Optional[str],
+        ValidateAs(t.Optional[AddressModel | str], _materialize_model_from_type),
+    ] = None
+    strategy: t.Optional[str] = None
+    worker_ports: t.Optional[t.Tuple[int, int]] = None
+    worker_port_range: t.Optional[t.Tuple[int, int]] = None
+    interchange_port_range: t.Optional[t.Tuple[int, int]] = None
+    max_retries_on_system_failure: t.Optional[int] = None
+    allowed_serializers: t.Optional[t.List[str]] = None
 
-    _validate_type = _validate_import("type", engines)
-    _validate_provider = _validate_params("provider")
-    _validate_address = _validate_params("address")
+    model_config = ConfigDict(
+        extra="allow", validate_default=True, arbitrary_types_allowed=True
+    )
 
-    class Config:
-        extra = "allow"
-        validate_all = True
-
-    @root_validator(pre=True)
+    @model_validator(mode="before")
     @classmethod
     def _validate_provider_container_compatibility(cls, values: dict):
         provider_type = values.get("provider", {}).get("type")
@@ -108,41 +116,40 @@ class EngineModel(BaseConfigModel):
 
 
 class BaseEndpointConfigModel(BaseModel):
-    display_name: t.Optional[str]
-    allowed_functions: t.Optional[t.List[uuid.UUID]]
-    admins: t.Optional[t.List[uuid.UUID]]
-    authentication_policy: t.Optional[uuid.UUID]
-    subscription_id: t.Optional[uuid.UUID]
-    amqp_port: t.Optional[int]
-    heartbeat_period: t.Optional[int]
-    environment: t.Optional[str]
-    local_compute_services: t.Optional[bool]
-    high_assurance: t.Optional[bool]
-    debug: t.Optional[bool]
+    display_name: t.Optional[str] = None
+    allowed_functions: t.Optional[t.List[uuid.UUID]] = None
+    admins: t.Optional[t.List[uuid.UUID]] = None
+    authentication_policy: t.Optional[uuid.UUID] = None
+    subscription_id: t.Optional[uuid.UUID] = None
+    amqp_port: t.Optional[int] = None
+    heartbeat_period: t.Optional[int] = None
+    environment: t.Optional[str] = None
+    local_compute_services: t.Optional[bool] = None
+    high_assurance: t.Optional[bool] = None
+    debug: t.Optional[bool] = None
 
-    class Config:
-        extra = "forbid"
+    model_config = ConfigDict(extra="forbid", arbitrary_types_allowed=True)
 
 
 class UserEndpointConfigModel(BaseEndpointConfigModel):
-    engine: EngineModel
-    heartbeat_threshold: t.Optional[int]
-    idle_heartbeats_soft: t.Optional[int]
-    idle_heartbeats_hard: t.Optional[int]
-    endpoint_setup: t.Optional[str]
-    endpoint_teardown: t.Optional[str]
-    log_dir: t.Optional[str]
-    stdout: t.Optional[str]
-    stderr: t.Optional[str]
-
-    _validate_engine = _validate_params("engine")
+    engine: t.Annotated[
+        GlobusComputeEngineBase, ValidateAs(EngineModel, _materialize_model_from_type)
+    ]
+    heartbeat_threshold: t.Optional[int] = None
+    idle_heartbeats_soft: t.Optional[int] = None
+    idle_heartbeats_hard: t.Optional[int] = None
+    endpoint_setup: t.Optional[str] = None
+    endpoint_teardown: t.Optional[str] = None
+    log_dir: t.Optional[str] = None
+    stdout: t.Optional[str] = None
+    stderr: t.Optional[str] = None
 
 
 class ManagerEndpointConfigModel(BaseEndpointConfigModel):
-    public: t.Optional[bool]
-    user_config_template_path: t.Optional[FilePath]
-    user_config_schema_path: t.Optional[FilePath]
-    identity_mapping_config_path: t.Optional[FilePath]
-    audit_log_path: t.Optional[pathlib.Path]
-    mu_child_ep_grace_period_s: t.Optional[float]
-    pam: t.Optional[PamConfiguration]
+    public: t.Optional[bool] = None
+    user_config_template_path: t.Optional[FilePath] = None
+    user_config_schema_path: t.Optional[FilePath] = None
+    identity_mapping_config_path: t.Optional[FilePath] = None
+    audit_log_path: t.Optional[FilePath] = None
+    mu_child_ep_grace_period_s: t.Optional[float] = None
+    pam: t.Optional[PamConfiguration] = None

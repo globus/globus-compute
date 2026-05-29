@@ -4,7 +4,6 @@ import typing as t
 from unittest import mock
 
 import pytest
-from globus_compute_common.pydantic_v1 import ValidationError
 from globus_compute_endpoint.endpoint.config import (
     ManagerEndpointConfig,
     ManagerEndpointConfigModel,
@@ -13,6 +12,7 @@ from globus_compute_endpoint.endpoint.config import (
     UserEndpointConfigModel,
 )
 from globus_compute_endpoint.endpoint.config.model import EngineModel, ProviderModel
+from pydantic import ValidationError
 from tests.unit.conftest import known_manager_config_opts, known_user_config_opts
 
 _MOCK_BASE = "globus_compute_endpoint.endpoint.config."
@@ -64,7 +64,9 @@ def test_config_engine_model_tuple_conversions(
 
     e_str = str(pyt_e)
     assert field in e_str, "Verify test; are we testing what we think?"
-    assert "not a valid tuple" in e_str, "Verify test; are we testing what we think?"
+    assert "should be a valid tuple" in e_str, (
+        "Verify test; are we testing what we think?"
+    )
 
 
 def test_config_provider_persistent_volumes_conversion():
@@ -85,7 +87,9 @@ def test_config_provider_persistent_volumes_conversion():
 
     p_str = str(pyt_e)
     assert field in p_str, "Verify test; are we testing what we think?"
-    assert "not a valid tuple" in p_str, "Verify test; are we testing what we think?"
+    assert "should be a valid tuple" in p_str, (
+        "Verify test; are we testing what we think?"
+    )
 
 
 def test_config_model_enforces_engine(config_dict):
@@ -93,7 +97,7 @@ def test_config_model_enforces_engine(config_dict):
     with pytest.raises(ValidationError) as pyt_exc:
         UserEndpointConfigModel(**config_dict)
 
-    assert "engine\n  field required" in str(pyt_exc.value)
+    assert "engine\n  Field required" in str(pyt_exc.value)
 
 
 def test_manager_config_model_rejects_engine(config_dict_mep):
@@ -104,7 +108,7 @@ def test_manager_config_model_rejects_engine(config_dict_mep):
     with pytest.raises(ValidationError) as pyt_exc:
         ManagerEndpointConfigModel(**config_dict_mep)
 
-    assert "engine\n  extra fields not permitted" in str(pyt_exc.value)
+    assert "engine\n  Extra inputs are not permitted" in str(pyt_exc.value)
 
 
 @pytest.mark.parametrize(
@@ -122,7 +126,7 @@ def test_mep_config_verifies_path_like_fields(config_dict_mep, field: str):
         ManagerEndpointConfigModel(**config_dict_mep)
 
     e_str = str(pyt_e.value)
-    assert "does not exist" in e_str
+    assert "Path does not point to a file" in e_str
     assert str(conf_p) in e_str, "expect location in exc to help human out"
 
     del config_dict_mep[field]

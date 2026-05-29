@@ -11,8 +11,8 @@ import typing as t
 
 import yaml
 from click import ClickException
-from globus_compute_common.pydantic_v1 import ValidationError
 from globus_compute_endpoint.endpoint.identity_mapper import MappedPosixIdentity
+from pydantic import ValidationError
 
 from .config import ManagerEndpointConfig, UserEndpointConfig
 
@@ -106,7 +106,7 @@ def load_config_yaml(config_str: str) -> UserEndpointConfig | ManagerEndpointCon
     except ValidationError as err:
         raise ClickException(str(err)) from err
 
-    config_dict = config_schema.dict(exclude_unset=True)
+    config_dict = config_schema.model_dump(exclude_unset=True)
 
     try:
         config = ConfigClass(**config_dict)
