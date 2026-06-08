@@ -246,6 +246,8 @@ def epmanager_as_user(
     mock_os.dup2.side_effect = (0, 1, 2, AssertionError("dup2: unexpected?"))
     mock_os.open.side_effect = (4, 5, AssertionError("open: unexpected?"))
 
+    mock_os.waitpid.return_value = (0, 0)
+
     mock_pwd = mocker.patch(f"{_MOCK_BASE}pwd")
     mock_pwd.getpwnam.side_effect = AssertionError(
         "getpwnam: unprivileged should not care"
@@ -301,6 +303,8 @@ def epmanager_as_root(
     mock_os.dup2.side_effect = (0, 1, 2, AssertionError("dup2: unexpected?"))
     mock_os.open.side_effect = (4, 5, AssertionError("open: unexpected?"))
     mock_os.environ = {"Some": "test", "environ": "with", "debug": "1"}
+
+    mock_os.waitpid.return_value = (0, 0)
 
     mock_pwd = mocker.patch(f"{_MOCK_BASE}pwd")
     mock_pwd.getpwnam.side_effect = (
@@ -668,12 +672,9 @@ def test_writes_endpoint_uuid(epmanager_as_root):
     assert ep_data["endpoint_id"] == returned_uuid
 
 
-def test_log_contains_sentinel_lines(
-    mocker, mock_log, epmanager_as_root, noop, reset_signals
-):
+def test_log_contains_sentinel_lines(mock_log, epmanager_as_root, noop, reset_signals):
     *_, em = epmanager_as_root
 
-    mocker.patch(f"{_MOCK_BASE}os")
     em._event_loop = noop
     em.start()
 
@@ -692,13 +693,12 @@ def test_log_contains_sentinel_lines(
 
 
 def test_title_changes_for_shutdown(
-    mocker, epmanager_as_root, noop, mock_setproctitle, reset_signals
+    epmanager_as_root, noop, mock_setproctitle, reset_signals
 ):
     *_, em = epmanager_as_root
     mock_spt, orig_proc_title = mock_setproctitle
 
     em._event_loop = noop
-    mocker.patch(f"{_MOCK_BASE}os")
 
     mock_spt.reset_mock()
     assert not mock_spt.setproctitle.called, "Verify test setup"
@@ -713,16 +713,15 @@ def test_title_changes_for_shutdown(
 def test_children_signaled_at_shutdown(
     mocker, epmanager_as_root, randomstring, noop, reset_signals
 ):
-    *_, em = epmanager_as_root
+    *_, mock_os, _, em = epmanager_as_root
 
     em._event_loop = mock.Mock()
     em.wait_for_children = noop
-    mock_os = mocker.patch(f"{_MOCK_BASE}os")
     mock_time = mocker.patch(f"{_MOCK_BASE}time")
     mock_time.monotonic.side_effect = [0, 10, 20, 30]  # don't _actually_ wait.
     mock_os.getuid.side_effect = ["us"]  # fail if called more than once; intentional
     mock_os.getgid.side_effect = ["us"]  # fail if called more than once; intentional
-    mock_os.getpgid = lambda pid: pid
+    mock_os.getpgid = lambda pid: 100000 + pid % 10
 
     expected = []
     for _ in range(random.randrange(0, 10)):
@@ -750,23 +749,32 @@ def test_children_signaled_at_shutdown(
         for a in b
     )
 
-    # test that SIGTERM, *then* SIGKILL sent
-    killpg_expected_calls = [(pid, signal.SIGTERM) for pid in em._children]
-    killpg_expected_calls.extend((pid, signal.SIGKILL) for pid in em._children)
+    # test that SIGTERM is sent to pid
+    kill_expected_calls = [(pid, signal.SIGTERM) for pid in em._children]
+
+    # test that SIGKILL is sent to pgid
+    killpg_expected_calls = [
+        (100000 + pid % 10, signal.SIGKILL) for pid in em._children
+    ]
 
     em.start()
     assert em._event_loop.called, "Verify test setup"
 
     resgid = mock_os.setresgid.call_args_list
     resuid = mock_os.setresuid.call_args_list
+    kill = mock_os.kill.call_args_list[0:]
+
+    # The first call is to getpgid(0)
     killpg = mock_os.killpg.call_args_list[1:]
 
     for setgid_call, exp_args in zip(resgid, gid_expected_calls):
         assert setgid_call[0] == exp_args, "Signals only sent by _same_ user, NOT root"
     for setuid_call, exp_args in zip(resuid, uid_expected_calls):
         assert setuid_call[0] == exp_args, "Signals only sent by _same_ user, NOT root"
+    for kill_call, exp_args in zip(kill, kill_expected_calls):
+        assert kill_call[0] == exp_args, "Expected SIGTERM only for os.kill"
     for killpg_call, exp_args in zip(killpg, killpg_expected_calls):
-        assert killpg_call[0] == exp_args, "Expected SIGTERM, *then* SIGKILL"
+        assert killpg_call[0] == exp_args, "Expected SIGKILL only for os.killpg"
 
 
 def test_restarts_running_endpoint_with_cached_args(epmanager_as_root, mock_log):
@@ -792,11 +800,10 @@ def test_restarts_running_endpoint_with_cached_args(epmanager_as_root, mock_log)
     assert em.cmd_start_endpoint.call_args.args == args_tup
 
 
-def test_no_cached_args_means_no_restart(epmanager_as_root, mocker, mock_log):
-    *_, em = epmanager_as_root
+def test_no_cached_args_means_no_restart(epmanager_as_root, mock_log):
+    *_, mock_os, _, em = epmanager_as_root
     child_pid = random.randrange(1, 32768 + 1)
 
-    mock_os = mocker.patch(f"{_MOCK_BASE}os")
     mock_os.waitpid.side_effect = [(child_pid, -1), (0, -1)]
     mock_os.waitstatus_to_exitcode.return_value = 0
     em.cmd_start_endpoint = mock.Mock()
