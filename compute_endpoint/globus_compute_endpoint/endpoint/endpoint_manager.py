@@ -514,21 +514,29 @@ class EndpointManager:
             log.warning(f"Unable to send final heartbeat -- ({type(e).__name__}) {e}")
 
         self._heartbeat_publisher.stop(block=False)
+
         os.killpg(os.getpgid(0), signal.SIGTERM)
 
         proc_uid, proc_gid = os.getuid(), os.getgid()
-        for msg_prefix, signum in (
-            ("Signaling shutdown", signal.SIGTERM),
-            ("Forcibly killing", signal.SIGKILL),
+        for msg_prefix, signum, loop_wait_s in (
+            ("Signaling shutdown", signal.SIGTERM, 0.5),
+            ("Forcibly killing", signal.SIGKILL, 0.05),
         ):
             for pid, rec in self._children.items():
                 uid, gid, uname, proc_args = rec.uid, rec.gid, rec.uname, rec.arguments
-                proc_ident = f"PID: {pid}, UID: {uid}, GID: {gid}, User: {uname}"
+                pgid = os.getpgid(pid)
+                proc_ident = (
+                    f"PID: {pid}, PGID: {pgid}, UID: {uid}, GID: {gid}, User: {uname}"
+                )
                 log.info(f"{msg_prefix} of user endpoint ({proc_ident}) [{proc_args}]")
                 try:
                     os.setresgid(gid, gid, -1)
                     os.setresuid(uid, uid, -1)
-                    os.killpg(os.getpgid(pid), signum)
+                    if signum == signal.SIGTERM:
+                        os.kill(pid, signum)
+                    else:
+                        # SIGTERM was ineffective, force kill its group entirely
+                        os.killpg(pgid, signum)
                 except Exception as e:
                     log.warning(
                         f"User endpoint signal failed: {e} ({proc_ident}) [{proc_args}]"
@@ -539,7 +547,7 @@ class EndpointManager:
 
             deadline = time.monotonic() + 10
             while self._children and time.monotonic() < deadline:
-                time.sleep(0.5)
+                time.sleep(loop_wait_s)
                 self.wait_for_children()
 
         self._audit_log_handler_stop = True
