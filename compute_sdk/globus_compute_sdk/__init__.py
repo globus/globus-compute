@@ -1,5 +1,7 @@
 """Globus Compute : Fast function serving for clouds, clusters and supercomputers."""
 
+import warnings
+
 from globus_compute_sdk.version import __version__ as _version
 
 __author__ = "The Globus Compute Team"
@@ -16,4 +18,14 @@ __all__ = (
     "MPIFunction",
     "ShellFunction",
     "ShellResult",
+)
+
+# Without adding this filter, DeprecationWarnings are hidden by default
+# This can be overridden with
+#     PYTHONWARNINGS="module::DeprecationWarning" <python script>
+# 'module' can be one of https://docs.python.org/3/library/warnings.html#warning-filter
+warnings.filterwarnings(
+    "always",
+    category=DeprecationWarning,
+    module=r"(globus_compute_sdk|globus_compute_endpoint)(\..+)?$",
 )

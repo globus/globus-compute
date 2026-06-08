@@ -176,6 +176,7 @@ class Executor(concurrent.futures.Executor):
                 warnings.warn(
                     f"'{key}' is not utilized and will be removed in a future release",
                     DeprecationWarning,
+                    stacklevel=2,
                 )
                 continue
             msg = f"'{key}' is an invalid argument for {self.__class__.__name__}"
