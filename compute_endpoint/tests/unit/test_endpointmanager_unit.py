@@ -246,6 +246,8 @@ def epmanager_as_user(
     mock_os.dup2.side_effect = (0, 1, 2, AssertionError("dup2: unexpected?"))
     mock_os.open.side_effect = (4, 5, AssertionError("open: unexpected?"))
 
+    mock_os.waitpid.return_value = (0, 0)
+
     mock_pwd = mocker.patch(f"{_MOCK_BASE}pwd")
     mock_pwd.getpwnam.side_effect = AssertionError(
         "getpwnam: unprivileged should not care"
@@ -301,6 +303,8 @@ def epmanager_as_root(
     mock_os.dup2.side_effect = (0, 1, 2, AssertionError("dup2: unexpected?"))
     mock_os.open.side_effect = (4, 5, AssertionError("open: unexpected?"))
     mock_os.environ = {"Some": "test", "environ": "with", "debug": "1"}
+
+    mock_os.waitpid.return_value = (0, 0)
 
     mock_pwd = mocker.patch(f"{_MOCK_BASE}pwd")
     mock_pwd.getpwnam.side_effect = (
@@ -673,7 +677,6 @@ def test_log_contains_sentinel_lines(
 ):
     *_, em = epmanager_as_root
 
-    mocker.patch(f"{_MOCK_BASE}os")
     em._event_loop = noop
     em.start()
 
@@ -691,6 +694,31 @@ def test_log_contains_sentinel_lines(
     assert end_re_uuid.search(log_str) is not None, "Expected end sentinel has EP id"
 
 
+@pytest.mark.parametrize(("waitpid"), (0, 1234))
+def test_log_uep_pid_lines(
+    mocker, mock_log, epmanager_as_root, noop, reset_signals, waitpid
+):
+    _, _, _, mock_os, _, em = epmanager_as_root
+
+    # Loop exits on first zero pid
+    mock_os.waitpid.side_effect = [(waitpid, 0), (1, 0), (0, 0)]
+    mocker.patch("time.sleep")
+
+    em._event_loop = noop
+    em.start()
+
+    log_str = "\n".join(a[0] for a, _ in mock_log.info.call_args_list)
+
+    exit_msg = f"Child pid={waitpid} exited for CEP with PID"
+
+    if waitpid != 0:
+        assert exit_msg in log_str
+        assert mock_os.waitpid.call_count == 3
+    else:
+        assert exit_msg not in log_str
+        assert mock_os.waitpid.call_count == 1
+
+
 def test_title_changes_for_shutdown(
     mocker, epmanager_as_root, noop, mock_setproctitle, reset_signals
 ):
@@ -698,7 +726,6 @@ def test_title_changes_for_shutdown(
     mock_spt, orig_proc_title = mock_setproctitle
 
     em._event_loop = noop
-    mocker.patch(f"{_MOCK_BASE}os")
 
     mock_spt.reset_mock()
     assert not mock_spt.setproctitle.called, "Verify test setup"
