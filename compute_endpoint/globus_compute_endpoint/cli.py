@@ -470,6 +470,7 @@ def configure_endpoint(
             "--endpoint-config is deprecated; use --manager-config instead."
             " If you want to configure user endpoint processes, use --template-config.",
             DeprecationWarning,
+            stacklevel=2,
         )
 
         if manager_config is None:
@@ -479,6 +480,7 @@ def configure_endpoint(
                 "Both --endpoint-config and --manager-config were provided;"
                 " --endpoint-config will be ignored.",
                 UserWarning,
+                stacklevel=2,
             )
 
     try:
