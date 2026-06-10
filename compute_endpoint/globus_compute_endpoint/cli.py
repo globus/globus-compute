@@ -50,7 +50,10 @@ from globus_compute_endpoint.endpoint.utils import (
 )
 from globus_compute_endpoint.exception_handling import handle_auth_errors
 from globus_compute_endpoint.exceptions import MessageSystemExit
-from globus_compute_endpoint.logging_config import setup_logging
+from globus_compute_endpoint.logging_config import (
+    ensure_log_path,
+    setup_logging,
+)
 from globus_compute_sdk import Client
 from globus_compute_sdk.sdk.auth.auth_client import ComputeAuthClient
 from globus_compute_sdk.sdk.auth.whoami import print_whoami_info
@@ -942,9 +945,10 @@ def _start_user_endpoint(
 ):
     os.umask(0o077)
     state = CommandState.ensure()
+
     if ep_dir.is_dir():
         setup_logging(
-            logfile=ep_dir / "endpoint.log",
+            logfile=ensure_log_path(ep_dir),
             debug=state.debug,
             console_enabled=state.log_to_console,
             no_color=state.no_color,
@@ -988,7 +992,7 @@ def _start_user_endpoint(
 
             if not state.debug and ep_config.debug:
                 setup_logging(
-                    logfile=ep_dir / "endpoint.log",
+                    logfile=ensure_log_path(ep_dir),
                     debug=ep_config.debug,
                     console_enabled=state.log_to_console,
                     no_color=state.no_color,
