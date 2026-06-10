@@ -528,7 +528,7 @@ class EndpointManager:
                 try:
                     os.setresgid(gid, gid, -1)
                     os.setresuid(uid, uid, -1)
-                    os.kill(pid, signum)  #.......
+                    os.kill(pid, signum)  # .......
                 except Exception as e:
                     log.warning(
                         f"User endpoint signal failed: {e} ({proc_ident}) [{proc_args}]"
