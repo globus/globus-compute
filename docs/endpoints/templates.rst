@@ -186,13 +186,14 @@ Reserved Variables
 ==================
 
 Every template has access to reserved variables that cannot be overridden by the
-user or admin:
+user or admin.  These are accessible from the Globus-Compute-supplied variable of
+``_GC``.
 
-- ``parent_config``: Contains the configuration values of the parent manager
+- ``_GC.parent_config``: Contains the configuration values of the parent manager
   endpoint.  This can be helpful in situations involving Python-based
   configuration files.
 
-- ``user_runtime``: Contains information about the runtime environment of the
+- ``_GC.user_runtime``: Contains information about the runtime environment of the
   user submitting tasks, such as their Python version.  The following fields are
   available:
 
@@ -218,7 +219,7 @@ user or admin:
     - ``processor``: Host processor name (e.g., ``"x86_64"``)
     - ``release``: Host OS release (e.g., ``"6.16.5-2-generic"``)
 
-- ``mapped_identity``: Contains information about the user's mapped identity.
+- ``_GC.mapped_identity``: Contains information about the user's mapped identity.
   The following fields are available:
 
   - ``local.uname``: Local user's username
@@ -238,11 +239,15 @@ user or admin:
          type: GlobusComputeEngine
          provider:
             type: SlurmProvider
-      {% if 1001 in mapped_identity.local.groups %}
+      {% if 1001 in _GC.mapped_identity.local.groups %}
             partition: {{ partition }}
       {% else %}
             partition: default
       {% endif %}
+
+.. note::
+   The variables ``parent_config``, ``user_runtime``, and ``mapped_identity`` are
+   available outside of ``_GC`` for legacy reasons, but this access is deprecated.
 
 
 Combining Templates
