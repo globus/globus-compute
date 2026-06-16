@@ -1,5 +1,6 @@
 import inspect
 import json
+import logging
 import os
 import pathlib
 import shlex
@@ -401,6 +402,29 @@ def test_render_config_passes_user_runtime(
         assert rendered_dict["user_python"] == user_runtime["python"]["version"]
     else:
         assert rendered_dict["user_python"] == "<none>"
+
+
+@pytest.mark.parametrize("reserved_word", RESERVED_USER_CONFIG_TEMPLATE_VARIABLES)
+def test_render_config_logs_deprecated_reserved_fields(
+    conf_no_engine: UserEndpointConfig,
+    mapped_ident: MappedPosixIdentity,
+    reserved_word,
+    randomstring,
+    caplog,
+):
+    caplog.set_level(logging.WARNING)
+    template = "some_key: {{ %s }}" % reserved_word
+    rendered = render_config_user_template(
+        conf_no_engine, template, pathlib.Path("/"), mapped_ident
+    )
+
+    if "_GC" == reserved_word:
+        assert len(caplog.records) == 0, "Expect no warning if using `_GC`"
+    else:
+        r = caplog.records[-1]
+        assert r.levelno == logging.WARNING
+        assert f"`{reserved_word}` is deprecated" in r.message
+        assert f"(i.e., _GC.{reserved_word})" in r.message, "Expect directed how to fix"
 
 
 def test_render_config_passes_mapped_identity(mocker, conf_no_engine):

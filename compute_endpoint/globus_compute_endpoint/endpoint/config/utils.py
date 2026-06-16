@@ -23,7 +23,41 @@ RESERVED_USER_CONFIG_TEMPLATE_VARIABLES = (
     "parent_config",
     "user_runtime",
     "mapped_identity",
+    "_GC",
 )
+
+
+class DeprecatedTemplateVar:
+    def __init__(self, name: str, data):
+        self.name = name
+        self.data = data
+
+    def warn(self):
+        log.warning(
+            f"Template access to `{self.name}` is deprecated; access via `_GC`"
+            f" instead.  (i.e., _GC.{self.name})",
+            stacklevel=3,
+        )
+
+    def __getattr__(self, key):
+        self.warn()
+        d = self.data
+        val = None
+        if d:
+            try:
+                val = d[key]
+            except TypeError:
+                val = getattr(d, key)
+
+        return val
+
+    def __bool__(self):
+        self.warn()
+        return bool(self.data)
+
+    def __str__(self):
+        self.warn()
+        return str(self.data)
 
 
 def _read_config_file(config_path: pathlib.Path) -> str:
@@ -289,11 +323,20 @@ def render_config_user_template(
     _validate_user_opts(_user_opts, user_config_schema)
     _user_opts = _sanitize_user_json(_user_opts)
 
-    _render_payload = _user_opts | {
+    R = {  # "reserved", but line length woes
         "parent_config": parent_config,
         "mapped_identity": _parse_mapped_identity(mapped_identity),
         "user_runtime": _sanitize_user_json(user_runtime or {}),
     }
+    reserved_template_vars = {
+        "_GC": R,
+        "parent_config": DeprecatedTemplateVar("parent_config", R["parent_config"]),
+        "mapped_identity": DeprecatedTemplateVar(
+            "mapped_identity", R["mapped_identity"]
+        ),
+        "user_runtime": DeprecatedTemplateVar("user_runtime", R["user_runtime"]),
+    }
+    _render_payload = _user_opts | reserved_template_vars
 
     user_config_template_dir = user_config_template_path.parent
     try:
