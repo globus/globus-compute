@@ -8,7 +8,7 @@ REQUIRES = [
     # request sending and authorization tools
     "requests>=2.31.0,<3",
     "globus-sdk>=4.4.0,<5",
-    "globus-compute-common==0.7.1",
+    "globus-compute-common==1.0.0",
     # dill is an extension of `pickle` to a wider array of native python types
     # pin to the latest version, as 'dill' is not at 1.0 and does not have a clear
     # versioning and compatibility policy

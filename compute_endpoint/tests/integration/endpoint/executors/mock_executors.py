@@ -7,6 +7,7 @@ import uuid
 from globus_compute_common import messagepack
 from globus_compute_common.messagepack.message_types import Result, Task
 from globus_compute_endpoint.engines import GCFuture
+from globus_compute_endpoint.engines.base import GlobusComputeEngineBase
 from globus_compute_sdk import Client
 from globus_compute_sdk.serialize.facade import validate_strategylike
 from parsl.executors.errors import InvalidResourceSpecification
@@ -17,6 +18,8 @@ class MockEngine(unittest.mock.Mock):
         super().__init__(**kwargs)
         self.passthrough = True
         self.executor_exception = False
+
+    __class__ = GlobusComputeEngineBase
 
     def start(
         self,

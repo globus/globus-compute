@@ -12,6 +12,7 @@ from click.testing import CliRunner
 from globus_compute_endpoint.cli import _do_stop_endpoint, app
 from globus_compute_endpoint.endpoint import endpoint
 from globus_compute_endpoint.endpoint.config import UserEndpointConfig
+from globus_compute_endpoint.engines.base import GlobusComputeEngineBase
 from globus_compute_sdk import Client
 from globus_compute_sdk.sdk.client import _ComputeWebClient
 from globus_sdk import GlobusAPIError, UserApp
@@ -100,7 +101,7 @@ def test_endpoint_setup_execution(mocker, tmp_path, randomstring):
     endpoint_uuid = None
     endpoint_config = UserEndpointConfig(
         endpoint_setup=command,
-        engine=mock.Mock(),
+        engine=mock.Mock(spec=GlobusComputeEngineBase),
     )
     log_to_console = False
     reg_info = {}

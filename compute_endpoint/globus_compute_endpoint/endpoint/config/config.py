@@ -12,6 +12,7 @@ from globus_compute_sdk.sdk.utils.uuid_like import (
     as_optional_uuid,
     as_uuid,
 )
+from pydantic import ConfigDict, validate_call
 
 from .pam import PamConfiguration
 
@@ -57,6 +58,7 @@ class BaseConfig:
         Globus subscription (i.e., ``subscription_id``).
     """
 
+    @validate_call
     def __init__(
         self,
         *,
@@ -94,16 +96,23 @@ class BaseConfig:
 
     def __repr__(self) -> str:
         deprecated: t.Set[str] = set()
+        kwd_param_types = {
+            inspect.Parameter.KEYWORD_ONLY,
+            inspect.Parameter.POSITIONAL_OR_KEYWORD,
+        }
 
         kwds: dict[str, t.Any] = {}
         for cls in type(self).__mro__:
-            fargspec = inspect.getfullargspec(cls.__init__)  # type: ignore[misc]
-            kwdefs = fargspec.kwonlydefaults
-            for kw in fargspec.kwonlyargs:
-                if kw in deprecated:
+            init_sig = inspect.signature(cls)
+            for kw, param in init_sig.parameters.items():
+                if (
+                    param.kind not in kwd_param_types
+                    or kw == "self"
+                    or kw in deprecated
+                ):
                     continue
                 curval = getattr(self, kw)
-                if kwdefs and curval != kwdefs.get(kw):
+                if curval != param.default:
                     kwds.setdefault(kw, curval)
 
         self_name = type(self).__name__
@@ -222,6 +231,7 @@ class UserEndpointConfig(BaseConfig):
     :param stderr: Path where the endpoint's stderr should be written
     """
 
+    @validate_call(config=ConfigDict(arbitrary_types_allowed=True))
     def __init__(
         self,
         *,
@@ -382,6 +392,7 @@ class ManagerEndpointConfig(BaseConfig):
     .. _setuid(2): https://www.man7.org/linux/man-pages/man2/setuid.2.html
     """  # noqa
 
+    @validate_call
     def __init__(
         self,
         *,
@@ -420,7 +431,13 @@ class ManagerEndpointConfig(BaseConfig):
 
     @user_config_template_path.setter
     def user_config_template_path(self, val: os.PathLike | str | None):
-        self._user_config_template_path = pathlib.Path(val) if val else None
+        self._user_config_template_path: pathlib.Path | None = None
+        if not val:
+            return
+        _p = pathlib.Path(val)
+        if not _p.exists():
+            raise ValueError(f"User config template path not found ({_p})")
+        self._user_config_template_path = _p
 
     @property
     def user_config_schema_path(self) -> pathlib.Path | None:
@@ -428,7 +445,13 @@ class ManagerEndpointConfig(BaseConfig):
 
     @user_config_schema_path.setter
     def user_config_schema_path(self, val: os.PathLike | str | None):
-        self._user_config_schema_path = pathlib.Path(val) if val else None
+        self._user_config_schema_path: pathlib.Path | None = None
+        if not val:
+            return
+        _p = pathlib.Path(val)
+        if not _p.exists():
+            raise ValueError(f"User config schema path not found ({_p})")
+        self._user_config_schema_path = _p
 
     @property
     def identity_mapping_config_path(self) -> pathlib.Path | None:

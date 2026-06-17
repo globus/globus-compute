@@ -4,10 +4,11 @@ from .config import (  # noqa: F401
     ManagerEndpointConfig,
     UserEndpointConfig,
 )
-from .model import (  # noqa: F401
-    BaseConfigModel,
-    BaseEndpointConfigModel,
-    ManagerEndpointConfigModel,
-    UserEndpointConfigModel,
+from .dispatch import (  # noqa: F401
+    AddressDispatcher,
+    EngineDispatcher,
+    LauncherDispatcher,
+    ProviderDispatcher,
+    TypeDispatcher,
 )
 from .pam import PamConfiguration  # noqa: F401
