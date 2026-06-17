@@ -47,7 +47,7 @@ def mock_engine(endpoint_uuid):
     m = MockEngine()
     m.endpoint_id = endpoint_uuid
     m.get_status_report.return_value = EPStatusReport(
-        endpoint_id=endpoint_uuid, global_state={}, task_statuses=[]
+        endpoint_id=endpoint_uuid, global_state={}, task_statuses={}
     )
 
     yield m
@@ -409,7 +409,7 @@ def test_sends_status_reports(
     mocker, ep_ix, endpoint_uuid, randomstring, mock_rp, mock_tqs
 ):
     status_reports = [
-        EPStatusReport(endpoint_id=uuid.uuid4(), global_state={}, task_statuses=[])
+        EPStatusReport(endpoint_id=uuid.uuid4(), global_state={}, task_statuses={})
         for i in range(5)
     ]
     ep_ix.engine.get_status_report.side_effect = status_reports

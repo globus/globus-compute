@@ -38,7 +38,7 @@ def run_interchange_process(
         mock_exe.endpoint_id = endpoint_uuid
         mock_exe.executor_exception = None
         mock_exe.get_status_report.return_value = EPStatusReport(
-            endpoint_id=endpoint_uuid, global_state={}, task_statuses=[]
+            endpoint_id=endpoint_uuid, global_state={}, task_statuses={}
         )
 
         if hasattr(request, "param") and request.param:

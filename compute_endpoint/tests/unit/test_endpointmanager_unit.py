@@ -23,6 +23,7 @@ import yaml
 from globus_compute_common.messagepack import unpack
 from globus_compute_common.messagepack.message_types import EPStatusReport
 from globus_compute_endpoint.endpoint.config import (
+    EngineDispatcher,
     ManagerEndpointConfig,
     UserEndpointConfig,
 )
@@ -1986,6 +1987,8 @@ def test_ha_aligned(successful_exec_from_mocked_root, user_conf_template, mep_ha
     stdin_data = json.loads(stdin_str)
     uep_conf_str = stdin_data.get("config")
     uep_conf_data = yaml.safe_load(uep_conf_str)
+    uep_conf_data["engine"] = EngineDispatcher.build_instance(uep_conf_data["engine"])
+    uep_conf_data["engine"].shutdown()
     uep_conf = UserEndpointConfig(**uep_conf_data)
 
     assert em._config.high_assurance is uep_conf.high_assurance
