@@ -1,6 +1,0 @@
-Bug Fixes
-^^^^^^^^^
-
-- A user-unfriendly Timeout stacktrace Exception may be displayed to the
-  user when force deleting an endpoint in unusual circumstances.  The
-  stacktrace is now replaced with a suggestion to retry the delete command.

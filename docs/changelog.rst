@@ -3,6 +3,25 @@ Changelog
 
 .. scriv-insert-here
 
+.. _changelog-4.13.0:
+
+globus-compute-sdk & globus-compute-endpoint v4.13.0
+----------------------------------------------------
+
+Bug Fixes
+^^^^^^^^^
+
+- A user-unfriendly Timeout stacktrace Exception may be displayed to the
+  user when force deleting an endpoint in unusual circumstances.  The
+  stacktrace is now replaced with a suggestion to retry the delete command.
+
+Changed
+^^^^^^^
+
+- DeprecationWarning is now always emitted by default, instead of being hidden.  As before,
+  ``warnings.warn()`` output can be `customized <https://docs.python.org/3/library/warnings.html#warning-filter>`_.
+  e.g. ``PYTHONWARNINGS="ignore::DeprecationWarning" globus-compute-endpoint start my_endpoint``
+
 .. _changelog-4.12.0:
 
 globus-compute-sdk & globus-compute-endpoint v4.12.0
