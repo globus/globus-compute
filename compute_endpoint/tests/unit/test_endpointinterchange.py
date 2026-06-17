@@ -73,7 +73,7 @@ def ei(endpoint_uuid, mock_gce, mock_quiesce, mock_ep_info):
     )
     _ei._quiesce_event = mock_quiesce
     _ei.engine.get_status_report.return_value = EPStatusReport(
-        endpoint_id=_ei.endpoint_id, global_state={}, task_statuses=[]
+        endpoint_id=_ei.endpoint_id, global_state={}, task_statuses={}
     )
 
     yield _ei
