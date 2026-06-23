@@ -544,8 +544,8 @@ class EndpointManager:
         while time.monotonic() < deadline:
             time.sleep(0.5)
             try:
-                pid, _ = os.waitpid(-1, os.WNOHANG)
-                if pid:
+                id_status = os.waitpid(-1, os.WNOHANG)
+                if len(id_status) == 2 and id_status[0]:
                     log.info(f"Last child {pid} exited for CEP with PID: {proc_pid}")
                     break
             except ChildProcessError:
