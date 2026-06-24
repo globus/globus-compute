@@ -541,11 +541,12 @@ class EndpointManager:
         deadline = time.monotonic() + 5
         cep_ident = f"GID: {proc_gid}, PID: {proc_pid}, UID: {proc_uid}"
         log.info(f"Waiting on children for Core Endpoint with {cep_ident}")
+        log.info(f"tm={time.monotonic()}, dl={deadline}")
         while time.monotonic() < deadline:
             time.sleep(0.5)
             try:
-                id_status = os.waitpid(-1, os.WNOHANG)
-                if len(id_status) == 2 and id_status[0]:
+                pid, _ = os.waitpid(-1, os.WNOHANG)
+                if pid:
                     log.info(f"Last child {pid} exited for CEP with PID: {proc_pid}")
                     break
             except ChildProcessError:
