@@ -13,9 +13,9 @@ import pytest
 from globus_compute_endpoint.endpoint import endpoint
 from globus_compute_endpoint.endpoint.config import (
     PamConfiguration,
-    PathModel,
     UserEndpointConfig,
 )
+from globus_compute_endpoint.endpoint.config.model import PathModel
 from globus_compute_endpoint.engines import ThreadPoolEngine
 from globus_compute_endpoint.engines.helper import execute_task
 from parsl import HighThroughputExecutor
@@ -50,7 +50,7 @@ known_user_config_opts = {
     "environment": str,
     "high_assurance": False,
     "engine": None,
-    "paths": None,
+    "paths": PathModel,
 }
 
 known_manager_config_opts = {
@@ -100,7 +100,7 @@ def get_random_of_datatype_impl(cls):
     elif issubclass(cls, PamConfiguration):
         return PamConfiguration(True, "some-service-name")
     elif issubclass(cls, PathModel):
-        return PathModel({"endpoint_log": "abc.txt", "gc_dir": "/some_dir"})
+        return PathModel(endpoint_log="abc.txt", gc_dir="/some_dir")
 
     raise NotImplementedError(f"Missing test branch for type: {repr(cls)}")
 
