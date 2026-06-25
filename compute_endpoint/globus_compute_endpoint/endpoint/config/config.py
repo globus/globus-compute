@@ -12,8 +12,8 @@ from globus_compute_sdk.sdk.utils.uuid_like import (
     as_optional_uuid,
     as_uuid,
 )
+from pydantic import BaseModel
 
-from .model import PathModel
 from .pam import PamConfiguration
 
 MINIMUM_HEARTBEAT: float = 5.0
@@ -164,6 +164,11 @@ class BaseConfig:
             self._admins = tuple(as_uuid(identity_id) for identity_id in val)
 
 
+class PathModel(BaseModel):
+    gc_dir: str | None = None
+    endpoint_log: str | None = None
+
+
 class UserEndpointConfig(BaseConfig):
     """Holds the configuration items for a task-processing endpoint.
 
@@ -229,7 +234,7 @@ class UserEndpointConfig(BaseConfig):
         idle_heartbeats_hard: int = 5760,  # Two days, divided by `heartbeat_period`
         endpoint_setup: str | None = None,
         endpoint_teardown: str | None = None,
-        paths: dict | None = None,
+        paths: PathModel | None = None,
         **kwargs,
     ) -> None:
         super().__init__(**kwargs)
@@ -254,11 +259,11 @@ class UserEndpointConfig(BaseConfig):
         self._engine = val
 
     @property
-    def paths(self) -> dict | None:
+    def paths(self) -> PathModel | None:
         return self._paths
 
     @paths.setter
-    def paths(self, val: dict | None):
+    def paths(self, val: PathModel | None):
         self._paths = val
 
     @property

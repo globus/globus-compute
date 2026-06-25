@@ -13,6 +13,7 @@ import pytest
 from globus_compute_endpoint.endpoint import endpoint
 from globus_compute_endpoint.endpoint.config import (
     PamConfiguration,
+    PathModel,
     UserEndpointConfig,
 )
 from globus_compute_endpoint.engines import ThreadPoolEngine
@@ -98,6 +99,8 @@ def get_random_of_datatype_impl(cls):
         return random.random() * 1_000_000
     elif issubclass(cls, PamConfiguration):
         return PamConfiguration(True, "some-service-name")
+    elif issubclass(cls, PathModel):
+        return PathModel({"endpoint_log": "abc.txt", "gc_dir": "/some_dir"})
 
     raise NotImplementedError(f"Missing test branch for type: {repr(cls)}")
 
