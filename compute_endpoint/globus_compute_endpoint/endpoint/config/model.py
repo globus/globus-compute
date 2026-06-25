@@ -13,6 +13,7 @@ from globus_compute_common.pydantic_v1 import (
 )
 from globus_compute_endpoint import engines
 from globus_compute_endpoint.endpoint.config.pam import PamConfiguration
+from globus_compute_endpoint.endpoint.config import PathModel
 from parsl import addresses as parsl_addresses
 from parsl import launchers as parsl_launchers
 from parsl import providers as parsl_providers
@@ -67,11 +68,6 @@ class ProviderModel(BaseConfigModel):
 
     _validate_type = _validate_import("type", parsl_providers)
     _validate_launcher = _validate_params("launcher")
-
-
-class PathModel(BaseConfigModel):
-    gc_dir: t.Optional[str]
-    endpoint_log: t.Optional[str]
 
 
 class EngineModel(BaseConfigModel):
