@@ -672,9 +672,7 @@ def test_writes_endpoint_uuid(epmanager_as_root):
     assert ep_data["endpoint_id"] == returned_uuid
 
 
-def test_log_contains_sentinel_lines(
-    mocker, mock_log, epmanager_as_root, noop, reset_signals
-):
+def test_log_contains_sentinel_lines(mock_log, epmanager_as_root, noop, reset_signals):
     *_, em = epmanager_as_root
 
     em._event_loop = noop
@@ -695,7 +693,7 @@ def test_log_contains_sentinel_lines(
 
 
 def test_title_changes_for_shutdown(
-    mocker, epmanager_as_root, noop, mock_setproctitle, reset_signals
+    epmanager_as_root, noop, mock_setproctitle, reset_signals
 ):
     *_, em = epmanager_as_root
     mock_spt, orig_proc_title = mock_setproctitle
@@ -715,11 +713,10 @@ def test_title_changes_for_shutdown(
 def test_children_signaled_at_shutdown(
     mocker, epmanager_as_root, randomstring, noop, reset_signals
 ):
-    *_, em = epmanager_as_root
+    *_, mock_os, _, em = epmanager_as_root
 
     em._event_loop = mock.Mock()
     em.wait_for_children = noop
-    mock_os = mocker.patch(f"{_MOCK_BASE}os")
     mock_time = mocker.patch(f"{_MOCK_BASE}time")
     mock_time.monotonic.side_effect = [0, 10, 20, 30]  # don't _actually_ wait.
     mock_os.getuid.side_effect = ["us"]  # fail if called more than once; intentional
