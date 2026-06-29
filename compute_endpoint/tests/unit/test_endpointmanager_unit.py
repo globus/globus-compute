@@ -694,14 +694,34 @@ def test_log_contains_sentinel_lines(
     assert end_re_uuid.search(log_str) is not None, "Expected end sentinel has EP id"
 
 
-@pytest.mark.parametrize(("waitpid"), (0, 1234))
+@pytest.mark.parametrize(
+    ("waitpid_term", "status_term", "waitpid_kill", "status_kill"),
+    (
+        [0, 15, 1, 9],
+        # [1234, 0, 1, 9],
+    ),
+)
 def test_log_uep_pid_lines(
-    mocker, mock_log, epmanager_as_root, noop, reset_signals, waitpid
+    mocker,
+    mock_log,
+    epmanager_as_root,
+    noop,
+    reset_signals,
+    waitpid_term,
+    status_term,
+    waitpid_kill,
+    status_kill,
 ):
     _, _, _, mock_os, _, em = epmanager_as_root
 
-    # Loop exits on first zero pid
-    mock_os.waitpid.side_effect = [(waitpid, 0), (1, 0), (0, 0)]
+    #
+    mock_os.waitpid.side_effect = [
+        (1, 15),
+        (waitpid_term, status_term),
+        (1, 0),
+        (waitpid_kill, status_kill),
+        (0, 0),
+    ]
     mocker.patch("time.sleep")
 
     em._event_loop = noop
@@ -709,9 +729,9 @@ def test_log_uep_pid_lines(
 
     log_str = "\n".join(a[0] for a, _ in mock_log.info.call_args_list)
 
-    exit_msg = f"Child pid={waitpid} exited for CEP with PID"
+    exit_msg = f"Child pid={waitpid_term} exited for CEP with PID"
 
-    if waitpid != 0:
+    if waitpid_term != 0:
         assert exit_msg in log_str
         assert mock_os.waitpid.call_count == 3
     else:

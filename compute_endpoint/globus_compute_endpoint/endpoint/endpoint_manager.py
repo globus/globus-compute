@@ -25,7 +25,6 @@ from concurrent.futures import Future
 from contextlib import contextmanager
 from datetime import datetime
 
-import psutil
 import setproctitle
 import yaml
 from cachetools import TTLCache
@@ -517,55 +516,39 @@ class EndpointManager:
         self._heartbeat_publisher.stop(block=False)
         os.killpg(os.getpgid(0), signal.SIGTERM)
 
-        proc_uid, proc_gid, proc_pid = os.getuid(), os.getgid(), os.getpid()
-
-        # First, send SIGTERM to child processes and hope they shut down
-        # uneventfully
-        for pid, rec in self._children.items():
-            uid, gid, uname, proc_args = rec.uid, rec.gid, rec.uname, rec.arguments
-            proc_ident = f"PID: {pid}, UID: {uid}, GID: {gid}, User: {uname}"
-            log.info(f"Sending SIGTERM to user endpoint ({proc_ident}) [{proc_args}]")
-            try:
-                os.setresgid(gid, gid, -1)
-                os.setresuid(uid, uid, -1)
-                os.kill(pid, signal.SIGTERM)
-            except Exception as e:
-                log.warning(
-                    f"User endpoint signal failed: {e} ({proc_ident}) [{proc_args}]"
+        proc_uid, proc_gid = os.getuid(), os.getgid()
+        for msg_prefix, signum, loop_wait_s in (
+            ("Signaling shutdown", signal.SIGTERM, 0.5),
+            ("Forcibly killing", signal.SIGKILL, 0.05),
+        ):
+            for pid, rec in self._children.items():
+                uid, gid, uname, proc_args = rec.uid, rec.gid, rec.uname, rec.arguments
+                pgid = os.getpgid(pid)
+                proc_ident = (
+                    f"PID: {pid}, PGID: {pgid}, UID: {uid}, GID: {gid}, User: {uname}"
                 )
-            finally:
-                os.setresuid(proc_uid, proc_uid, -1)
-                os.setresgid(proc_gid, proc_gid, -1)
+                log.info(f"{msg_prefix} of user endpoint ({proc_ident}) [{proc_args}]")
+                try:
+                    os.setresgid(gid, gid, -1)
+                    os.setresuid(uid, uid, -1)
+                    if signum == signal.SIGTERM:
+                        os.kill(pid, signum)
+                    else:
+                        # SIGTERM was ineffective, force kill its group entirely
+                        os.killpg(pgid, signum)
+                except Exception as e:
+                    log.warning(
+                        f"User endpoint signal failed: {e} ({proc_ident}) [{proc_args}]"
+                    )
+                finally:
+                    os.setresuid(proc_uid, proc_uid, -1)
+                    os.setresgid(proc_gid, proc_gid, -1)
 
-        # Wait for a bit of time to give children leeway to shutdown from SIGTERM
-        deadline = time.monotonic() + 5
-        cep_ident = f"GID: {proc_gid}, PID: {proc_pid}, UID: {proc_uid}"
-        log.info(f"Waiting on children for Core Endpoint with {cep_ident}")
-        log.info(f"tm={time.monotonic()}, dl={deadline}")
-        while time.monotonic() < deadline:
-            time.sleep(0.5)
-            try:
-                pid, _ = os.waitpid(-1, os.WNOHANG)
-                if pid:
-                    log.info(f"Child {pid=} exited for CEP with PID: {proc_pid}")
-                else:
-                    # No children left
-                    break
-            except ChildProcessError:
-                # Children all terminated
-                break
-
-        killed_pids = []
-        for pid, rec in self._children.items():
-            if psutil.pid_exists(pid):
-                # SIGTERM was ineffective, force kill the groups entirely
-                killed_pids.append(pid)
-                os.killpg(os.getpgid(pid), signal.SIGKILL)
-        if killed_pids:
-            log.info(
-                f"Grace period exceeded, sent SIGKILL to children {killed_pids}"
-                f" of CEP with {cep_ident}"
-            )
+            # Wait slightly less than psutil's default 10 second Timeout
+            deadline = time.monotonic() + 8
+            while self._children and time.monotonic() < deadline:
+                time.sleep(loop_wait_s)
+                self.wait_for_children()
 
         self._audit_log_handler_stop = True
         self._command.join(5)
