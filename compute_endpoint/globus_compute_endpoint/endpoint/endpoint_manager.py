@@ -514,6 +514,7 @@ class EndpointManager:
             log.warning(f"Unable to send final heartbeat -- ({type(e).__name__}) {e}")
 
         self._heartbeat_publisher.stop(block=False)
+
         os.killpg(os.getpgid(0), signal.SIGTERM)
 
         proc_uid, proc_gid = os.getuid(), os.getgid()
@@ -521,12 +522,14 @@ class EndpointManager:
             ("Signaling shutdown", signal.SIGTERM, 0.5),
             ("Forcibly killing", signal.SIGKILL, 0.05),
         ):
+            log.info(f"\n***\nXYZ 6 {signum=}")
             for pid, rec in self._children.items():
                 uid, gid, uname, proc_args = rec.uid, rec.gid, rec.uname, rec.arguments
                 pgid = os.getpgid(pid)
                 proc_ident = (
                     f"PID: {pid}, PGID: {pgid}, UID: {uid}, GID: {gid}, User: {uname}"
                 )
+                log.info(f"\n***\nXYZ 7 {signum=}")
                 log.info(f"{msg_prefix} of user endpoint ({proc_ident}) [{proc_args}]")
                 try:
                     os.setresgid(gid, gid, -1)

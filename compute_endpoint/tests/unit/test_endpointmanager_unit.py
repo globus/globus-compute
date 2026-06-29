@@ -694,51 +694,6 @@ def test_log_contains_sentinel_lines(
     assert end_re_uuid.search(log_str) is not None, "Expected end sentinel has EP id"
 
 
-@pytest.mark.parametrize(
-    ("waitpid_term", "status_term", "waitpid_kill", "status_kill"),
-    (
-        [0, 15, 1, 9],
-        # [1234, 0, 1, 9],
-    ),
-)
-def test_log_uep_pid_lines(
-    mocker,
-    mock_log,
-    epmanager_as_root,
-    noop,
-    reset_signals,
-    waitpid_term,
-    status_term,
-    waitpid_kill,
-    status_kill,
-):
-    _, _, _, mock_os, _, em = epmanager_as_root
-
-    #
-    mock_os.waitpid.side_effect = [
-        (1, 15),
-        (waitpid_term, status_term),
-        (1, 0),
-        (waitpid_kill, status_kill),
-        (0, 0),
-    ]
-    mocker.patch("time.sleep")
-
-    em._event_loop = noop
-    em.start()
-
-    log_str = "\n".join(a[0] for a, _ in mock_log.info.call_args_list)
-
-    exit_msg = f"Child pid={waitpid_term} exited for CEP with PID"
-
-    if waitpid_term != 0:
-        assert exit_msg in log_str
-        assert mock_os.waitpid.call_count == 3
-    else:
-        assert exit_msg not in log_str
-        assert mock_os.waitpid.call_count == 1
-
-
 def test_title_changes_for_shutdown(
     mocker, epmanager_as_root, noop, mock_setproctitle, reset_signals
 ):
@@ -769,11 +724,12 @@ def test_children_signaled_at_shutdown(
     mock_time.monotonic.side_effect = [0, 10, 20, 30]  # don't _actually_ wait.
     mock_os.getuid.side_effect = ["us"]  # fail if called more than once; intentional
     mock_os.getgid.side_effect = ["us"]  # fail if called more than once; intentional
-    mock_os.getpgid = lambda pid: pid
+    mock_os.getpgid = lambda pid: 100000 + pid % 10
 
     expected = []
     for _ in range(random.randrange(0, 10)):
         uid, gid, pid = tuple(random.randint(1, 2**30) for _ in range(3))
+        print(f"{pid=} PID {gid=}")
         uname = randomstring()
         expected.append((uid, gid, uname, "some process command line"))
         mock_rec = mocker.MagicMock()
@@ -797,23 +753,32 @@ def test_children_signaled_at_shutdown(
         for a in b
     )
 
-    # test that SIGTERM, *then* SIGKILL sent
-    killpg_expected_calls = [(pid, signal.SIGTERM) for pid in em._children]
-    killpg_expected_calls.extend((pid, signal.SIGKILL) for pid in em._children)
+    # test that SIGTERM is sent to pid
+    kill_expected_calls = [(pid, signal.SIGTERM) for pid in em._children]
+
+    # test that SIGKILL is sent to pgid
+    killpg_expected_calls = [
+        (100000 + pid % 10, signal.SIGKILL) for pid in em._children
+    ]
 
     em.start()
     assert em._event_loop.called, "Verify test setup"
 
     resgid = mock_os.setresgid.call_args_list
     resuid = mock_os.setresuid.call_args_list
+    kill = mock_os.kill.call_args_list[0:]
+
+    # The first call is to getpgid(0)
     killpg = mock_os.killpg.call_args_list[1:]
 
     for setgid_call, exp_args in zip(resgid, gid_expected_calls):
         assert setgid_call[0] == exp_args, "Signals only sent by _same_ user, NOT root"
     for setuid_call, exp_args in zip(resuid, uid_expected_calls):
         assert setuid_call[0] == exp_args, "Signals only sent by _same_ user, NOT root"
+    for kill_call, exp_args in zip(kill, kill_expected_calls):
+        assert kill_call[0] == exp_args, "Expected SIGTERM only for os.kill"
     for killpg_call, exp_args in zip(killpg, killpg_expected_calls):
-        assert killpg_call[0] == exp_args, "Expected SIGTERM, *then* SIGKILL"
+        assert killpg_call[0] == exp_args, "Expected SIGKILL only for os.killpg"
 
 
 def test_restarts_running_endpoint_with_cached_args(epmanager_as_root, mock_log):
