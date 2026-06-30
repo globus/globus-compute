@@ -776,6 +776,21 @@ def test_children_signaled_at_shutdown(
     for killpg_call, exp_args in zip(killpg, killpg_expected_calls):
         assert killpg_call[0] == exp_args, "Expected SIGKILL only for os.killpg"
 
+    # First os.killpg() should be before the SIGTERM/SIGKILL loop, but all other
+    # os.killpg() should be after os.kill()
+    kill_called = False
+    killpg_call_count = 0
+    for c in mock_os.mock_calls:
+        if c[0] == "kill":
+            assert killpg_call_count < 2, (
+                "os.kill should not be called after 2nd os.killpg"
+            )
+            kill_called = True
+        elif c[0] == "killpg":
+            if killpg_call_count > 0:
+                assert kill_called, "subsequent os.killpg calls should follow os.kill"
+            killpg_call_count += 1
+
 
 def test_restarts_running_endpoint_with_cached_args(epmanager_as_root, mock_log):
     *_, mock_os, _mock_pwd, em = epmanager_as_root
