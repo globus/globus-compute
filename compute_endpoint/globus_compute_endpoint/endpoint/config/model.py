@@ -54,6 +54,11 @@ class AddressModel(BaseConfigModel):
     _validate_type = _validate_import("type", parsl_addresses)
 
 
+class PathModel(BaseModel):
+    gc_dir: t.Optional[str]
+    endpoint_log: t.Optional[str]
+
+
 class LauncherModel(BaseConfigModel):
     type: str
 
@@ -126,14 +131,12 @@ class BaseEndpointConfigModel(BaseModel):
 
 class UserEndpointConfigModel(BaseEndpointConfigModel):
     engine: EngineModel
+    paths: t.Optional[PathModel]
     heartbeat_threshold: t.Optional[int]
     idle_heartbeats_soft: t.Optional[int]
     idle_heartbeats_hard: t.Optional[int]
     endpoint_setup: t.Optional[str]
     endpoint_teardown: t.Optional[str]
-    log_dir: t.Optional[str]
-    stdout: t.Optional[str]
-    stderr: t.Optional[str]
 
     _validate_engine = _validate_params("engine")
 

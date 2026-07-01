@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 import functools
 import inspect
 import os
@@ -8,7 +10,13 @@ import uuid
 from unittest import mock
 
 import pytest
-from globus_compute_endpoint.endpoint.config import PamConfiguration
+from globus_compute_endpoint.endpoint import endpoint
+from globus_compute_endpoint.endpoint.config import (
+    PamConfiguration,
+    UserEndpointConfig,
+)
+from globus_compute_endpoint.endpoint.config.model import PathModel
+from globus_compute_endpoint.engines import ThreadPoolEngine
 from globus_compute_endpoint.engines.helper import execute_task
 from parsl import HighThroughputExecutor
 from parsl.executors import MPIExecutor
@@ -38,13 +46,11 @@ known_user_config_opts = {
     "idle_heartbeats_hard": int,
     "endpoint_setup": str,
     "endpoint_teardown": str,
-    "log_dir": str,
-    "stdout": str,
-    "stderr": str,
     "local_compute_services": True,
     "environment": str,
     "high_assurance": False,
     "engine": None,
+    "paths": PathModel,
 }
 
 known_manager_config_opts = {
@@ -93,6 +99,8 @@ def get_random_of_datatype_impl(cls):
         return random.random() * 1_000_000
     elif issubclass(cls, PamConfiguration):
         return PamConfiguration(True, "some-service-name")
+    elif issubclass(cls, PathModel):
+        return {"endpoint_log": "abc.txt", "gc_dir": "/some_dir"}
 
     raise NotImplementedError(f"Missing test branch for type: {repr(cls)}")
 
@@ -123,3 +131,34 @@ def mock_mpiex():
     m.launch_cmd = "launchy"
     m.interchange_launch_cmd = "ix-launchy"
     return m
+
+
+@pytest.fixture
+def mock_get_config():
+    with mock.patch("globus_compute_endpoint.endpoint.endpoint.get_config") as m:
+        yield m
+
+
+@pytest.fixture
+def conf():
+    _conf = UserEndpointConfig(engine=ThreadPoolEngine())
+    _conf.source_content = "# test source content"
+    _conf.source_content += "\nengine:\n  type: ThreadPoolEngine"
+    yield _conf
+
+
+@pytest.fixture
+def mock_ep_data(fs, conf):
+    ep = endpoint.Endpoint()
+    ep_dir = pathlib.Path("/some/path/mock_endpoint")
+    ep_dir.mkdir(parents=True, exist_ok=True)
+    log_to_console = False
+    yield ep, ep_dir, log_to_console, conf
+
+
+@pytest.fixture
+def mock_ep_dir(fs, mock_ep_data, mock_get_config):
+    ep, ep_dir, *_, conf = mock_ep_data
+    mock_get_config.return_value = conf
+    ep._config_file_path(ep_dir).write_text(conf.source_content)
+    yield ep, ep_dir
