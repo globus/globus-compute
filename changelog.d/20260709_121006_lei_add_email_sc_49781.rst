@@ -1,0 +1,29 @@
+New Functionality
+^^^^^^^^^^^^^^^^^
+
+- When configuring a new endpoint, a new argument, ``--contact-email``, is
+  now available.  A value is required for multi-user and optional for
+  single-user Compute endpoints.
+  Providing it gives Compute users an initial point of contact to
+  reach out to for support.
+
+  Usage example:
+
+  .. code-block:: console
+
+     $ gce configure --contact-email admin@example.edu test_endpoint
+
+  The value will be stored in ``config.yaml`` as ``email`` and can be updated there:
+
+  .. code-block:: yaml
+
+     display_name: Compute Endpoint for example.edu
+     email: admin@example.edu
+     subscription_id: ...
+     admins:
+       ...
+
+  Existing multi-user endpoint admins will have to add the ``email`` field and value
+  to their ``config.yaml`` if they update globus-compute-endpoint to the latest version.
+  Note that this new field is optional for single-user (non identity-mapping)
+  compute endpoints.

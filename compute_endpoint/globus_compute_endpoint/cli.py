@@ -335,6 +335,11 @@ def version_command():
         " https://docs.globus.org/api/auth/developer-guide/#authentication-policies."
     ),
 )
+@click.option(
+    "--contact-email",
+    type=click.STRING,
+    help="The email address to contact for the administrators of the endpoint",
+)
 @optgroup.group(
     "Configuration File Overrides",
     help=(
@@ -443,6 +448,7 @@ def configure_endpoint(
     user_env_config: pathlib.Path | None,
     multi_user: bool | None,
     high_assurance: bool,
+    contact_email: str,
     display_name: str | None,
     auth_policy: str | None,
     auth_policy_mfa_required: bool,
@@ -489,6 +495,12 @@ def configure_endpoint(
         raise ClickException(str(e))
 
     id_mapping = is_privileged() if multi_user is None else multi_user
+
+    if id_mapping and not contact_email:
+        raise ClickException(
+            "Email must be specified via --contact-email for multi-user endpoints"
+        )
+
     if id_mapping_config is not None and not id_mapping:
         raise ClickException(
             "--id-mapping-config requires multi user support (hint: --multi-user true)"
@@ -560,6 +572,7 @@ def configure_endpoint(
         display_name=display_name,
         auth_policy=auth_policy,
         subscription_id=subscription_id,
+        contact_email=contact_email,
     )
 
 
@@ -901,6 +914,11 @@ def _start_endpoint_manager(
                 f"Configuration for endpoint {ep_dir.name} contains an `engine` field;"
                 " endpoint will not start. (Hint: move the `engine` block to"
                 " `user_config_template.yaml.j2`)"
+            )
+        elif not ep_config.email and is_privileged():
+            raise ClickException(
+                f"Multi-user endpoints require a contact email"
+                " address.  (Hint: add an `email` field to config.yaml)"
             )
 
         reg_info = _do_register_endpoint(ep_dir, ep_config, endpoint_uuid)
