@@ -113,6 +113,7 @@ class Endpoint:
         auth_policy: str | None,
         subscription_id: str | None,
         public_visibility: bool = False,
+        contact_email: str | None = None,
     ):
         config_text = original_path.read_text()
         config_dict = yaml.safe_load(config_text)
@@ -128,6 +129,9 @@ class Endpoint:
 
         if display_name:
             config_dict["display_name"] = display_name
+
+        if contact_email:
+            config_dict["email"] = contact_email
 
         if id_mapping:
             config_dict["identity_mapping_config_path"] = str(
@@ -170,6 +174,7 @@ class Endpoint:
         display_name: str | None = None,
         auth_policy: str | None = None,
         subscription_id: str | None = None,
+        contact_email: str | None = None,
     ) -> None:
         """Initialize a clean endpoint dir
 
@@ -251,6 +256,7 @@ class Endpoint:
                 display_name,
                 auth_policy,
                 subscription_id,
+                contact_email=contact_email,
                 public_visibility=id_mapping,
             )
 
@@ -270,6 +276,7 @@ class Endpoint:
         display_name: str | None = None,
         auth_policy: str | None = None,
         subscription_id: str | None = None,
+        contact_email: str | None = None,
     ):
         ep_name = conf_dir.name
         if conf_dir.exists():
@@ -290,6 +297,7 @@ class Endpoint:
                 display_name,
                 auth_policy,
                 subscription_id,
+                contact_email,
             )
         except Exception:
             # Clean up the new EP directory as it may be incomplete/corrupt

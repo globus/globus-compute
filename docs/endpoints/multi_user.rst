@@ -143,7 +143,7 @@ properly generate the :ref:`multi-user-config-yaml` and
 
 .. code-block:: console
 
-   # gce configure my_mu_ep
+   # gce configure --contact-email admin@example.edu my_mu_ep
    Created profile for endpoint named <my_mu_ep>
 
        Configuration file: /root/.globus_compute/my_mu_ep/config.yaml
@@ -164,16 +164,17 @@ properly generate the :ref:`multi-user-config-yaml` and
 ``config.yaml``
 ---------------
 
-The default multi-user endpoint ``config.yaml`` file contains one additional
-field to specify the identity mapping file path:
+The default multi-user endpoint ``config.yaml`` file contains two additional
+fields, to specify the contact email and identity mapping file path respectively
 
 .. code-block:: yaml
    :caption: The default multi-user ``config.yaml`` configuration
-   :emphasize-lines: 3
+   :emphasize-lines: 4-5
 
    amqp_port: 443
    display_name: null
    public: true
+   email: admin@example.edu
    identity_mapping_config_path: /root/.globus_compute/my_mu_ep/example_identity_mapping_config.json
 
 Please refer to :ref:`endpoint-manager-config` for details on each field.

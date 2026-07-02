@@ -66,6 +66,7 @@ known_manager_config_opts = {
     "local_compute_services": True,
     "environment": str,
     "high_assurance": True,
+    "email": str,
 }
 
 

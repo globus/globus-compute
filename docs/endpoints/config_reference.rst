@@ -345,6 +345,18 @@ configuration options in this file are used to create an instance of the
 
      public: true
 
+- ``email``
+
+  A string value that will be visible to endpoint users as an initial point
+  of contact to reach out to for support.  This stores the value provided via
+  the ``--contact-email`` argument when configuring a multi-user endpoint.
+  ``email`` is allowed but not required for non identity-mapping endpoints.
+
+  .. code-block:: yaml
+     :caption: ``config.yaml`` -- example email
+
+     email: admin@example.edu
+
 - ``identity_mapping_config_path``
 
   A path to an identity mapping configuration, per the Globus Connect Server
