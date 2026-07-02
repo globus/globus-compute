@@ -335,6 +335,11 @@ def version_command():
         " https://docs.globus.org/api/auth/developer-guide/#authentication-policies."
     ),
 )
+@click.option(
+    "--contact-email",
+    type=click.STRING,
+    help="The email address to contact for the administrators of the endpoint",
+)
 @optgroup.group(
     "Configuration File Overrides",
     help=(
@@ -443,6 +448,7 @@ def configure_endpoint(
     user_env_config: pathlib.Path | None,
     multi_user: bool | None,
     high_assurance: bool,
+    contact_email: str,
     display_name: str | None,
     auth_policy: str | None,
     auth_policy_mfa_required: bool,
@@ -464,6 +470,13 @@ def configure_endpoint(
             "Unable to configure new endpoints; Manager Endpoint Processes are not"
             " supported on this system"
         )
+    elif multi_user:
+        if not _has_multi_user:
+            raise ClickException("Multi-user support is not available on this system")
+        if not contact_email:
+            raise ClickException(
+                "Must specify --contact-email for multi-user endpoints"
+            )
 
     if endpoint_config is not None:
         warnings.warn(
@@ -560,6 +573,7 @@ def configure_endpoint(
         display_name=display_name,
         auth_policy=auth_policy,
         subscription_id=subscription_id,
+        contact_email=contact_email,
     )
 
 

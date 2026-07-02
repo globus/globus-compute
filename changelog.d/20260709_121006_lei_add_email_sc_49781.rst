@@ -1,0 +1,16 @@
+New Functionality
+^^^^^^^^^^^^^^^^^
+
+- When configuring new multi-user Globus Compute endpoints, a new argument,
+   --contact-email is now required.  This makes it easier to find the initial
+   point of contact.  e.g. ``configure --contact-email admin@example.edu <endpoint_name>``
+
+  The value will be stored in config.yaml as ``email`` and can be updated there:
+
+    .. code-block:: yaml
+
+       multi_user: true
+       email: admin@example.edu
+       subscription_id: ...
+       admins:
+         ...

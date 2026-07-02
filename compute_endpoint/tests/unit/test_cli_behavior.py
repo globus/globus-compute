@@ -53,6 +53,9 @@ from pytest_mock import MockFixture
 _MOCK_BASE = "globus_compute_endpoint.cli."
 
 
+C_WITH_EMAIL = "configure --contact-email foo@example.com"
+
+
 @pytest.fixture(autouse=True, scope="module")
 def reset_umask():
     original_umask = os.umask(0)
@@ -255,6 +258,7 @@ display_name: null
         )
         ep_template.write_text(
             """
+email: foo@example.com
 heartbeat_period: {{ heartbeat }}
 engine:
     type: ThreadPoolEngine
@@ -817,17 +821,50 @@ def test_start_ep_display_name_in_config(
     dir_name, display_name = display_test
 
     conf = gc_dir / dir_name / "config.yaml"
-    open("/tmp/err.txt", "a").write(f"XXX {conf=}\n")
     configure_arg = ""
     if display_name is not None:
         configure_arg = f" --display-name '{display_name}'"
     run_line(f"configure {dir_name}{configure_arg}")
 
-    open("/tmp/err.txt", "a").write(f"YYY {dir_name=} {conf=}")
     with open(conf) as f:
         conf_dict = yaml.safe_load(f)
 
     assert conf_dict["display_name"] == display_name
+
+
+@pytest.mark.parametrize(
+    ("email", "multi_user"),
+    [
+        ["test@example.org", True],
+        ["test@example.org", False],
+        [None, True],
+        [None, False],
+    ],
+)
+def test_start_ep_contact_email_in_config(
+    run_line, gc_dir, make_endpoint_dir, email, multi_user
+):
+
+    ep_name = "test_ep"
+    conf = gc_dir / ep_name / "config.yaml"
+    configure_arg = ""
+    if email is not None:
+        configure_arg = f" --contact-email '{email}'"
+    if multi_user is not None:
+        configure_arg += f" --multi-user {multi_user}"
+
+    if multi_user and not email:
+        res = run_line(f"configure {ep_name}{configure_arg}", assert_exit_code=1)
+        assert "Must specify --contact-email" in res.stderr, "Expect error message"
+    else:
+        run_line(f"configure {ep_name}{configure_arg}")
+        with open(conf) as f:
+            conf_dict = yaml.safe_load(f)
+
+        if email:
+            assert conf_dict["email"] == email
+        else:
+            assert "email" not in conf_dict
 
 
 @pytest.mark.parametrize(
@@ -879,7 +916,7 @@ def test_configure_ep_subscription_id_in_config(run_line, gc_dir, make_endpoint_
     subscription_id = str(uuid.uuid4())
     conf = gc_dir / ep_name / "config.yaml"
 
-    run_line(f"configure {ep_name} --subscription-id {subscription_id}")
+    run_line(f"{C_WITH_EMAIL} {ep_name} --subscription-id {subscription_id}")
 
     with open(conf) as f:
         conf_dict = yaml.safe_load(f)
@@ -905,7 +942,7 @@ def test_configure_ep_public_visible_by_default(
 
     mu_arg_str = f" --multi-user {mu_arg}" if mu_arg is not None else ""
     with mock.patch(f"{_MOCK_BASE}is_privileged", return_value=is_privileged):
-        run_line(f"configure {mu_arg_str} {ep_name}")
+        run_line(f"{C_WITH_EMAIL} {mu_arg_str} {ep_name}")
 
     with open(conf) as f:
         conf_dict = yaml.safe_load(f)
@@ -968,7 +1005,7 @@ def test_configure_ep_config_options(
 ):
     gc_dir.mkdir(parents=True, exist_ok=True)
 
-    cmd = f"configure {randomstring()}"
+    cmd = f"{C_WITH_EMAIL} {randomstring()}"
     if manager_config:
         manager_config = gc_dir / manager_config
         manager_config.touch()
@@ -1008,7 +1045,7 @@ def test_configure_ep_errors_on_id_mapping_config_without_multiuser(
     id_mapping_config = gc_dir / "some-id-mapping.json"
     id_mapping_config.touch()
 
-    cmd = f"configure {randomstring()} --id-mapping-config {id_mapping_config}"
+    cmd = f"{C_WITH_EMAIL} {randomstring()} --id-mapping-config {id_mapping_config}"
 
     res = run_line(cmd, assert_exit_code=1)
 
@@ -1511,7 +1548,9 @@ def test_configure_ep_auth_policy_mutually_exclusive(
         params += f" --auth-timeout={ap_timeout}"
         expected_exit_code = 1
 
-    res = run_line(f"configure {params} {ep_name}", assert_exit_code=expected_exit_code)
+    res = run_line(
+        f"{C_WITH_EMAIL} {params} {ep_name}", assert_exit_code=expected_exit_code
+    )
 
     if expected_exit_code == 1:
         assert "at the same time" in res.stderr

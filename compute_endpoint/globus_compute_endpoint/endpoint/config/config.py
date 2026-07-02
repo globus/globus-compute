@@ -73,6 +73,7 @@ class BaseConfig:
         local_compute_services: bool = False,
         debug: bool = False,
         admins: t.Iterable[UUID_LIKE_T] | None = None,
+        email: str | None = None,
     ):
         # Misc
         self.display_name = display_name
