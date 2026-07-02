@@ -1,0 +1,10 @@
+New Functionality
+^^^^^^^^^^^^^^^^^
+
+- Newly created multi-user Globus Compute endpoints now require a contact email
+  address which can be specified using the ``--contact-email`` argument when
+  configuring the endpoint, or via the ``email`` option in the endpoint's
+  config.yaml.
+
+  TBD more detail
+
