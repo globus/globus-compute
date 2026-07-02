@@ -1,18 +1,24 @@
+import copy
 import os
 import pathlib
+import types
 import typing as t
 from unittest import mock
 
 import pytest
-from globus_compute_common.pydantic_v1 import ValidationError
 from globus_compute_endpoint.endpoint.config import (
+    BaseConfig,
     ManagerEndpointConfig,
-    ManagerEndpointConfigModel,
     PamConfiguration,
     UserEndpointConfig,
-    UserEndpointConfigModel,
 )
-from globus_compute_endpoint.endpoint.config.model import EngineModel, ProviderModel
+from globus_compute_endpoint.endpoint.config.dispatch import (
+    AddressDispatcher,
+    EngineDispatcher,
+    LauncherDispatcher,
+    ProviderDispatcher,
+)
+from pydantic import TypeAdapter, ValidationError
 from tests.unit.conftest import known_manager_config_opts, known_user_config_opts
 
 _MOCK_BASE = "globus_compute_endpoint.endpoint.config."
@@ -39,75 +45,6 @@ def mock_log():
 
 
 @pytest.mark.parametrize(
-    "field, expected_val",
-    [
-        ("worker_ports", (50000, 55000)),
-        ("worker_port_range", (50000, 55000)),
-        ("interchange_port_range", (50000, 55000)),
-    ],
-)
-def test_config_engine_model_tuple_conversions(
-    config_dict: dict, field: str, expected_val: t.Tuple
-):
-    e_conf = config_dict["engine"]
-    e_conf[field] = expected_val
-    model = EngineModel(**e_conf)
-    assert getattr(model, field) == expected_val
-
-    e_conf[field] = list(expected_val)
-    model = EngineModel(**e_conf)
-    assert getattr(model, field) == expected_val
-
-    e_conf[field] = 50000
-    with pytest.raises(ValueError) as pyt_e:
-        EngineModel(**e_conf)
-
-    e_str = str(pyt_e)
-    assert field in e_str, "Verify test; are we testing what we think?"
-    assert "not a valid tuple" in e_str, "Verify test; are we testing what we think?"
-
-
-def test_config_provider_persistent_volumes_conversion():
-    field = "persistent_volumes"
-    expected_val = [("pvc1", "/path/to/dir"), ("pvc2", "/path/to/dir2")]
-    p_conf = {"type": "KubernetesProvider", field: expected_val}
-
-    model = ProviderModel(**p_conf)
-    assert model.persistent_volumes == expected_val
-
-    p_conf[field] = [list(t) for t in expected_val]
-    model = ProviderModel(**p_conf)
-    assert model.persistent_volumes == expected_val
-
-    p_conf[field] = [t[0] for t in expected_val]
-    with pytest.raises(ValueError) as pyt_e:
-        ProviderModel(**p_conf)
-
-    p_str = str(pyt_e)
-    assert field in p_str, "Verify test; are we testing what we think?"
-    assert "not a valid tuple" in p_str, "Verify test; are we testing what we think?"
-
-
-def test_config_model_enforces_engine(config_dict):
-    del config_dict["engine"]
-    with pytest.raises(ValidationError) as pyt_exc:
-        UserEndpointConfigModel(**config_dict)
-
-    assert "engine\n  field required" in str(pyt_exc.value)
-
-
-def test_manager_config_model_rejects_engine(config_dict_mep):
-    config_dict_mep["engine"] = {
-        "type": "GlobusComputeEngine",
-        "address": "localhost",
-    }
-    with pytest.raises(ValidationError) as pyt_exc:
-        ManagerEndpointConfigModel(**config_dict_mep)
-
-    assert "engine\n  extra fields not permitted" in str(pyt_exc.value)
-
-
-@pytest.mark.parametrize(
     "field",
     (
         "identity_mapping_config_path",
@@ -118,17 +55,15 @@ def test_manager_config_model_rejects_engine(config_dict_mep):
 def test_mep_config_verifies_path_like_fields(config_dict_mep, field: str):
     conf_p = pathlib.Path("/some/path/not exists file")
     config_dict_mep[field] = conf_p
-    with pytest.raises(ValidationError) as pyt_e:
-        ManagerEndpointConfigModel(**config_dict_mep)
+    with pytest.raises(ValueError) as pyt_e:
+        ManagerEndpointConfig(**config_dict_mep)
 
     e_str = str(pyt_e.value)
-    assert "does not exist" in e_str
+    assert "not found" in e_str
     assert str(conf_p) in e_str, "expect location in exc to help human out"
 
     del config_dict_mep[field]
-    ManagerEndpointConfigModel(
-        **config_dict_mep
-    )  # doesn't raise; conditional validation
+    ManagerEndpointConfig(**config_dict_mep)  # doesn't raise; conditional validation
 
 
 def test_mep_config_privileged_verifies_idmapping(config_dict_mep):
@@ -143,10 +78,19 @@ def test_mep_config_privileged_verifies_idmapping(config_dict_mep):
     assert str(p) in str(pyt_e), "Expect invalid path shared"
 
 
+ta_bool = TypeAdapter(bool)
+
+
 @pytest.mark.parametrize("public", (None, True, False, "a", 1))
 def test_mep_public(public: t.Any):
-    c = ManagerEndpointConfig(public=public)
-    assert c.public is (public is True)
+    try:
+        ta_bool.validate_python(public)
+    except ValidationError:
+        with pytest.raises(ValidationError):
+            ManagerEndpointConfig(public=public)
+    else:
+        c = ManagerEndpointConfig(public=public)
+        assert c.public is bool(public), "Verify that public is set to what we expect"
 
 
 @pytest.mark.parametrize(
@@ -161,16 +105,16 @@ def test_mep_public(public: t.Any):
 def test_provider_container_compatibility(
     config_dict: dict, provider_type: str, compatible: bool
 ):
-    config_dict["engine"]["container_uri"] = "docker://ubuntu"
-    config_dict["engine"]["provider"] = {"type": provider_type}
-    config_dict["engine"]["address"] = "::1"
+    engine_dict = config_dict["engine"]
+    engine_dict["container_uri"] = "docker://ubuntu"
+    engine_dict["provider"] = {"type": provider_type}
+    engine_dict["address"] = "::1"
 
     if compatible:
-        conf = UserEndpointConfigModel(**config_dict)
-        conf.engine.shutdown()
+        EngineDispatcher.build_instance(engine_dict).shutdown()
     else:
         with pytest.raises(ValueError) as pyt_e:
-            UserEndpointConfigModel(**config_dict)
+            EngineDispatcher.build_instance(engine_dict).shutdown()
         assert f"not compatible with {provider_type}" in str(pyt_e.value)
 
 
@@ -213,18 +157,82 @@ def test_managerconfig_repr_nondefault_kwargs(
     assert f"{kw}={repr(val)}" in repr_c
 
 
-def test_engine_model_objects_allow_extra():
-    config_dict = {
-        "engine": {
-            "type": "GlobusComputeEngine",
-            "address": {
-                "type": "address_by_interface",
-                "ifname": "lo",  # Not specified in model
-            },
-            "provider": {
-                "type": "LocalProvider",
-                "max_blocks": 2,  # Not specified in model
-            },
-        }
+def test_engine_dispatcher_objects_allow_extra():
+    engine_dict = {
+        "type": "GlobusComputeEngine",
+        "address": {
+            "type": "address_by_interface",
+            "ifname": "lo",  # Not specified in model
+        },
+        "provider": {
+            "type": "LocalProvider",
+            "max_blocks": 2,  # Not specified in model
+        },
     }
-    UserEndpointConfigModel(**config_dict).engine.shutdown()
+    EngineDispatcher.build_instance(engine_dict).shutdown()
+
+
+def test_dispatcher_requires_type_field():
+    with pytest.raises(ValidationError) as pyt_e:
+        EngineDispatcher.build_instance({})
+
+    assert "type" in str(pyt_e.value)
+
+
+@pytest.mark.parametrize(
+    "dispatcher, cfg, expected",
+    (
+        (EngineDispatcher, {"type": "NoSuchEngine"}, "not a valid engine"),
+        (ProviderDispatcher, {"type": "NoSuchProvider"}, "not a valid provider"),
+        (LauncherDispatcher, {"type": "NoSuchLauncher"}, "not a valid launcher"),
+        (AddressDispatcher, {"type": "NoSuchAddress"}, "not a valid address"),
+        (
+            ProviderDispatcher,
+            {"type": "LocalProvider", "launcer": {"type": "SingleNodeLauncher"}},
+            "unexpected keyword argument",
+        ),
+        (
+            LauncherDispatcher,
+            {"type": "SingleNodeLauncher", "debgu": True},
+            "unexpected keyword argument",
+        ),
+    ),
+)
+def test_dispatcher_rejects_bad_input(dispatcher, cfg, expected):
+    with pytest.raises(ValueError) as pyt_e:
+        dispatcher.build_instance(cfg)
+
+    assert expected in str(pyt_e.value)
+
+
+def test_address_dispatcher_accepts_string_or_typed_dict(monkeypatch):
+    mock_addresses = types.SimpleNamespace(UnitTestAddress=lambda: "test-addr")
+    monkeypatch.setattr(AddressDispatcher, "_source_module", mock_addresses)
+
+    assert AddressDispatcher.build_instance("127.0.0.1") == "127.0.0.1"
+    assert AddressDispatcher.build_instance({"type": "UnitTestAddress"}) == "test-addr"
+
+
+def test_dispatcher_does_not_mutate_input_dict():
+    provider_cfg = {
+        "type": "LocalProvider",
+        "launcher": {"type": "SingleNodeLauncher"},
+    }
+    provider_cfg_orig = copy.deepcopy(provider_cfg)
+
+    ProviderDispatcher.build_instance(provider_cfg)
+
+    assert provider_cfg == provider_cfg_orig
+
+
+@pytest.mark.parametrize(
+    "cls",
+    (
+        BaseConfig,
+        UserEndpointConfig,
+        ManagerEndpointConfig,
+    ),
+)
+def test_config_init_validated_with_pydantic(cls):
+    with pytest.raises(ValidationError):
+        cls(heartbeat_period=object())

@@ -30,7 +30,6 @@ import yaml
 from cachetools import TTLCache
 from globus_compute_common.messagepack import pack
 from globus_compute_common.messagepack.message_types import EPStatusReport
-from globus_compute_common.pydantic_v1 import BaseModel
 from globus_compute_endpoint import __version__
 from globus_compute_endpoint.auth import get_globus_app_with_scopes
 from globus_compute_endpoint.endpoint.config import ManagerEndpointConfig
@@ -61,6 +60,7 @@ from globus_compute_sdk import Client
 from globus_compute_sdk.sdk.auth.auth_client import ComputeAuthClient
 from globus_compute_sdk.sdk.compute_dir import ensure_compute_dir
 from packaging.version import Version
+from pydantic import BaseModel, ConfigDict
 
 if t.TYPE_CHECKING:
     from pika.spec import BasicProperties
@@ -95,6 +95,7 @@ def _import_pam() -> types.ModuleType:
 
 
 class UserEndpointRecord(BaseModel):
+    model_config = ConfigDict(arbitrary_types_allowed=True)
     ep_name: str
     local_user_info: t.Optional[pwd.struct_passwd]
     arguments: str

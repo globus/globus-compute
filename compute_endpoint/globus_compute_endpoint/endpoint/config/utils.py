@@ -11,10 +11,10 @@ import typing as t
 
 import yaml
 from click import ClickException
-from globus_compute_common.pydantic_v1 import ValidationError
 from globus_compute_endpoint.endpoint.identity_mapper import MappedPosixIdentity
 
 from .config import ManagerEndpointConfig, UserEndpointConfig
+from .dispatch import EngineDispatcher
 
 log = logging.getLogger(__name__)
 
@@ -122,29 +122,17 @@ def load_config_yaml(config_str: str) -> UserEndpointConfig | ManagerEndpointCon
     except Exception as err:
         raise ClickException(f"Invalid config syntax: {str(err)}") from err
 
-    is_templatable = config_dict.get("engine") is None
-    try:
-        ConfigClass: type[UserEndpointConfig | ManagerEndpointConfig]
-        if is_templatable:
-            from . import BaseEndpointConfigModel, ManagerEndpointConfigModel
-
-            ConfigClass = ManagerEndpointConfig
-            config_schema: BaseEndpointConfigModel = ManagerEndpointConfigModel(
-                **config_dict
-            )
-        else:
-            from . import UserEndpointConfigModel
-
-            ConfigClass = UserEndpointConfig
-            config_schema = UserEndpointConfigModel(**config_dict)
-    except ValidationError as err:
-        raise ClickException(str(err)) from err
-
-    config_dict = config_schema.dict(exclude_unset=True)
+    engine_dict = config_dict.pop("engine", None)
+    ConfigClass = ManagerEndpointConfig if engine_dict is None else UserEndpointConfig
 
     try:
+        if engine_dict is not None:
+            config_dict["engine"] = EngineDispatcher.build_instance(engine_dict)
+
         config = ConfigClass(**config_dict)
     except Exception as err:
+        if engine := config_dict.get("engine"):
+            engine.shutdown()
         raise ClickException(str(err)) from err
 
     # Special case of 'display_name: None' converting to the empty

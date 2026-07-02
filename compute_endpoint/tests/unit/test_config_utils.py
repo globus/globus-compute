@@ -41,6 +41,31 @@ def mock_log():
         yield m
 
 
+@pytest.fixture
+def mock_engine():
+    return mock.Mock()
+
+
+@pytest.fixture
+def mock_build_instance():
+    with mock.patch(f"{_MOCK_BASE}EngineDispatcher.build_instance") as m:
+        yield m
+
+
+@pytest.fixture
+def mock_user_cfg():
+    with mock.patch(f"{_MOCK_BASE}UserEndpointConfig") as m:
+        yield m
+
+
+@pytest.fixture
+def mock_threadpool_shutdown():
+    with mock.patch(
+        "globus_compute_endpoint.engines.thread_pool.ThreadPoolEngine.shutdown"
+    ) as m:
+        yield m
+
+
 @pytest.fixture(autouse=True)
 def use_fs(fs):
     yield
@@ -66,10 +91,10 @@ def conf_no_engine():
     yield UserEndpointConfig(engine=None)
 
 
-def _get_cls_kwds(cls) -> set[str]:
-    fas = (inspect.getfullargspec(c.__init__) for c in cls.__mro__)
+def _get_cls_kwds(cls: type) -> set[str]:
+    sigs = (inspect.signature(c).parameters.items() for c in cls.__mro__)
 
-    return {k for f in fas for k in f.kwonlyargs}
+    return {k for s in sigs for k, v in s if v.kind == v.KEYWORD_ONLY}
 
 
 def test_config_opts_accounted_for_in_tests():
@@ -127,6 +152,54 @@ def test_load_manager_endpoint_config_full(get_random_of_datatype):
     serde_yaml = yaml.safe_dump(conf)
     conf = load_config_yaml(serde_yaml)
     assert isinstance(conf, ManagerEndpointConfig)
+
+
+def test_load_config_yaml_shutdowns_engine_on_user_config_error(
+    mock_build_instance, mock_user_cfg, mock_engine
+):
+    mock_build_instance.return_value = mock_engine
+    mock_user_cfg.side_effect = ValueError("bad user config")
+
+    conf = yaml.safe_dump({"engine": {"type": "ThreadPoolEngine"}})
+
+    with pytest.raises(ClickException) as pyt_e:
+        load_config_yaml(conf)
+
+    assert "bad user config" in str(pyt_e.value)
+    mock_build_instance.assert_called_once()
+    mock_user_cfg.assert_called_once()
+    mock_engine.shutdown.assert_called_once_with()
+
+
+def test_load_config_yaml_engine_build_error_does_not_attempt_shutdown(
+    mock_threadpool_shutdown, mock_build_instance, mock_user_cfg
+):
+    mock_build_instance.side_effect = ValueError("bad engine")
+
+    conf = yaml.safe_dump({"engine": {"type": "ThreadPoolEngine"}})
+
+    with pytest.raises(ClickException) as pyt_e:
+        load_config_yaml(conf)
+
+    assert "bad engine" in str(pyt_e.value)
+    mock_threadpool_shutdown.assert_not_called()
+    mock_build_instance.assert_called_once()
+    mock_user_cfg.assert_not_called()
+
+
+def test_load_config_yaml_happy_path(mock_engine, mock_build_instance, mock_user_cfg):
+    mock_build_instance.return_value = mock_engine
+    mock_user_cfg.return_value = mock.Mock(display_name="my endpoint")
+
+    conf = {"engine": {"type": "ThreadPoolEngine"}}
+    serde_yaml = yaml.safe_dump(conf)
+
+    conf_obj = load_config_yaml(serde_yaml)
+
+    mock_user_cfg.assert_called_once(), "Expect config object is created"
+    assert conf_obj is mock_user_cfg.return_value, "Expect correct object is returned"
+    mock_build_instance.assert_called_once(), "Expect top-level engine is built"
+    mock_engine.shutdown.assert_not_called(), "Expect live engine on success"
 
 
 def test_render_user_config_escape_strings(
