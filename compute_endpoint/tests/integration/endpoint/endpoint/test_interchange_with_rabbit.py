@@ -18,6 +18,26 @@ from tests.utils import try_for_timeout
 _test_func_ids = [str(uuid.uuid4()) for i in range(3)]
 
 
+def _run_ixproc(reg_info: dict, endpoint_uuid, endpoint_dir):
+    mock_exe = MockEngine()
+    mock_exe.endpoint_id = endpoint_uuid
+    mock_exe.executor_exception = None
+    mock_exe.get_status_report.return_value = EPStatusReport(
+        endpoint_id=endpoint_uuid, global_state={}, task_statuses={}
+    )
+
+    ix = EndpointInterchange(
+        config=UserEndpointConfig(engine=mock_exe),
+        endpoint_id=endpoint_uuid,
+        reg_info=reg_info,
+        ep_info={},
+        endpoint_dir=endpoint_dir,
+        logdir=endpoint_dir,
+    )
+
+    ix.start()
+
+
 @pytest.fixture
 def run_interchange_process(
     get_standard_compute_client,
@@ -33,25 +53,6 @@ def run_interchange_process(
     a random endpoint id, and the mocked registration info.
     """
 
-    def run_it(reg_info: dict, endpoint_uuid, endpoint_dir):
-        mock_exe = MockEngine()
-        mock_exe.endpoint_id = endpoint_uuid
-        mock_exe.executor_exception = None
-        mock_exe.get_status_report.return_value = EPStatusReport(
-            endpoint_id=endpoint_uuid, global_state={}, task_statuses={}
-        )
-
-        ix = EndpointInterchange(
-            config=UserEndpointConfig(engine=mock_exe),
-            endpoint_id=endpoint_uuid,
-            reg_info=reg_info,
-            ep_info={},
-            endpoint_dir=endpoint_dir,
-            logdir=endpoint_dir,
-        )
-
-        ix.start()
-
     endpoint_name = "endpoint_foo"
     gcc = get_standard_compute_client()
     setup_register_endpoint_response(ep_uuid)
@@ -63,7 +64,7 @@ def run_interchange_process(
     assert "heartbeat_queue_info" in reg_info
 
     ix_proc = multiprocessing.Process(
-        target=run_it, args=(reg_info, ep_uuid), kwargs={"endpoint_dir": tmp_path}
+        target=_run_ixproc, args=(reg_info, ep_uuid), kwargs={"endpoint_dir": tmp_path}
     )
     ix_proc.start()
 
