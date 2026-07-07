@@ -17,26 +17,19 @@ REQUIRES = [
     # TODO: re-evaluate bound after we have an answer of some kind from psutil
     # see:
     #   https://github.com/giampaolo/psutil/issues/2002
-    "psutil<6",
+    "psutil>5.9,<8",
     # provides easy daemonization of the endpoint
     "python-daemon>=2,<3",
     # CLI parsing
     "click>=8,<8.2.0",
     "click-option-group>=0.5.6,<1",
-    # disallow use of 22.3.0; the whl package on some platforms causes ZMQ issues
-    #
-    # NOTE: 22.3.0 introduced a patched version of libzmq.so to the wheel packaging
-    # which may be the source of the problems , the problem can be fixed by
-    # building from source, which may mean there's an issue in the packaged library
-    # further investigation may be needed if the issue persists in the next pyzmq
-    # release
-    "pyzmq>=22.0.0,!=22.3.0,<=26.1.0",
+    "pyzmq>=24,<=28",
     # 'parsl' is a core requirement of the globus-compute-endpoint, essential to a range
     # of different features and functions
     # pin exact versions because it does not use semver
     "parsl==2026.4.20",
     # May 2026: Parsl 1.4.0 just released; has an as-yet undiagnosed iteration bug
-    "pika>=1.2,<1.4",
+    "pika>=1.2,<1.5",
     "pyprctl<0.2.0",
     "setproctitle>=1.3.2,<1.4",
     "pyyaml>=6.0,<7.0",
