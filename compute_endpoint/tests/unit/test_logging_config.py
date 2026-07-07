@@ -12,6 +12,7 @@ from globus_compute_endpoint.logging_config import (
     ensure_log_path,
     setup_logging,
 )
+from globus_compute_sdk.sdk.compute_dir import COMPUTE_EP_DIR_ENV
 from pytest_mock import MockFixture
 
 _MOCK_BASE = "globus_compute_endpoint.logging_config."
@@ -116,14 +117,15 @@ def test_ensure_log_path(
             # create file but non-writable if file
             p.parent.mkdir(parents=True)
             p.touch(mode=0o400)
+    envs[COMPUTE_EP_DIR_ENV] = str(ep_dir.resolve())
 
     with mock.patch.dict(os.environ, envs):
         if exc_msg is not None:
             with pytest.raises(Exception) as actual_exc_msg:
-                ensure_log_path(ep_dir)
+                ensure_log_path()
             assert exc_msg in str(actual_exc_msg)
         else:
-            result_path: pathlib.Path = ensure_log_path(ep_dir)
+            result_path: pathlib.Path = ensure_log_path()
             if log_path is None:
                 # Default - use ep_dir
                 assert result_path == ep_dir / "endpoint.log"

@@ -150,15 +150,15 @@ directory for all user endpoints.
 The main User Endpoint logs will be appended to the file ``endpoint.log`` in this
 directory.
 
-Both the user endpoint base directory and the endpoint log path can be set in the
-``paths`` configuration section, via ``gc_dir`` and ``endpoint_log`` respectively
-in the ``user_config_template.yaml.j2`` jinja template:
+Both the user endpoint directory and the endpoint log path can be set in the
+``paths`` configuration section, via ``endpoint_dir`` and ``endpoint_log`` respectively
+in the ``user_config_template.yaml.j2`` Jinja2 template:
 
 .. code-block:: yaml
    :caption: ``~/.globus_compute/custom_cluster_setup/user_config_template.yaml.j2``
 
    paths:
-     gc_dir: {{ _GC.env.HOME }}/compute_endpoints
+     endpoint_dir: {{ _GC.env.HOME }}/custom_endpoint_dir
      endpoint_log: /tmp/{{ _GC.env.USER }}/user_endpoints.log
 
    engine:
