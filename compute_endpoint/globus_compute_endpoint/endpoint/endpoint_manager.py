@@ -58,7 +58,7 @@ from globus_compute_endpoint.endpoint.utils import (
 from globus_compute_endpoint.exceptions import MessageSystemExit
 from globus_compute_sdk import Client
 from globus_compute_sdk.sdk.auth.auth_client import ComputeAuthClient
-from globus_compute_sdk.sdk.compute_dir import ensure_compute_dir
+from globus_compute_sdk.sdk.compute_dir import COMPUTE_EP_DIR_ENV, ensure_compute_dir
 from packaging.version import Version
 from pydantic import BaseModel, ConfigDict
 
@@ -1060,9 +1060,6 @@ class EndpointManager:
                 LOG_TS_FMT,
                 ensure_log_path,
                 setup_logging,
-            )
-            from globus_compute_sdk.sdk.compute_dir import (
-                COMPUTE_EP_DIR_ENV,
             )
 
             # We've closed all files (beyond std*), so log.* calls are not able to
