@@ -41,14 +41,8 @@ def run_interchange_process(
             endpoint_id=endpoint_uuid, global_state={}, task_statuses={}
         )
 
-        if hasattr(request, "param") and request.param:
-            config = request.param
-        else:
-            config = UserEndpointConfig(engine=None)
-        config.engine = mock_exe
-
         ix = EndpointInterchange(
-            config=config,
+            config=UserEndpointConfig(engine=mock_exe),
             endpoint_id=endpoint_uuid,
             reg_info=reg_info,
             ep_info={},
