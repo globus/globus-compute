@@ -14,6 +14,8 @@ import sys
 from collections import defaultdict
 from datetime import datetime
 
+from globus_compute_sdk.sdk.compute_dir import COMPUTE_EP_DIR_ENV
+
 log = logging.getLogger(__name__)
 
 LOG_TS_FMT = "%Y-%m-%d %H:%M:%S,%f"
@@ -273,26 +275,30 @@ def setup_logging(
     logging.config.dictConfig(config)
 
 
-def ensure_log_path(ep_dir: pathlib.Path | None = None) -> pathlib.Path:
+def ensure_log_path() -> pathlib.Path:
     """
     Gets the path where logs should be written to.  This defaults to
     ~/.globus_compute/<EP_DIR>/endpoint.log if not specifically configured.
 
     The path can be customized via environment variable GLOBUS_COMPUTE_LOG_PATH
-    If the env variable is not set, it is assumed to be `endpoint.log` in the
-    provided `ep_dir` directory.
+    If the env variable is not set, it is assumed to be ``endpoint.log`` in the
+    endpoint directory.  (Optionally specified by the environment variable
+    GLOBUS_COMPUTE_ENDPOINT_DIR)
 
-    The file is created if it doesn't exist, which also validates permissions
+    The log file is created if it doesn't exist, which also validates permissions
     """
-    log_dir = os.environ.get(LOG_PATH_ENV)
-    if log_dir and log_dir.strip():
+    log_dir = os.environ.get(LOG_PATH_ENV, "").strip()
+    ep_dir = os.environ.get(COMPUTE_EP_DIR_ENV, "").strip()
+    if log_dir:
         # This expands both ~/... and $X e.g. ~/$MY_SUB_DIR/abc.log
         log_path = pathlib.Path(os.path.expandvars(log_dir)).expanduser()
         if log_path.is_dir():
             raise ValueError(f"{LOG_PATH_ENV} can not be a directory: {log_path}")
+        logger.info(f"Setting custom endpoint log path to {log_path}")
+    elif ep_dir:
+        log_path = pathlib.Path(ep_dir) / "endpoint.log"
     else:
-        assert ep_dir, "ep_dir must be provided if LOG_PATH_ENV is not set"
-        log_path = ep_dir / "endpoint.log"
+        raise ValueError("ep_dir must be provided if LOG_PATH_ENV is not set")
 
     # Parent directory (default -> UEP directory) might have already been created
     # but confirm anyway

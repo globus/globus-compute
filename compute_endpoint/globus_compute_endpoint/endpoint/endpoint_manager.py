@@ -1061,7 +1061,9 @@ class EndpointManager:
                 ensure_log_path,
                 setup_logging,
             )
-            from globus_compute_sdk.sdk.compute_dir import COMPUTE_DIR_ENV
+            from globus_compute_sdk.sdk.compute_dir import (
+                COMPUTE_EP_DIR_ENV,
+            )
 
             # We've closed all files (beyond std*), so log.* calls are not able to
             # access the parent's logs directly.  Now rely on stderr (not yet separated)
@@ -1150,6 +1152,7 @@ class EndpointManager:
             env.setdefault("HOME", udir)
             env.setdefault("USER", uname)
             env.setdefault("PATH", upath)
+            env.setdefault("GLOBUS_COMPUTE_ENDPOINT_NAME", ep_name)
 
             umask = 0o077  # Let child process set less restrictive, if desired
             log.debug("Setting process umask for %s to 0o%04o (%s)", pid, umask, uname)
@@ -1207,31 +1210,24 @@ class EndpointManager:
             exit_code += 1
             _conf = yaml.safe_load(user_config)
 
-            override_log_path = False
-
             # Override with custom values from user config if present
-            # This sets two environment vars used by paths: (gc_dir|endpoint_log)
-            if path_info := _conf.get("paths"):
-                if log_path_val := path_info.get("endpoint_log"):
-                    # Overrides the default in ensure_log_path()
-                    env[LOG_PATH_ENV] = log_path_val
-                    override_log_path = True
-                if gc_dir_val := path_info.get("gc_dir"):
-                    log.info(f"Setting Compute base path to {gc_dir_val}")
-                    # Overrides the default in ensure_compute_dir()
-                    env[COMPUTE_DIR_ENV] = gc_dir_val
+            # This sets two environment vars used by paths:
+            #   - endpoint_dir
+            #   - endpoint_log
+            if ep_dir_val := _conf.get("paths", {}).get("endpoint_dir"):
+                log.info(f"Setting endpoint directory to {ep_dir_val}")
+                env[COMPUTE_EP_DIR_ENV] = ep_dir_val
+            if log_path_val := _conf.get("paths", {}).get("endpoint_log"):
+                # Overrides the default in ensure_log_path()
+                env[LOG_PATH_ENV] = log_path_val
 
-            # ensure_compute_dir picks up possibly updated GLOBUS_COMPUTE_USER_DIR
+            # ensure_compute_dir() picks up possibly updated GLOBUS_COMPUTE_USER_DIR
             gc_dir: pathlib.Path = ensure_compute_dir()
             ep_dir: pathlib.Path = gc_dir / ep_name
             ep_dir.mkdir(mode=0o700, parents=True, exist_ok=True)
 
-            if override_log_path:
-                # Use the environment value set from paths.endpoint_log
-                ep_log = ensure_log_path()
-                log.info(f"Setting custom endpoint log path to {ep_log}")
-            else:
-                ep_log = ensure_log_path(ep_dir)
+            # Use the environment value set from paths.endpoint_log
+            ep_log = ensure_log_path()
 
             _ha_key = "high_assurance"
             if _ha_key in _conf:

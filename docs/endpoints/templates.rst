@@ -196,13 +196,14 @@ user or admin.  These are accessible from the Globus-Compute-supplied variable o
 - ``_GC.env``: Contains the environment variables available to the runtime environment
   of the user submitting tasks.  e.g., ``_GC.env.HOME``
 
-  - In non identity-mapping Compute endpoints, this contains all variables available
-    to the process that started the endpoint.
-  - In identity-mapping (multi-user) endpoints, the environment will be cleared and
+  - In non identity-mapping Compute endpoints (i.e., "single user endpoints"), this contains
+    all variables available to the process that started the endpoint.
+  - In identity-mapping (i.e., multi-user) endpoints, the environment will be cleared and
     three values will be set for the user endpoint:
     - ``HOME`` - the user's home directory
     - ``USER`` - the username i.e. the result of ``whoami`` or ``id -un``
-    - ``PATH`` - a limited set of default paths: "/usr/local/bin:/usr/bin:/bin:<Python3 executable's parent directory>"
+    - ``PATH`` - a limited set of default paths:  ``/usr/local/bin:/usr/bin:/bin:<Python3 executable's parent directory>``
+    - ``GLOBUS_COMPUTE_ENDPOINT_NAME`` - The default name of the endpoint directory, as assigned by the web service
 
 
 - ``_GC.user_runtime``: Contains information about the runtime environment of the
