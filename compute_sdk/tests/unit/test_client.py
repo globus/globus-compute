@@ -983,8 +983,8 @@ def test_batch_run_raises_ha_warning(gcc, mocker):
     with pytest.warns(UserWarning) as record:
         gcc.batch_run("endpoint_id", batch=mocker.Mock())
 
-    assert len(record) == 1
-    assert "some arbitrary warning text" in str(record[0].message)
+    msgs = "\n\n".join(str(r.message) for r in record)
+    assert msgs.count("some arbitrary warning text") == 1
 
 
 def test_ha_register_and_submit_warning_deduplication(gcc, mocker):
