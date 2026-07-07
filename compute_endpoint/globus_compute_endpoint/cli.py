@@ -60,6 +60,7 @@ from globus_compute_sdk.sdk.auth.whoami import print_whoami_info
 from globus_compute_sdk.sdk.batch import create_user_runtime
 from globus_compute_sdk.sdk.compute_dir import (
     COMPUTE_DIR_ENV,
+    COMPUTE_EP_DIR_ENV,
     ensure_compute_dir,
     get_compute_dir,
 )
@@ -950,8 +951,11 @@ def _start_user_endpoint(
     os.umask(0o077)
     state = CommandState.ensure()
     if ep_dir.is_dir():
+        if not os.environ.get(COMPUTE_EP_DIR_ENV):
+            # If not already set for us, use the endpoint dir
+            os.environ[COMPUTE_EP_DIR_ENV] = str(ep_dir.resolve())
         setup_logging(
-            logfile=ensure_log_path(ep_dir),
+            logfile=ensure_log_path(),
             debug=state.debug,
             console_enabled=state.log_to_console,
             no_color=state.no_color,

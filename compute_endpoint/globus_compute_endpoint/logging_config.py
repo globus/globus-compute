@@ -280,7 +280,7 @@ def ensure_log_path() -> pathlib.Path:
     Gets the path where logs should be written to.  This defaults to
     ~/.globus_compute/<EP_DIR>/endpoint.log if not specifically configured.
 
-    The path can be customized via environment variable GLOBUS_COMPUTE_LOG_PATH
+    The path can be customized via environment variable GLOBUS_COMPUTE_LOG_PATH.
     If the env variable is not set, it is assumed to be ``endpoint.log`` in the
     endpoint directory.  (Optionally specified by the environment variable
     GLOBUS_COMPUTE_ENDPOINT_DIR)
