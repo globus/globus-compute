@@ -11,7 +11,11 @@ import sys
 from unittest import mock
 
 import pytest
-from globus_compute_sdk.sdk.diagnostic import cat, do_diagnostic_base
+from globus_compute_sdk.sdk.diagnostic import (
+    cat,
+    do_diagnostic_base,
+    get_recent_endpoints,
+)
 from globus_compute_sdk.sdk.hardware_report import (
     mem_info,
     python_runtime_host_info,
@@ -544,3 +548,18 @@ def test_mem_swap_info():
 
     assert "iB " in minfo, "Expect humanization of output"
     assert "iB " in sinfo, "Expect humanization of output"
+
+
+def test_get_recent_endpoints(fs):
+    base_dir = pathlib.Path("/gc_dir")
+
+    not_empty = base_dir / "not_empty_dir"
+    not_empty.mkdir(parents=True)
+    (not_empty / "some_file").touch()
+    recent_dirs = get_recent_endpoints(base_dir, [])
+    assert not_empty in recent_dirs
+
+    empty = base_dir / "empty_dir"
+    empty.mkdir()
+    recent_dirs = get_recent_endpoints(base_dir, [])
+    assert empty in recent_dirs, "Expect no crash; if empty recent, it's in list"
