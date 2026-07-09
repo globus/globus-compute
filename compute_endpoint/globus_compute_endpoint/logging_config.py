@@ -306,7 +306,4 @@ def ensure_log_path() -> pathlib.Path:
     # but confirm anyway
     log_path.parent.mkdir(parents=True, exist_ok=True)
 
-    # Ensure we have permission to write to it.  Generate PermissionError otherwise
-    log_path.open("a")
-
     return log_path

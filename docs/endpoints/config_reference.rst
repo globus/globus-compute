@@ -164,9 +164,9 @@ in the ``user_config_template.yaml.j2`` Jinja2 template:
    engine:
      ...
 
-The example above uses the reserved _GC template variable as described at
-:ref:`reserved-template-variables`. ``env`` will contain environment variables
-available to the User Endpoint process.  For non-identity-mapping endpoints,
+The example above uses the reserved ``_GC`` template variable as described at
+:ref:`reserved-template-variables`. ``_GC.env`` will contain environment variables
+available to the user endpoint process.  For non-identity-mapping endpoints,
 this includes all variables from the parent process.  For identity mapping
 endpoints, ``env`` only contains a few select values such as ``HOME`` - the user's
 home directory e.g. ``/home/foobar`` and ``USER`` - the user's uname e.g. ``foobar``

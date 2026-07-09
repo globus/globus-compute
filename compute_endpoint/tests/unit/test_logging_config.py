@@ -94,12 +94,12 @@ def test_include_correct_loggers(logfile: t.Optional[str], mocker: MockFixture, 
     assert set(loggers) == expected, "Time to update this test?"
 
 
+@pytest.mark.parametrize()
 @pytest.mark.parametrize(
     ("log_path", "envs", "is_dir", "exists", "expected_path", "exc_msg"),
     (
         ["/a/a_dir", {}, True, True, None, f"{LOG_PATH_ENV} can not be a directory"],
         ["/b/$XYZ/file.log", {"XYZ": "abc"}, False, False, "/b/abc/file.log", None],
-        ["/c/file.log", {}, False, True, "/c/file.log", "Permission denied"],
         ["/d/file.log", {}, False, False, "/d/file.log", None],
         [None, {}, False, False, None, None],
     ),

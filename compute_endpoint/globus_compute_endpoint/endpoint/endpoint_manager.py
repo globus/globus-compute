@@ -1207,25 +1207,21 @@ class EndpointManager:
             exit_code += 1
             _conf = yaml.safe_load(user_config)
 
+            ep_dir = ensure_compute_dir() / ep_name
+
             # Override with custom values from user config if present
             # This sets two environment vars used by paths:
             #   - endpoint_dir
             #   - endpoint_log
             if ep_dir_val := _conf.get("paths", {}).get("endpoint_dir"):
                 log.info(f"Setting endpoint directory to {ep_dir_val}")
-                env[COMPUTE_EP_DIR_ENV] = ep_dir_val
+                ep_dir = pathlib.Path(ep_dir_val)
             if log_path_val := _conf.get("paths", {}).get("endpoint_log"):
                 # Overrides the default in ensure_log_path()
                 env[LOG_PATH_ENV] = log_path_val
 
-            # ensure_compute_dir() picks up possibly updated GLOBUS_COMPUTE_USER_DIR
-            gc_dir: pathlib.Path = ensure_compute_dir()
-
-            if not ep_dir_val:
-                # Not customized, construct the default path
-                ep_dir: pathlib.Path = gc_dir / ep_name
-                ep_dir.mkdir(mode=0o700, parents=True, exist_ok=True)
-                env[COMPUTE_EP_DIR_ENV] = str(ep_dir.resolve())
+            ep_dir.mkdir(mode=0o700, parents=True, exist_ok=True)
+            env[COMPUTE_EP_DIR_ENV] = str(ep_dir.resolve())
 
             # Use the environment value set from default or customized log path
             ep_log = ensure_log_path()
