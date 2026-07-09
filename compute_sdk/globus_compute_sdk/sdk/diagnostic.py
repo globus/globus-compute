@@ -303,7 +303,7 @@ def get_recent_endpoints(base_dir: Path, ep_names: list) -> list[Path]:
     for ep in ep_list:
         if ep.is_dir() and ep.name in ep_names:
             latest_ts = max(
-                ep.stat().st_mtime, *(p.stat().st_mtime for p in ep.iterdir())
+                (ep.stat().st_mtime, *(p.stat().st_mtime for p in ep.iterdir()))
             )
             ep_list_by_ts.append([latest_ts, ep])
     return [e[1] for e in sorted(ep_list_by_ts, reverse=True)]
