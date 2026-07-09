@@ -125,6 +125,13 @@ You will also need the following credentials:
 1. Create a GitHub release from the tag. See [GitHub documentation](https://docs.github.com/en/repositories/releasing-projects-on-github/managing-releases-in-a-repository#creating-a-release)
    for instructions.
 
+   **⚠️ Note:** The automatically generated changelog from GitHub includes every PR in
+   the release, but not every PR is of interest.  Cull from the changelog items in the
+   generated notes those PRs that are only of interest to Compute developers.  For
+   example, test-only changes, or [pre-commit] PRs may be removed.  (If users are
+   interested to see the exact set of changes, then they may use the "Full Changelog"
+   link at the bottom of the generated notes.)
+
 1. Navigate to the [Build with Parameters](https://builds.globus.org/jenkins/job/BuildGlobusComputeAgentPackages/build?delay=0sec) Jenkins page.
 
 1. Enter the name of the release branch (eg, `v4.8.0`) into the `BRANCH_OR_TAG` field, and ensure `BUILD_FOR_STABLE` is checked.
