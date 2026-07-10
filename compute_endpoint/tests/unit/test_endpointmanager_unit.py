@@ -1200,6 +1200,29 @@ def test_command_verifies_content_type(mock_log, epmanager_as_root, mock_props):
     assert em._command.ack.called, "Command always ACKed"
 
 
+@pytest.mark.parametrize("bad_ts", (None, "not-a-number", [], True, False, b"1234567"))
+def test_rejects_missing_or_invalid_timestamp(
+    mock_log, epmanager_as_root, mock_props, bad_ts
+):
+    *_, em = epmanager_as_root
+    em._command_queue = mock.Mock()
+    em._command_stop_event.set()
+    em.send_failure_notice = mock.Mock()
+
+    mock_props.timestamp = bad_ts  # the test
+
+    queue_item = [1, mock_props, json.dumps({"kwargs": {}}).encode()]
+    em._command_queue.get.side_effect = [queue_item, queue.Empty()]
+    em._event_loop()
+
+    ml = mock_log.error.called and mock_log.error or mock_log.warning
+    assert ml.called
+
+    a, *_ = ml.call_args[0]
+    assert ("Unable to deserialize" in a) or ("too old or skew " in a)
+    assert em._command.ack.called, "Command always ACKed"
+
+
 def test_ignores_stale_commands(mock_log, epmanager_as_root, mock_props, randomstring):
     *_, mock_os, _, em = epmanager_as_root
     em._command_queue = mock.Mock()

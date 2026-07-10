@@ -641,9 +641,10 @@ class EndpointManager:
                 continue
 
             try:
-                server_cmd_ts = props.timestamp
                 if props.content_type != "application/json":
                     raise ValueError("Invalid message type; expecting JSON")
+
+                server_cmd_ts = int(props.timestamp)
 
                 cmd_msg = json.loads(body)
                 command = cmd_msg.get("command")
