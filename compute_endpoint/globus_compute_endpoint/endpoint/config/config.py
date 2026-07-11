@@ -15,6 +15,7 @@ from globus_compute_sdk.sdk.utils.uuid_like import (
 from pydantic import BaseModel, ConfigDict, validate_call
 
 from .pam import PamConfiguration
+from .path_config import PathConfiguration
 
 MINIMUM_HEARTBEAT: float = 5.0
 log = logging.getLogger(__name__)
@@ -172,11 +173,6 @@ class BaseConfig:
             self._admins = tuple(as_uuid(identity_id) for identity_id in val)
 
 
-class PathModel(BaseModel):
-    gc_dir: str | None = None
-    endpoint_log: str | None = None
-
-
 class UserEndpointConfig(BaseConfig):
     """Holds the configuration items for a task-processing endpoint.
 
@@ -203,6 +199,7 @@ class UserEndpointConfig(BaseConfig):
         and ``ThreadPoolEngine``.  See :ref:`uep-conf` for more information.
 
     :param paths: User Endpoint directory and log path related configuration group
+        See |PathConfiguration| or :ref:`xxxx` for more information.
 
     :param heartbeat_threshold: Seconds since the last heartbeat message from the
         Globus Compute web service after which the connection is assumed to be
@@ -229,6 +226,8 @@ class UserEndpointConfig(BaseConfig):
 
     :param endpoint_teardown: Command(s) to be run during the endpoint
         shutdown process
+
+    .. |PathConfiguration| replace:: :class:`PathConfiguration <globus_compute_endpoint.endpoint.config.path_config.PathConfiguration>`
     """
 
     @validate_call(config=ConfigDict(arbitrary_types_allowed=True))
@@ -243,7 +242,7 @@ class UserEndpointConfig(BaseConfig):
         idle_heartbeats_hard: int = 5760,  # Two days, divided by `heartbeat_period`
         endpoint_setup: str | None = None,
         endpoint_teardown: str | None = None,
-        paths: PathModel | None = None,
+        paths: PathConfiguration | None = None,
         **kwargs,
     ) -> None:
         super().__init__(**kwargs)
@@ -266,14 +265,6 @@ class UserEndpointConfig(BaseConfig):
     @engine.setter
     def engine(self, val: GlobusComputeEngineBase | None):
         self._engine = val
-
-    @property
-    def paths(self) -> PathModel | None:
-        return self._paths
-
-    @paths.setter
-    def paths(self, val: PathModel | None):
-        self._paths = val
 
     @property
     def heartbeat_threshold(self):

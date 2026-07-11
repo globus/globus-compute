@@ -23,7 +23,7 @@ New Functionality
      paths:
        endpoint_log: /tmp/{{ _GC.env.USER }}/user_endpoints.log
 
-For more information, please see :ref:`endpoint-log-paths`
+For more information, please see :ref:`endpoint-paths`
 
 Removed
 ^^^^^^^

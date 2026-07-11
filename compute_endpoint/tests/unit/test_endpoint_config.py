@@ -10,6 +10,7 @@ from globus_compute_endpoint.endpoint.config import (
     BaseConfig,
     ManagerEndpointConfig,
     PamConfiguration,
+    PathConfiguration,
     UserEndpointConfig,
 )
 from globus_compute_endpoint.endpoint.config.dispatch import (
@@ -131,7 +132,7 @@ def test_userconfig_repr_nondefault_kwargs(
     randomstring, kw, cls, get_random_of_datatype
 ):
     # Skip optional sections
-    if kw in ["engine", "paths"]:
+    if kw == "engine":
         return
 
     val = get_random_of_datatype(cls)

@@ -2242,6 +2242,26 @@ def test_respects_config_template_and_schema(mocker, successful_exec_from_mocked
     assert parsed_stdin["config"] == config
 
 
+def test_env_vars_passed_to_config(mocker, successful_exec_from_mocked_root):
+    mock_os, conf_dir, _, _, _, em = successful_exec_from_mocked_root
+
+    template_path = conf_dir / "my_template.yaml.j2"
+    schema_path = conf_dir / "my_schema.json"
+    em.user_config_template_path = template_path
+    em.user_config_schema_path = schema_path
+
+    template = "foo: {{ foo }}"
+    schema = {"type": "object", "properties": {"foo": {"type": "string"}}}
+    config = "foo: bar"
+
+    template_path.write_text(template)
+    schema_path.write_text(json.dumps(schema))
+
+    mock_os.fdopen.return_value.__enter__.return_value = m
+    with pytest.raises(SystemExit) as pyexc:
+        em._event_loop()
+
+
 def test_includes_mapped_identity_in_user_config(
     mocker, successful_exec_from_mocked_root, ident
 ):

@@ -277,33 +277,34 @@ def setup_logging(
 
 def ensure_log_path() -> pathlib.Path:
     """
-    Gets the path where logs should be written to.  This defaults to
-    ~/.globus_compute/<EP_DIR>/endpoint.log if not specifically configured.
+    Gets the path where logs should be written to and ensures the directory
+      structure is valid.  Note that this method does not verify write permissions
+      for the log file path itself, which is assumed to be done following this call.
 
-    The path can be customized via environment variable GLOBUS_COMPUTE_LOG_PATH.
-    If the env variable is not set, it is assumed to be ``endpoint.log`` in the
-    endpoint directory.  (Optionally specified by the environment variable
-    GLOBUS_COMPUTE_ENDPOINT_DIR)
+    The path is constructed based on the values in two optional environment
+     variables, GLOBUS_COMPUTE_ENDPOINT_DIR and GLOBUS_COMPUTE_LOG_PATH.
 
-    The log file is created if it doesn't exist, which also validates permissions
+    At least one of the envs must be set. GLOBUS_COMPUTE_LOG_PATH takes
+      precedence if both are available.
     """
     log_dir = os.environ.get(LOG_PATH_ENV, "").strip()
     ep_dir = os.environ.get(COMPUTE_EP_DIR_ENV, "").strip()
+
+    # This expands both ~/... and $X, for example:
+    #   ~/best_$USER/abc.log --> /home/foobar/best_foobar/abc.log
+    expanded = pathlib.Path(os.path.expandvars(log_dir or ep_dir or "")).expanduser()
+
     if log_dir:
-        # This expands both ~/... and $X e.g. ~/$MY_SUB_DIR/abc.log
-        log_path = pathlib.Path(os.path.expandvars(log_dir)).expanduser()
-        if log_path.is_dir():
-            raise ValueError(f"{LOG_PATH_ENV} can not be a directory: {log_path}")
-        logger.info(f"Setting custom endpoint log path to {log_path}")
-    elif ep_dir:
-        log_path = pathlib.Path(ep_dir) / "endpoint.log"
-    else:
+        if expanded.is_dir():
+            raise ValueError(f"{LOG_PATH_ENV} can not be a directory: {expanded}")
+        logger.info(f"Setting custom endpoint log path to {expanded}")
+    elif not ep_dir:
         raise ValueError(
             f"{COMPUTE_EP_DIR_ENV} must be provided if {LOG_PATH_ENV} is not set"
         )
 
     # Parent directory (default -> UEP directory) might have already been created
     # but confirm anyway
-    log_path.parent.mkdir(parents=True, exist_ok=True)
+    expanded.parent.mkdir(parents=True, exist_ok=True)
 
-    return log_path
+    return expanded

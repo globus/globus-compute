@@ -94,42 +94,79 @@ def test_include_correct_loggers(logfile: t.Optional[str], mocker: MockFixture, 
     assert set(loggers) == expected, "Time to update this test?"
 
 
-@pytest.mark.parametrize()
-@pytest.mark.parametrize(
-    ("log_path", "envs", "is_dir", "exists", "expected_path", "exc_msg"),
-    (
-        ["/a/a_dir", {}, True, True, None, f"{LOG_PATH_ENV} can not be a directory"],
-        ["/b/$XYZ/file.log", {"XYZ": "abc"}, False, False, "/b/abc/file.log", None],
-        ["/d/file.log", {}, False, False, "/d/file.log", None],
-        [None, {}, False, False, None, None],
-    ),
-)
-def test_ensure_log_path(
-    fs, mock_ep_dir, log_path, envs, is_dir, exists, expected_path, exc_msg
-):
-    _, ep_dir = mock_ep_dir
-    if log_path:
-        envs[LOG_PATH_ENV] = log_path
-        p = pathlib.Path(log_path)
-        if is_dir:
-            p.mkdir(parents=True)
-        elif exists:
-            # create file but non-writable if file
-            p.parent.mkdir(parents=True)
-            p.touch(mode=0o400)
-    envs[COMPUTE_EP_DIR_ENV] = str(ep_dir.resolve())
+def test_ensure_log_path_no_env_error():
+    with mock.patch.dict(os.environ, {"random_env": "value"}):
+        with pytest.raises(ValueError) as actual_exc_msg:
+            ensure_log_path()
+        assert f"{COMPUTE_EP_DIR_ENV} must be provided" in str(actual_exc_msg)
 
-    with mock.patch.dict(os.environ, envs):
-        if exc_msg is not None:
-            with pytest.raises(Exception) as actual_exc_msg:
+
+@pytest.mark.parametrize(
+    ("is_dir", "exc_msg"), ([True, "can not be a directory"], [False, None])
+)
+def test_ensure_log_path_dir_or_file(fs, is_dir, exc_msg):
+    a_path = pathlib.Path("/a/b/c/d")
+
+    with mock.patch.dict(os.environ, {LOG_PATH_ENV: str(a_path.resolve())}):
+        if exc_msg:
+            a_path.mkdir(parents=True)
+            with pytest.raises(ValueError) as actual_exc_msg:
                 ensure_log_path()
             assert exc_msg in str(actual_exc_msg)
         else:
-            result_path: pathlib.Path = ensure_log_path()
-            if log_path is None:
-                # Default - use ep_dir
-                assert result_path == ep_dir / "endpoint.log"
-            else:
-                # Custom log_path
-                assert str(result_path.resolve()) == expected_path
-                result_path.write_text("I can write to log file")
+            # Should create the dir structure
+            result_path = ensure_log_path()
+            assert result_path == a_path
+            assert result_path.parent.exists()
+
+
+@pytest.mark.parametrize(
+    ("ep_env", "log_env", "expected_path_str"),
+    (
+        (None, "/a/b/c.txt", "/a/b/c.txt"),
+        ("/a/b/c", None, "/a/b/c/endpoint.log"),
+        ("/a/b/c", "/d/e/f.txt", "/d/e/f.txt"),
+    ),
+)
+def test_ensure_log_path_env_order(fs, ep_env, log_env, expected_path_str):
+    expected_path = pathlib.Path(expected_path_str)
+
+    with mock.patch.dict(
+        os.environ, {COMPUTE_EP_DIR_ENV: ep_env or "", LOG_PATH_ENV: log_env or ""}
+    ):
+        result_path = ensure_log_path()
+        assert result_path == expected_path
+        assert expected_path.parent.exists()
+        assert expected_path.parent.is_dir()
+
+
+@pytest.mark.parametrize(
+    ("home_env", "ep_env", "user_env", "log_env", "expected_path_str"),
+    (
+        ("/home/rob", None, "bob", "$HOME/a.b", "/home/rob/a.b"),
+        ("/home/rob", None, "bob", "~/gc-$USER/a.b", "/home/rob/gc-bob/a.b"),
+        ("/home/rob", "$HOME/gc", "bob", None, "/home/rob/gc/endpoint.log"),
+        ("/home/rob", "~/gc-${USER}", "bob", None, "/home/rob/gc-bob/endpoint.log"),
+        ("/opt", None, "root", "~/a/b/gc.log   ", "/opt/a/b/gc.log"),
+        ("/", None, "root", "~/a/b/gc.log   ", "/a/b/gc.log"),
+        ("/home/jane", "/a/b/gc", "jane", "/tmp/gc.log", "/tmp/gc.log"),
+    ),
+)
+def test_ensure_log_path_expansion(
+    fs, home_env, ep_env, user_env, log_env, expected_path_str
+):
+    expected_path = pathlib.Path(expected_path_str)
+
+    with mock.patch.dict(
+        os.environ,
+        {
+            "HOME": home_env,
+            "USER": user_env,
+            COMPUTE_EP_DIR_ENV: ep_env or "",
+            LOG_PATH_ENV: log_env or "",
+        },
+    ):
+        result_path = ensure_log_path()
+        assert result_path == expected_path
+        assert expected_path.parent.exists()
+        assert expected_path.parent.is_dir()

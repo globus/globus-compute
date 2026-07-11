@@ -134,7 +134,7 @@ rough equivalent to the ``ProcessPoolEngine`` example would be:
        max_blocks: 4
 
 
-.. _endpoint-log-paths:
+.. _endpoint-paths:
 
 User Endpoint and Log Paths
 ---------------------------
@@ -535,6 +535,10 @@ available options.
    :member-order: bysource
 
 .. autoclass:: globus_compute_endpoint.endpoint.config.pam.PamConfiguration
+   :members:
+   :member-order: bysource
+
+.. autoclass:: globus_compute_endpoint.endpoint.config.path_config.PathConfiguration
    :members:
    :member-order: bysource
 
