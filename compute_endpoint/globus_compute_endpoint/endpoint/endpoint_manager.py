@@ -1214,22 +1214,24 @@ class EndpointManager:
             #   - endpoint_dir
             #   - endpoint_log
             if ep_dir_val := _conf.get("paths", {}).get("endpoint_dir"):
-                print(f"***\n***\nHAS {ep_dir_val=}")
                 log.info(f"Setting endpoint directory to {ep_dir_val}")
                 ep_dir = pathlib.Path(ep_dir_val)
-            else:
-                print("***\n***\nNO ep_dir_val")
             if log_path_val := _conf.get("paths", {}).get("endpoint_log"):
-                print(f"***\n***\nHAS {log_path_val=}")
                 # Overrides the default in ensure_log_path()
                 env[LOG_PATH_ENV] = log_path_val
-            print("***\n***\nNO log_path_val")
 
             ep_dir.mkdir(mode=0o700, parents=True, exist_ok=True)
             env[COMPUTE_EP_DIR_ENV] = str(ep_dir.resolve())
 
             # Use the environment value set from default or customized log path
             ep_log = ensure_log_path()
+
+            # ensure_log_path() might have expanded the supplied path (expandvars/user)
+            # so we should update the env vars just in case
+            if log_path_val:
+                env[LOG_PATH_ENV] = str(ep_log.resolve())
+            elif ep_dir_val:
+                env[COMPUTE_EP_DIR_ENV] = str(ep_log.parent.resolve())
 
             _ha_key = "high_assurance"
             if _ha_key in _conf:

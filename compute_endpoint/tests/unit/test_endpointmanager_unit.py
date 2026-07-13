@@ -2247,8 +2247,16 @@ def test_env_vars_passed_to_config(mocker, successful_exec_from_mocked_root):
 
     template_path = conf_dir / "my_template.yaml.j2"
     schema_path = conf_dir / "my_schema.json"
+    expected_env = {"my_env": "my_val"}
+    (conf_dir / "user_environment.yaml").write_text(yaml.dump(expected_env))
+
     em.user_config_template_path = template_path
     em.user_config_schema_path = schema_path
+
+    #    template_path = conf_dir / "my_template.yaml.j2"
+    #    schema_path = conf_dir / "my_schema.json"
+    #    em.user_config_template_path = template_path
+    #    em.user_config_schema_path = schema_path
 
     template = "foo: {{ foo }}"
     schema = {"type": "object", "properties": {"foo": {"type": "string"}}}
@@ -2257,6 +2265,7 @@ def test_env_vars_passed_to_config(mocker, successful_exec_from_mocked_root):
     template_path.write_text(template)
     schema_path.write_text(json.dumps(schema))
 
+    m = mock.Mock()
     mock_os.fdopen.return_value.__enter__.return_value = m
     with pytest.raises(SystemExit) as pyexc:
         em._event_loop()

@@ -133,7 +133,6 @@ def test_load_user_endpoint_config_full(get_random_of_datatype):
         kw: get_random_of_datatype(tval) for kw, tval in known_user_config_opts.items()
     }
     conf["engine"] = {"type": "ThreadPoolEngine"}
-    conf["paths"] = {"endpoint_dir": "/my/dir", "endpoint_log": "/other/t.log"}
     serde_yaml = yaml.safe_dump(conf)
     conf = load_config_yaml(serde_yaml)
     assert isinstance(conf, UserEndpointConfig)

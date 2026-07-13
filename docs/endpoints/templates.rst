@@ -197,7 +197,7 @@ user or admin.  These are accessible from the Globus-Compute-supplied variable o
   submitting tasks.  (e.g., ``_GC.env.HOME``)
 
   - In non identity-mapping Compute endpoints (i.e., "single user endpoints"), this contains
-    all variables of the parent process
+    all environment variables of the parent process
   - In identity-mapping (i.e., multi-user) endpoints, the environment will be cleared and
     a few values will be set for the user endpoint:
     - ``HOME`` - the user's home directory
