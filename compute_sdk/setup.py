@@ -37,6 +37,7 @@ TEST_REQUIRES = [
     "psutil",
     "pytest>=7.2",
     "pytest-mock",
+    "pytest-random-order",
     "pyfakefs",
     "coverage",
     # easy mocking of the `requests` library
