@@ -21,7 +21,7 @@ REQUIRES = [
     # provides easy daemonization of the endpoint
     "python-daemon>=2,<3",
     # CLI parsing
-    "click>=8,<8.2.0",
+    "click>=8.3.3,<8.4.0",
     "click-option-group>=0.5.6,<1",
     "pyzmq>=24,<=28",
     # 'parsl' is a core requirement of the globus-compute-endpoint, essential to a range
