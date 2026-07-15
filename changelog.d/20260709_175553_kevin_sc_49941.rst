@@ -1,5 +1,0 @@
-Bug Fixes
-^^^^^^^^^
-
-- ``globus-compute-diagnostic`` no longer crashes when encountering an empty
-  directory
