@@ -225,6 +225,13 @@ def test_dispatcher_does_not_mutate_input_dict():
     assert provider_cfg == provider_cfg_orig
 
 
+def test_dispatcher_excludes_none():
+    provider = ProviderDispatcher.build_instance(
+        {"type": "LocalProvider", "worker_init": None}
+    )
+    assert provider.worker_init == "", "None should fall through to default"
+
+
 @pytest.mark.parametrize(
     "cls",
     (

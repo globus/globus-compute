@@ -46,7 +46,8 @@ class TypeDispatcher(abc.ABC, t.Generic[T]):
             )
 
         try:
-            instance = obj(**data)
+            # exclude None values to match the old Pydantic v1 `exclude_none=True` behavior
+            instance = obj(**{k: v for k, v in data.items() if v is not None})
         except Exception as e:
             raise ValueError(str(e)) from e
         return t.cast(T, instance)
