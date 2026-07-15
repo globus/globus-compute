@@ -98,9 +98,9 @@ def _get_cls_kwds(cls: type) -> set[str]:
     return {k for s in sigs for k, v in s if v.kind == v.KEYWORD_ONLY}
 
 
-@pytest.mark.skip("TEMPORARY SKIP REMOVE BEFORE MERGE")
 def test_config_opts_accounted_for_in_tests():
     kwds = _get_cls_kwds(UserEndpointConfig)
+    print("\n***\n" + str(kwds) + "\n***\n")
     assert set(known_user_config_opts) == kwds
     kwds = _get_cls_kwds(ManagerEndpointConfig)
     assert set(known_manager_config_opts) == kwds
@@ -477,7 +477,6 @@ def test_render_config_passes_user_runtime(
         assert rendered_dict["user_python"] == "<none>"
 
 
-@pytest.mark.skip("TEMPORARY SKIP REMOVE BEFORE MERGE")
 @pytest.mark.parametrize("reserved_word", RESERVED_USER_CONFIG_TEMPLATE_VARIABLES)
 def test_render_config_logs_deprecated_reserved_fields(
     conf_no_engine: UserEndpointConfig,

@@ -45,6 +45,7 @@ known_user_config_opts = {
     "environment": str,
     "high_assurance": False,
     "engine": None,
+    "email": None,
 }
 
 known_manager_config_opts = {
@@ -66,6 +67,7 @@ known_manager_config_opts = {
     "local_compute_services": True,
     "environment": str,
     "high_assurance": True,
+    "email": str,
 }
 
 

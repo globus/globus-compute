@@ -79,6 +79,7 @@ class BaseConfig:
         self.display_name = display_name
         self.debug = debug is True
         self.high_assurance = high_assurance is True
+        self.email = email
 
         # Connection info and tuning
         self.amqp_port = amqp_port

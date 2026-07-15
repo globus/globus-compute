@@ -118,7 +118,6 @@ def test_provider_container_compatibility(
         assert f"not compatible with {provider_type}" in str(pyt_e.value)
 
 
-@pytest.mark.skip("TEMPORARY SKIP REMOVE BEFORE MERGE")
 def test_configs_repr_default_kwargs():
     assert repr(UserEndpointConfig()) == "UserEndpointConfig()"
     defs = f"pam={PamConfiguration(enable=False)!r}"
@@ -127,7 +126,6 @@ def test_configs_repr_default_kwargs():
     )
 
 
-@pytest.mark.skip("TEMPORARY SKIP REMOVE BEFORE MERGE")
 @pytest.mark.parametrize("kw,cls", known_user_config_opts.items())
 def test_userconfig_repr_nondefault_kwargs(
     randomstring, kw, cls, get_random_of_datatype
@@ -142,11 +140,12 @@ def test_userconfig_repr_nondefault_kwargs(
 
     if kw == "high_assurance":
         assert f"{kw}={repr(val)}" not in repr_c, "HA *off* by default"
+    elif kw == "email":
+        assert f"{kw}={repr(val)}" not in repr_c, "email not present by default"
     else:
         assert f"{kw}={repr(val)}" in repr_c
 
 
-@pytest.mark.skip("TEMPORARY SKIP REMOVE BEFORE MERGE")
 @pytest.mark.parametrize("kw,cls", known_manager_config_opts.items())
 def test_managerconfig_repr_nondefault_kwargs(
     randomstring, fs, kw, cls, get_random_of_datatype
