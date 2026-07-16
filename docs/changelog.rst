@@ -3,6 +3,38 @@ Changelog
 
 .. scriv-insert-here
 
+.. _changelog-4.15.0:
+
+globus-compute-sdk & globus-compute-endpoint v4.15.0
+----------------------------------------------------
+
+New Functionality
+^^^^^^^^^^^^^^^^^
+
+- Added support for Python 3.14.
+
+Bug Fixes
+^^^^^^^^^
+
+- ``globus-compute-diagnostic`` no longer crashes when encountering an empty
+  directory.
+
+Removed
+^^^^^^^
+
+- The Compute Endpoint no longer uses `Pydantic`__ v1.  (Pydantic v2
+  does `not support Python 3.14+`__.)
+
+.. __: https://pydantic.dev/docs/validation/latest/get-started/
+.. __: https://pydantic.dev/docs/validation/latest/get-started/changelog/#v11024-2025-09-25
+
+Added
+^^^^^
+
+- The Compute Endpoint now uses `Pydantic v2`__ internally.
+
+.. __: https://pydantic.dev/articles/pydantic-v2
+
 .. _changelog-4.14.0:
 
 globus-compute-sdk & globus-compute-endpoint v4.14.0
