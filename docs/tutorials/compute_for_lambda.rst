@@ -323,7 +323,7 @@ cases administrators might want to ensure that *only* this known function is cal
 which can be achieved with a :ref:`function allow list <function-allowlist>`:
 
 .. code-block:: yaml
-  :caption: :ref:`config.yaml <endpoint-manager-config>` with a function allow list
+  :caption: :ref:`config.yaml <core-endpoint-config>` with a function allow list
 
   allowed_functions:
     - eca16448-bfe2-445a-900c-cd46b1426522

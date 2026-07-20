@@ -529,11 +529,6 @@ def run_all_diags_wrapper(
             else:
                 diagnostic_output.append(cur_output + "\n")
 
-    # Should we provide default UUID as the Tutorial MEP?  It would
-    # likely slow down the diagnostic by 10-20 seconds while starting the UEP
-    # if ep_uuid is None:
-    #     ep_uuid = TUTORIAL_EP_UUID
-
     if ep_uuid:
         ep_test_title = f"Run sample function on endpoint {ep_uuid} via Executor"
         if print_only or verbose:
