@@ -29,6 +29,7 @@ DEFAULT_FORMAT = (
 )
 LOG_PATH_ENV = "GLOBUS_COMPUTE_LOG_PATH"
 
+
 _und = "\033[4m"
 _ital = "\033[3m"
 _green = "\033[32m"
@@ -332,7 +333,7 @@ def ensure_paths(ep_name: str | None, custom_paths: dict | None = None) -> pathl
         log_path = ep_dir / "endpoint.log"
 
     # Update the log path ENV with the final value and ensure parent is created
-    # Testing of the path's write access is left to the caller in endpoint_manager.py
+    # Testing of the path's write access is left to the caller in core_endpoint.py
     log_path = log_path.resolve()
     log_path.parent.mkdir(mode=0o700, parents=True, exist_ok=True)
     log_path_str = str(log_path)
