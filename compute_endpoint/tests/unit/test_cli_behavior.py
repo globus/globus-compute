@@ -23,6 +23,7 @@ import yaml
 from click import ClickException
 from click import File as ClickFile
 from click.testing import CliRunner
+from endpoint.config import CoreEndpointConfig
 from globus_compute_endpoint import cli
 from globus_compute_endpoint.cli import (
     _AUTH_POLICY_DEFAULT_DESC,
@@ -116,8 +117,8 @@ def mock_ep(gc_dir, ep_name):
 
 
 @pytest.fixture
-def mock_mep():
-    with mock.patch(f"{_MOCK_BASE}EndpointManager") as m:
+def mock_cep():
+    with mock.patch(f"{_MOCK_BASE}CoreEndpoint") as m:
         m.return_value = m
         yield m
 
@@ -148,7 +149,7 @@ def mock_get_config():
 
 @pytest.fixture
 def mock_load_config_yaml_mep():
-    conf = ManagerEndpointConfig()
+    conf = CoreEndpointConfig()
     with mock.patch(f"{_MOCK_BASE}load_config_yaml") as m:
         m.return_value = conf
         yield m
@@ -156,7 +157,7 @@ def mock_load_config_yaml_mep():
 
 @pytest.fixture
 def mock_get_config_mep():
-    conf = ManagerEndpointConfig()
+    conf = CoreEndpointConfig()
     with mock.patch(f"{_MOCK_BASE}get_config") as m:
         m.return_value = conf
         yield m
@@ -238,7 +239,7 @@ engine:
 
 
 @pytest.fixture
-def make_manager_endpoint_dir(gc_dir, ep_name):
+def make_core_endpoint_dir(gc_dir, ep_name):
     def func(name=ep_name, ep_uuid=None):
         ep_dir = gc_dir / name
         ep_dir.mkdir(parents=True, exist_ok=True)
@@ -370,28 +371,28 @@ def test_start_endpoint_no_such_ep(run_line, mock_ep, ep_name):
 
 def test_start_endpoint_existing_ep(
     run_line,
-    mock_mep,
-    make_manager_endpoint_dir,
+    mock_cep,
+    make_core_endpoint_dir,
     ep_name,
     mock_client,
 ):
-    make_manager_endpoint_dir(ep_name)
+    make_core_endpoint_dir(ep_name)
     run_line(f"start {ep_name}")
-    mock_mep.start.assert_called_once()
+    mock_cep.start.assert_called_once()
 
 
 @pytest.mark.parametrize("detach", (False, True))
 def test_start_endpoint_already_running(
     mock_command_ensure,
     gc_dir,
-    make_manager_endpoint_dir,
+    make_core_endpoint_dir,
     mock_client,
     ep_name,
     mock_send_endpoint_startup_failure_to_amqp,
     detach,
 ):
     """Check to ensure endpoint already active message prints to console"""
-    ep_dir = make_manager_endpoint_dir()
+    ep_dir = make_core_endpoint_dir()
     pid_path = Endpoint.pid_path(ep_dir)
     pid_path.write_text("12345")
     f = io.StringIO()
@@ -412,9 +413,9 @@ def test_start_endpoint_already_running(
 
 
 def test_start_endpoint_stale(
-    mock_mep, mock_command_ensure, make_manager_endpoint_dir, ep_name, mock_client
+    mock_cep, mock_command_ensure, make_core_endpoint_dir, ep_name, mock_client
 ):
-    ep_dir = make_manager_endpoint_dir()
+    ep_dir = make_core_endpoint_dir()
     pid_path = Endpoint.pid_path(ep_dir)
     pid_path.write_text("12345")
     stale_time = time.time() - 95  # something larger than HB * 3
@@ -540,7 +541,7 @@ def test_start_uep_stdin_allowed_fns_overrides_conf(
     ],
 )
 def test__do_register_endpoint_data_passthrough(
-    randomstring, make_manager_endpoint_dir, mock_client, display_name
+    randomstring, make_core_endpoint_dir, mock_client, display_name
 ):
     exp_err_reason = randomstring()
 
@@ -554,8 +555,8 @@ def test__do_register_endpoint_data_passthrough(
 
     mock_client.register_endpoint.side_effect = FakeGlobusAPIError(HTTPStatus.CONFLICT)
 
-    ep_dir = make_manager_endpoint_dir()
-    ep_conf = ManagerEndpointConfig()
+    ep_dir = make_core_endpoint_dir()
+    ep_conf = CoreEndpointConfig()
     ep_conf.allowed_functions = [uuid.uuid4() for _ in range(random.randint(1, 10))]
     ep_conf.authentication_policy = str(uuid.uuid4())
     ep_conf.subscription_id = str(uuid.uuid4())
@@ -592,13 +593,13 @@ def test_stop_endpoint(
 
 
 def test_restart_endpoint_does_start_and_stop(
-    run_line, mock_ep, mock_mep, make_manager_endpoint_dir, ep_name, mock_client
+    run_line, mock_ep, mock_cep, make_core_endpoint_dir, ep_name, mock_client
 ):
-    make_manager_endpoint_dir()
+    make_core_endpoint_dir()
     run_line(f"restart {ep_name}")
 
     mock_ep.stop_endpoint.assert_called_once()
-    mock_mep.start.assert_called_once()
+    mock_cep.start.assert_called_once()
 
 
 @responses.activate
@@ -620,7 +621,7 @@ def test__do_register_endpoint_registration_blocked(
     get_standard_compute_client,
     randomstring,
     register_endpoint_failure_response,
-    make_manager_endpoint_dir,
+    make_core_endpoint_dir,
     ep_uuid,
 ):
     mock_gcc = get_standard_compute_client()
@@ -631,7 +632,7 @@ def test__do_register_endpoint_registration_blocked(
     some_err = randomstring()
     register_endpoint_failure_response(ep_uuid, status_code, some_err)
 
-    ep_dir = make_manager_endpoint_dir(ep_uuid=ep_uuid)
+    ep_dir = make_core_endpoint_dir(ep_uuid=ep_uuid)
 
     f = io.StringIO()
     with redirect_stdout(f):
@@ -657,9 +658,9 @@ def test__do_register_endpoint_registration_blocked(
 
 @pytest.mark.parametrize("with_json", (False, True))
 def test__do_register_endpoint_provided_endpoint_id(
-    mock_client, ep_uuid, make_manager_endpoint_dir, with_json
+    mock_client, ep_uuid, make_core_endpoint_dir, with_json
 ):
-    ep_dir = make_manager_endpoint_dir(ep_uuid=ep_uuid if with_json else None)
+    ep_dir = make_core_endpoint_dir(ep_uuid=ep_uuid if with_json else None)
 
     cli._do_register_endpoint(ep_dir, ManagerEndpointConfig(), ep_uuid)
 
@@ -670,13 +671,13 @@ def test__do_register_endpoint_provided_endpoint_id(
 @pytest.mark.parametrize("public", (False, True))
 @pytest.mark.parametrize("privs", (False, True))
 def test__do_register_endpoint_sends_data_during_registration(
-    make_manager_endpoint_dir,
+    make_core_endpoint_dir,
     mock_client,
     ep_uuid,
     public: bool,
     privs: bool,
 ):
-    conf_dir = make_manager_endpoint_dir()
+    conf_dir = make_core_endpoint_dir()
 
     mock_conf = ManagerEndpointConfig()
     mock_conf.public = public
@@ -723,11 +724,11 @@ def test__do_register_endpoint_sends_data_during_registration(
 def test__do_register_endpoint_handles_network_error_scriptably(
     mocker,
     mock_client,
-    make_manager_endpoint_dir,
+    make_core_endpoint_dir,
     ep_uuid,
     randomstring,
 ):
-    conf_dir = make_manager_endpoint_dir()
+    conf_dir = make_core_endpoint_dir()
     mock_log = mocker.patch(f"{_MOCK_BASE}log")
 
     some_err = randomstring()
@@ -1087,24 +1088,24 @@ def test_start_ep_incorrect_config_py(
 
 @mock.patch("globus_compute_endpoint.endpoint.config.utils.load_config_yaml")
 def test_start_ep_config_py_takes_precedence(
-    mock_load, run_line, mock_mep, make_manager_endpoint_dir, ep_name, mock_client
+    mock_load, run_line, mock_cep, make_core_endpoint_dir, ep_name, mock_client
 ):
-    conf_py = make_manager_endpoint_dir() / "config.py"
+    conf_py = make_core_endpoint_dir() / "config.py"
     conf_py.write_text(
         "from globus_compute_endpoint.endpoint.config import ManagerEndpointConfig"
         "\nconfig = ManagerEndpointConfig()"
     )
 
     run_line(f"start {ep_name}")
-    assert mock_mep.start.called
+    assert mock_cep.start.called
     assert not mock_load.called, "Key outcome: config.py takes precedence"
 
 
 def test_start_ep_umask_set_restrictive(
-    run_line, make_manager_endpoint_dir, ep_name, mock_mep, mock_client
+    run_line, make_core_endpoint_dir, ep_name, mock_cep, mock_client
 ):
     orig_umask = os.umask(0)
-    make_manager_endpoint_dir()
+    make_core_endpoint_dir()
     run_line(f"start {ep_name}")
     assert os.umask(orig_umask) == 0o077
 
@@ -1112,13 +1113,13 @@ def test_start_ep_umask_set_restrictive(
 def test_start_ep_detached(
     run_line,
     mock_command_ensure,
-    make_manager_endpoint_dir,
+    make_core_endpoint_dir,
     ep_name,
     mock_daemon,
     mock_client,
     mock_send_endpoint_startup_failure_to_amqp,
 ):
-    make_manager_endpoint_dir()
+    make_core_endpoint_dir()
 
     mock_daemon_context_class = mock_daemon.DaemonContext
     mock_daemon_context_class.return_value.__enter__.side_effect = Exception(
@@ -1243,14 +1244,14 @@ def test_get_endpoint_by_name_or_uuid_error_message(tmp_path, run_line, data):
 def test_invalid_grant_triggers_login_if_interactive(
     mocker: MockFixture,
     run_line,
-    mock_mep,
-    make_manager_endpoint_dir,
+    mock_cep,
+    make_core_endpoint_dir,
     mock_send_endpoint_startup_failure_to_amqp,
     ep_name,
     mock_client,
     is_tty,
 ):
-    make_manager_endpoint_dir()
+    make_core_endpoint_dir()
 
     mock_resp = mock.MagicMock(
         status_code=400,
@@ -1258,7 +1259,7 @@ def test_invalid_grant_triggers_login_if_interactive(
         text='{"error":"invalid_grant"}',
     )
     mocker.patch.object(
-        mock_mep,
+        mock_cep,
         "start",
         side_effect=globus_sdk.AuthAPIError(r=mock_resp),
     )
@@ -1286,9 +1287,9 @@ def test_invalid_grant_triggers_login_if_interactive(
 def test_handle_globus_auth_error(
     mocker: MockFixture,
     run_line,
-    mock_mep,
+    mock_cep,
     mock_ep,
-    make_manager_endpoint_dir,
+    make_core_endpoint_dir,
     ep_name,
     cmd,
     ep_method,
@@ -1296,7 +1297,7 @@ def test_handle_globus_auth_error(
     mock_client,
     mock_send_endpoint_startup_failure_to_amqp,
 ):
-    make_manager_endpoint_dir()
+    make_core_endpoint_dir()
 
     mock_log = mocker.patch("globus_compute_endpoint.exception_handling.log")
     mock_resp = mock.MagicMock(
@@ -1304,7 +1305,7 @@ def test_handle_globus_auth_error(
         reason="Bad Request",
         text=auth_err_msg,
     )
-    for obj in (mock_ep, mock_mep):
+    for obj in (mock_ep, mock_cep):
         if hasattr(obj, ep_method):
             mocker.patch.object(
                 obj,
@@ -1390,16 +1391,16 @@ def test_fail_exit_sends_amqp_msg(
 @pytest.mark.parametrize("e_tty", (False, True))
 def test_file_exit_conditionally_emits_why_to_stdstream(
     mock_client,
-    mock_mep,
-    make_manager_endpoint_dir,
+    mock_cep,
+    make_core_endpoint_dir,
     mock_send_endpoint_startup_failure_to_amqp,
     ep_name,
     exit_exc,
     o_tty,
     e_tty,
 ):
-    make_manager_endpoint_dir(ep_name)
-    mock_mep.start.side_effect = exit_exc
+    make_core_endpoint_dir(ep_name)
+    mock_cep.start.side_effect = exit_exc
 
     # click.CliRunner swaps in its own std streams, so can't use run_line
     stdo, stde = io.StringIO(), io.StringIO()
@@ -1802,13 +1803,13 @@ def test_render_user_config_happy_path(
     mock_render_config_user_template,
     gc_dir,
     mock_command_ensure,
-    make_manager_endpoint_dir,
+    make_core_endpoint_dir,
     ep_name,
     randomstring,
 ):
     mock_render_result = randomstring()
     mock_render_config_user_template.return_value = mock_render_result
-    ep_dir = make_manager_endpoint_dir()
+    ep_dir = make_core_endpoint_dir()
 
     user_options = {"heartbeat": "some_value"}
     user_options_path = ep_dir / "user_options.json"
@@ -1842,13 +1843,13 @@ def test_render_user_config_happy_path(
 )
 def test_render_user_config_file_options(
     run_line,
-    make_manager_endpoint_dir,
+    make_core_endpoint_dir,
     mock_render_config_user_template,
     randomstring,
     option,
     contents,
 ):
-    ep_dir = make_manager_endpoint_dir()
+    ep_dir = make_core_endpoint_dir()
 
     file_path = ep_dir / randomstring()
     file_path.write_text(contents)
@@ -1916,11 +1917,11 @@ def test_render_user_config_stdin(run_line, mocker, randomstring, parameter):
 )
 def test_render_user_config_file_option_malformed(
     run_line,
-    make_manager_endpoint_dir,
+    make_core_endpoint_dir,
     randomstring,
     option,
 ):
-    ep_dir = make_manager_endpoint_dir()
+    ep_dir = make_core_endpoint_dir()
 
     file_path = ep_dir / randomstring()
     file_path.write_text(randomstring())  # malformed content
@@ -2001,9 +2002,9 @@ def test__do_render_user_config_checks_template_capable(
 @pytest.mark.parametrize("template_filename", [None, "template.yaml.j2"])
 @pytest.mark.parametrize("schema_filename", [None, "schema.json"])
 def test__do_render_user_config_gets_paths_from_parent_ep(
-    mocker, make_manager_endpoint_dir, template_filename, schema_filename
+    mocker, make_core_endpoint_dir, template_filename, schema_filename
 ):
-    ep_dir: pathlib.Path = make_manager_endpoint_dir()
+    ep_dir: pathlib.Path = make_core_endpoint_dir()
 
     template_path = (ep_dir / template_filename) if template_filename else None
     schema_path = (ep_dir / schema_filename) if schema_filename else None
@@ -2045,11 +2046,11 @@ def test__do_render_user_config_gets_paths_from_parent_ep(
 @pytest.mark.parametrize("schema_from", ["config", "param"])
 def test__do_render_user_config_parent_ep_overrides(
     mock_render_config_user_template,
-    make_manager_endpoint_dir,
+    make_core_endpoint_dir,
     template_from,
     schema_from,
 ):
-    ep_dir: pathlib.Path = make_manager_endpoint_dir()
+    ep_dir: pathlib.Path = make_core_endpoint_dir()
 
     template_config_path = ep_dir / "template.config"
     template_param_path = ep_dir / "template.param"
@@ -2103,9 +2104,9 @@ def test__do_render_user_config_parent_ep_overrides(
 
 def test__do_render_user_config_generic_catch_all_exception(
     mocker,
-    make_manager_endpoint_dir,
+    make_core_endpoint_dir,
 ):
-    ep_dir: pathlib.Path = make_manager_endpoint_dir()
+    ep_dir: pathlib.Path = make_core_endpoint_dir()
 
     mock_render = mocker.patch(f"{_MOCK_BASE}render_config_user_template")
     mock_render.side_effect = RuntimeError("Something bad happened")

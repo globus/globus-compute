@@ -1,7 +1,7 @@
 from .config import (  # noqa: F401
     BaseConfig,
     Config,
-    ManagerEndpointConfig,
+    CoreEndpointConfig,
     UserEndpointConfig,
 )
 from .dispatch import (  # noqa: F401
