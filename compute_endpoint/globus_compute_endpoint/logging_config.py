@@ -29,6 +29,7 @@ DEFAULT_FORMAT = (
 )
 LOG_PATH_ENV = "GLOBUS_COMPUTE_LOG_PATH"
 
+
 _und = "\033[4m"
 _ital = "\033[3m"
 _green = "\033[32m"

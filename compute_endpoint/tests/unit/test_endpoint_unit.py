@@ -21,13 +21,10 @@ import pytest
 import yaml
 from globus_compute_endpoint.endpoint import endpoint
 from globus_compute_endpoint.endpoint.config import (
-    ManagerEndpointConfig,
+    CoreEndpointConfig,
     UserEndpointConfig,
 )
 from globus_compute_endpoint.endpoint.endpoint import Endpoint
-from globus_compute_endpoint.engines import (
-    ThreadPoolEngine,
-)
 from globus_compute_sdk import Client
 from globus_sdk import NetworkError
 
@@ -973,7 +970,7 @@ def test_migrate_to_template_capable_success(
 
 def test_migrate_to_template_capable_already_template_capable(mock_get_config):
     mock_config_path = pathlib.Path("some/config/dir")
-    mock_get_config.return_value = mock.Mock(spec=ManagerEndpointConfig)
+    mock_get_config.return_value = mock.Mock(spec=CoreEndpointConfig)
 
     with pytest.raises(ValueError) as pyt_exc:
         Endpoint.migrate_to_template_capable(mock_config_path)

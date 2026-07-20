@@ -22,10 +22,10 @@ from tests.conftest import randomstring_impl
 
 def pytest_configure(config):
     config.addinivalue_line(
-        "markers", "no_mock_pim: In test_endpointmanager_unit, disable autouse fixture"
+        "markers", "no_mock_pim: In test_core_endpoint_unit, disable autouse fixture"
     )
     config.addinivalue_line(
-        "markers", "no_mock_shutil: In test_endpointmanager_unit, disable autouse"
+        "markers", "no_mock_shutil: In test_core_endpoint_unit, disable autouse"
     )
 
 
@@ -43,6 +43,9 @@ known_user_config_opts = {
     "idle_heartbeats_hard": int,
     "endpoint_setup": str,
     "endpoint_teardown": str,
+    "log_dir": str,
+    "stdout": str,
+    "stderr": str,
     "local_compute_services": True,
     "environment": str,
     "high_assurance": False,
@@ -50,7 +53,7 @@ known_user_config_opts = {
     "paths": PathConfiguration,
 }
 
-known_manager_config_opts = {
+known_core_config_opts = {
     "display_name": str,
     "allowed_functions": t.Iterable[uuid.UUID],
     "authentication_policy": uuid.UUID,

@@ -8,6 +8,8 @@ The Compute Endpoint may be installed via PyPI in the usual manner, as well as
 via system packages.  See :doc:`installation` for more information.
 
 
+.. _endpoint_user_guide_overview:
+
 Overview
 ========
 
@@ -19,7 +21,7 @@ leadership‑class HPC systems.
 
 A Globus Compute Endpoint consists of three main process types:
 
-- **Manager endpoint process (MEP)** - Renders a configuration template to
+- **Core endpoint process (CEP)** - Renders a configuration template to
   launch and manage user endpoint processes.
 
 - **User endpoint process (UEP)** - Establishes secure communication with Globus
@@ -30,8 +32,33 @@ A Globus Compute Endpoint consists of three main process types:
   resources (e.g., HPC cluster nodes) according to the rendered configuration
   template.
 
+.. note::
+  The ``Core`` endpoint was previously known as the ``Manager`` endpoint, changed
+  in 4.16.0, released August 2026
+
 For a detailed look at how a task makes its way to a user endpoint process, see
 :ref:`tracing-a-task`.
+
+
+Disambiguation of "Endpoint"
+----------------------------
+
+The word ``Endpoint`` is overloaded with several meanings, and without context
+it can refer to any of several entities. While the three types of endpoint
+*process* are described above, we may also use "Globus Compute Endpoint" to
+refer to the entirety of the Compute software package: the Python software
+that runs on the login and compute nodes, using CEPs, UEPs, and worker
+processes to receive and execute tasks.
+
+A Core endpoint process started by a privileged user with identity mapping
+enabled is running in *Multi-User* mode.  Without identity mapping, or if
+started by a non-privileged user, it is running in *Single-User* mode.  These
+are sometimes referred to as Multi-User and Single-User endpoints.
+
+This documentation attempts to be as specific as possible when referring to
+the overall 'endpoint', or to its constituent parts, such as Core endpoints
+or User endpoints. However, as language itself is imperfect, please contact
+us with any suggestions if any specific references are unclear.
 
 
 Quickstart
@@ -93,8 +120,8 @@ via the ``configure`` subcommand:
 ``config.yaml``
 ---------------
 
-The ``config.yaml`` file controls the manager endpoint process.  Please refer
-to :ref:`endpoint-manager-config` for details on each field.
+The ``config.yaml`` file controls the core endpoint process.  Please refer
+to :ref:`core-endpoint-config` for details on each field.
 
 .. code-block:: yaml
    :caption: Default ``config.yaml`` configuration
@@ -112,14 +139,14 @@ to :ref:`endpoint-manager-config` for details on each field.
 ``user_config_template.yaml.j2``
 --------------------------------
 
-The manager endpoint process will render this template with user defined
+The core endpoint process will render this template with user defined
 variables to launch a user endpoint process.  More than simple interpolation,
 the endpoint treats this file as a `Jinja template`_, enabling a good bit of
 flexibility.
 
-The template file lives in the manager endpoint directory by default, but users
+The template file lives in the core endpoint directory by default, but users
 can specify a different template path using the ``user_config_template_path``
-setting in the manager's :ref:`config.yaml <endpoint-manager-config>`.
+setting in the core endpoint's :ref:`config.yaml <core-endpoint-config>`.
 
 The default template includes a basic single-worker configuration and a
 ``worker_init`` script that :ref:`manages the Python environment
@@ -169,10 +196,10 @@ peculiarities.
 ---------------------------
 
 Admins can define a `JSON schema <https://json-schema.org/>`_ to validate
-user-defined variables.  The schema file lives in the manager endpoint directory
+user-defined variables.  The schema file lives in the core endpoint directory
 by default, but users can specify a different schema path using the
-``user_config_schema_path`` variable in the manager's :ref:`config.yaml
-<endpoint-manager-config>`.
+``user_config_schema_path`` variable in the core endpoint's :ref:`config.yaml
+<core-endpoint-config>`.
 
 The default schema is quite permissive, enforcing that the three default
 template variables are strings, then allowing any other user-defined properties:
@@ -288,7 +315,7 @@ Starting the Endpoint
 
 After configuration, start the endpoint instance with the ``start`` subcommand.
 Once started, the endpoint stays attached to the console, with a timer that
-updates every second as a hint that the manager endpoint process is running:
+updates every second as a hint that the core endpoint process is running:
 
 .. code-block:: console
 
@@ -302,7 +329,7 @@ services will request access to your `Globus Auth`_ identity and
 `Globus Groups`_.  Your Globus Auth identity will register as the endpoint owner
 and cannot be changed.
 
-If you start the endpoint as a non-privileged local user, then the manager and
+If you start the endpoint as a non-privileged local user, then the core and
 user endpoint processes will run as the same local user, and the endpoint will
 only accept tasks submitted by the endpoint owner.  We refer to this as a
 single-user endpoint:
@@ -310,7 +337,7 @@ single-user endpoint:
 .. code-block:: text
    :caption: Single-user endpoint process hierarchy
 
-   Manager Endpoint Process (alice, UID: 1001)
+   Core Endpoint Process (alice, UID: 1001)
    └── User Endpoint Process (alice, UID: 1001)
 
 .. hint::
@@ -335,13 +362,13 @@ subcommand:
    $ gce stop my_endpoint
    > Endpoint <my_endpoint> is now stopped
 
-Alternatively, if the PID of the manager endpoint process is handy, then either
+Alternatively, if the PID of the core endpoint process is handy, then either
 will work:
 
 .. code-block:: console
 
-   $ kill -SIGQUIT <manager_pid>    # equivalent to -SIGTERM
-   $ kill -SIGTERM <manager_pid>    # equivalent to -SIGQUIT
+   $ kill -SIGQUIT <core_pid>    # equivalent to -SIGTERM
+   $ kill -SIGTERM <core_pid>    # equivalent to -SIGQUIT
 
 
 Basic User Workflow
@@ -371,7 +398,7 @@ when submitting a task:
    ``Executor`` class; please consult the :doc:`../sdk/executor_user_guide`
    documentation for more information.
 
-The manager endpoint process renders the configuration template with the
+The core endpoint process renders the configuration template with the
 user-defined variables, then launches a user endpoint process.  When these
 values change, a new user endpoint process is launched and can run concurrently
 with existing processes.
@@ -437,8 +464,8 @@ Say there are three custom files in a directory that we want to use during confi
    $ pwd
    /my/compute/config/source/files/directory
    $ ls
-   custom_manager_config.yaml    custom_user_template.yaml.j2     custom_user_schema.json
-   $ cat custom_manager_config.yaml
+   custom_core_config.yaml    custom_user_template.yaml.j2     custom_user_schema.json
+   $ cat custom_core_config.yaml
    display_name: Custom Config Endpoint
    $ cat custom_user_template.yaml.j2
    endpoint_setup: {{ endpoint_setup|default() }}
@@ -453,13 +480,13 @@ Say there are three custom files in a directory that we want to use during confi
    }
 
 The ``gce configure`` command can be told to use those, instead of
-the defaults, using ``--manager-config``, ``--template-config``, and
+the defaults, using ``--core-config``, ``--template-config``, and
 ``--schema-config``, respectively:
 
 .. code-block:: console
 
    $ gce configure \
-      --manager-config custom_manager_config.yaml \
+      --core-config custom_core_config.yaml \
       --template-config custom_user_template.yaml.j2 \
       --schema-config custom_user_schema.json \
       my_custom_endpoint
@@ -759,9 +786,7 @@ and writing a custom ``globus-compute-endpoint`` wrapper:
 
 (The use of ``exec`` is not critical, but keeps the process tree tidy.)
 
-.. _manager_export_env:
-
-The manager endpoint process exports the following two environment variables that
+The core endpoint process exports the following two environment variables that
 shim‑authors may use to fine‑tune customizations:
 
 - ``GC_USER_PYTHON_VERSION`` - A dotted-decimal Python version (e.g., ``3.13.7``) that
@@ -795,7 +820,7 @@ Debugging User Endpoint Processes
 ---------------------------------
 
 The ``--debug`` flag will not carry-over to the child user endpoint processes.
-In particular, the command executed by the manager endpoint process is:
+In particular, the command executed by the core endpoint process is:
 
 .. code-block:: python
    :caption: arguments to ``os.execvpe``
@@ -1323,7 +1348,7 @@ Audit Logging
 -------------
 
 Audit logging is available only to High-Assurance endpoints, and is enabled by
-the ``audit_log_path`` |ManagerEndpointConfig| item:
+the ``audit_log_path`` |CoreEndpointConfig| item:
 
 .. code-block:: yaml
    :caption: Example ``config.yaml`` showing the ``audit_log_path``
@@ -1343,18 +1368,18 @@ When enabled, task events, if available, will be emitted one record per line:
    :caption: Example ``audit.log`` content; the ``...`` fields are omitted for
       documentation clarity
 
-   2025-04-10T14:44:58.742079-05:00 uid=0 pid=... eid=... Begin MEP session =====
+   2025-04-10T14:44:58.742079-05:00 uid=0 pid=... eid=... Begin CEP session =====
    ...
    2025-04-10T14:45:30.906170-05:00 uid=... pid=... uep=... fid=... tid=... bid= RECEIVED
    2025-04-10T14:45:30.906661-05:00 uid=... pid=... uep=... fid=... tid=... bid= EXEC_START
    2025-04-10T14:45:37.401833-05:00 uid=... pid=... uep=... fid=... tid=... bid=4 jid=2477 RUNNING
    2025-04-10T14:45:37.969570-05:00 uid=... pid=... uep=... fid=... tid=... bid=4 jid=2477 EXEC_END
    ...
-   2025-04-10T14:46:39.689716-05:00 uid=0 pid=... eid=... End MEP session -----
+   2025-04-10T14:46:39.689716-05:00 uid=0 pid=... eid=... End CEP session -----
 
-Each session begins when the MEP starts, and ends when the MEP stops (denoted
-with the sentinel lines ``Begin MEP session =====`` and
-``End MEP session -----``).  Each record contains for the emitting process:
+Each session begins when the CEP starts, and ends when the CEP stops (denoted
+with the sentinel lines ``Begin CEP session =====`` and
+``End CEP session -----``).  Each record contains for the emitting process:
 
 - a local-timezone timestamp in ISO 8601 format
 - ``uid`` -- the POSIX user id
@@ -1535,22 +1560,22 @@ The workflow for a task sent to an endpoint roughly follows these steps:
    it to start a user endpoint process as the user that initiated the REST
    request.
 
-#. If running a :doc:`multi-user endpoint <multi_user>`, the manager endpoint
+#. If running a :doc:`multi-user endpoint <multi_user>`, the core endpoint
    process maps the Globus Auth identity in the start request to a local POSIX
-   username.  If not, the manager endpoint process skips identity mapping
+   username.  If not, the core endpoint process skips identity mapping
    altogether.
 
-#. The manager endpoint process calls |fork(2)|_ to ceate a new process.
+#. The core endpoint process calls |fork(2)|_ to ceate a new process.
 
-#. If running a :doc:`multi-user endpoint <multi_user>`, the manager endpoint
+#. If running a :doc:`multi-user endpoint <multi_user>`, the core endpoint
    process ascertains the host-specific UID based on a |getpwnam(3)|_ call with
    the local username from the previous step, then drops privileges.
 
-#. The manager endpoint process validates the user-defined variables against the
+#. The core endpoint process validates the user-defined variables against the
    JSON schema, if present, then renders the user endpoint configuration
    template.
 
-#. The manager endpoint process calls ``exec()`` to launch the user endpoint
+#. The core endpoint process calls ``exec()`` to launch the user endpoint
    process and passes the generated configuration over ``stdin``.  Each user
    endpoint process creates a dedicated directory in the local user's
    ``$HOME/.globus_compute/`` directory to store logs and other essential files.
@@ -1618,7 +1643,7 @@ reach out to our Team directly by submitting a `support ticket`_.
 .. _MPIExecutor: https://parsl.readthedocs.io/en/stable/stubs/parsl.executors.MPIExecutor.html
 .. |SimpleLauncher| replace:: ``SimpleLauncher``
 .. _SimpleLauncher: https://parsl.readthedocs.io/en/stable/stubs/parsl.launchers.SimpleLauncher.html
-.. |ManagerEndpointConfig| replace:: :class:`ManagerEndpointConfig <globus_compute_endpoint.endpoint.config.config.ManagerEndpointConfig>`
+.. |CoreEndpointConfig| replace:: :class:`CoreEndpointConfig <globus_compute_endpoint.endpoint.config.config.CoreEndpointConfig>`
 .. _Web UI: https://app.globus.org/compute
 .. _Jinja template: https://jinja.palletsprojects.com/en/stable/
 .. _Globus Auth: https://www.globus.org/platform/services/auth

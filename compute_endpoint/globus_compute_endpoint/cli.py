@@ -28,7 +28,7 @@ from daemon.pidfile import PIDLockFile
 from globus_compute_endpoint.auth import get_globus_app_with_scopes
 from globus_compute_endpoint.boot_persistence import disable_on_boot, enable_on_boot
 from globus_compute_endpoint.endpoint.config import (
-    ManagerEndpointConfig,
+    CoreEndpointConfig,
     UserEndpointConfig,
 )
 from globus_compute_endpoint.endpoint.config.utils import (
@@ -38,8 +38,8 @@ from globus_compute_endpoint.endpoint.config.utils import (
     load_user_config_template,
     render_config_user_template,
 )
+from globus_compute_endpoint.endpoint.core_endpoint import CoreEndpoint
 from globus_compute_endpoint.endpoint.endpoint import Endpoint
-from globus_compute_endpoint.endpoint.endpoint_manager import EndpointManager
 from globus_compute_endpoint.endpoint.identity_mapper import MappedPosixIdentity
 from globus_compute_endpoint.endpoint.utils import has_pyprctl as _has_multi_user
 from globus_compute_endpoint.endpoint.utils import (
@@ -71,7 +71,7 @@ if not _has_multi_user and "--debug" in sys.argv and sys.stderr.isatty():
     # We haven't set up logging yet so manually print for now
     _e = pyprctl_import_error
     print(
-        f"(DEBUG) {__file__}: pyprctl not available; MEPs will not work"
+        f"(DEBUG) {__file__}: pyprctl not available; endpoint may fail to start"
         "\n(DEBUG) (Hints: Is pyprctl installed? Is this a Linux system?)"
         f"\n(DEBUG) [{type(_e).__name__}] {_e}",
         file=sys.stderr,
@@ -176,7 +176,7 @@ def common_options(f):
     return f
 
 
-def mep_start_options(f):
+def cep_start_options(f):
     f = click.option(
         "--endpoint-uuid",
         default=None,
@@ -347,7 +347,16 @@ def version_command():
     "--manager-config",
     type=click.Path(exists=True, dir_okay=False, path_type=pathlib.Path),
     default=None,
-    help="Specify a custom manager configuration (config.yaml)",
+    help=(
+        "(Deprecated, use --core-config)"
+        " Specify a custom core endpoint configuration (config.yaml)"
+    ),
+)
+@optgroup.option(
+    "--core-config",
+    type=click.Path(exists=True, dir_okay=False, path_type=pathlib.Path),
+    default=None,
+    help="Specify a custom core endpoint configuration (config.yaml)",
 )
 @optgroup.option(
     "--template-config",
@@ -431,6 +440,7 @@ def configure_endpoint(
     *,
     name: str,
     manager_config: pathlib.Path | None,
+    core_config: pathlib.Path | None,
     template_config: pathlib.Path | None,
     id_mapping_config: pathlib.Path | None,
     schema_config: pathlib.Path | None,
@@ -456,7 +466,7 @@ def configure_endpoint(
     """
     if not _has_multi_user:
         raise ClickException(
-            "Unable to configure new endpoints; Manager Endpoint Processes are not"
+            "Unable to configure new endpoints; Compute endpoints are not"
             " supported on this system"
         )
 
@@ -533,7 +543,7 @@ def configure_endpoint(
     ep_dir = compute_dir / name
     Endpoint.configure_endpoint(
         conf_dir=ep_dir,
-        endpoint_config=manager_config,
+        core_config=core_config,
         user_config_template=template_config,
         user_config_schema=schema_config,
         user_environment=user_env_config,
@@ -549,7 +559,7 @@ def configure_endpoint(
 
 @app.command(name="start", help="Start an endpoint")
 @name_or_uuid_arg
-@mep_start_options
+@cep_start_options
 @common_options
 @handle_auth_errors
 @click.option(
@@ -561,7 +571,7 @@ def configure_endpoint(
 )
 def start_endpoint(*, ep_dir: pathlib.Path, die_with_parent: bool, **_kwargs):
     state = CommandState.ensure()
-    # for backward compatibility with EndpointManager versions that run
+    # for backward compatibility with CoreEndpoint versions that run
     # `gce start --die-with-parent` instead of `gce _start-user-endpoint`.
     # deprecated; to be removed in 6 months (roughly Oct 2026)
     if die_with_parent:
@@ -570,7 +580,7 @@ def start_endpoint(*, ep_dir: pathlib.Path, die_with_parent: bool, **_kwargs):
             endpoint_uuid=state.endpoint_uuid,
         )
     else:
-        _start_endpoint_manager(
+        _start_core_endpoint(
             ep_dir=ep_dir,
             endpoint_uuid=state.endpoint_uuid,
         )
@@ -773,7 +783,7 @@ class _SendMessageOnErrorExit(contextlib.AbstractContextManager):
 
 
 def _do_register_endpoint(
-    ep_dir: pathlib.Path, ep_config: ManagerEndpointConfig, ep_uuid: str | None
+    ep_dir: pathlib.Path, ep_config: CoreEndpointConfig, ep_uuid: str | None
 ) -> dict:
     gcc = Client(
         local_compute_services=ep_config.local_compute_services,
@@ -785,7 +795,7 @@ def _do_register_endpoint(
         reg_info = gcc.register_endpoint(
             name=ep_dir.name,
             endpoint_id=ep_uuid or Endpoint.get_endpoint_id(ep_dir),
-            metadata=EndpointManager.get_metadata(ep_dir, ep_config),
+            metadata=CoreEndpoint.get_metadata(ep_dir, ep_config),
             public=ep_config.public,
             multi_user=is_privileged(),
             display_name=ep_config.display_name,
@@ -830,7 +840,7 @@ def _do_register_endpoint(
     return reg_info
 
 
-def _start_endpoint_manager(
+def _start_core_endpoint(
     *,
     ep_dir: pathlib.Path,
     endpoint_uuid: str | None,
@@ -880,7 +890,7 @@ def _start_endpoint_manager(
         pid_stale_after_s = ep_config.heartbeat_period * 3
         _pidfile_check(pid_path, pid_stale_after_s)
 
-        if not isinstance(ep_config, ManagerEndpointConfig):
+        if not isinstance(ep_config, CoreEndpointConfig):
             raise ClickException(
                 f"Configuration for endpoint {ep_dir.name} contains an `engine` field;"
                 " endpoint will not start. (Hint: move the `engine` block to"
@@ -920,7 +930,7 @@ def _start_endpoint_manager(
         pid_path = Endpoint.pid_path(ep_dir)
         stk.enter_context(_pidfile(pid_path, ep_config.heartbeat_period * 3))
 
-        epm = EndpointManager(ep_dir, endpoint_uuid, ep_config, reg_info)
+        epm = CoreEndpoint(ep_dir, endpoint_uuid, ep_config, reg_info)
         epm.start()
 
 
@@ -966,7 +976,7 @@ def _start_user_endpoint(
             raise ClickException(
                 "Missing or invalid endpoint information from stdin. (Hint: this"
                 " command is not meant to be invoked manually; it should only be run"
-                " by an endpoint manager process.)"
+                " by a core endpoint process.)"
             ) from e
 
     with contextlib.ExitStack() as stk:
@@ -1042,12 +1052,12 @@ def _do_stop_endpoint(*, ep_dir: pathlib.Path, remote: bool = False) -> None:
 @app.command("restart")
 @name_or_uuid_arg
 @common_options
-@mep_start_options
+@cep_start_options
 def restart_endpoint(*, ep_dir: pathlib.Path, **_kwargs):
     """Restarts an endpoint"""
     state = CommandState.ensure()
     _do_stop_endpoint(ep_dir=ep_dir)
-    _start_endpoint_manager(
+    _start_core_endpoint(
         ep_dir=ep_dir,
         endpoint_uuid=state.endpoint_uuid,
     )
@@ -1380,14 +1390,14 @@ def _do_render_user_config(
     if parent_ep_dir is None and template_file is None:
         raise ClickException("Must provide at least one of --endpoint or --template.")
 
-    parent_config = ManagerEndpointConfig()
+    parent_config = CoreEndpointConfig()
     user_config_template: str
     user_config_template_path: pathlib.Path
     user_config_schema = {}
 
     if parent_ep_dir is not None:
         parent_config = get_config(parent_ep_dir)  # type: ignore[assignment]
-        if not isinstance(parent_config, ManagerEndpointConfig):
+        if not isinstance(parent_config, CoreEndpointConfig):
             raise ClickException(
                 f"Endpoint {parent_ep_dir.name} does not support templating."
             )
@@ -1408,7 +1418,7 @@ def _do_render_user_config(
             raise ClickExceptionWithContext(
                 f"Invalid parent config data in {parent_config_file.name}."
             ) from e
-        if not isinstance(parent_config, ManagerEndpointConfig):
+        if not isinstance(parent_config, CoreEndpointConfig):
             raise ClickException("Provided parent config does not support templating.")
 
     if template_file is not None:

@@ -20,7 +20,7 @@ import yaml
 from globus_compute_endpoint.auth import get_globus_app_with_scopes
 from globus_compute_endpoint.endpoint.config import (
     BaseConfig,
-    ManagerEndpointConfig,
+    CoreEndpointConfig,
     UserEndpointConfig,
 )
 from globus_compute_endpoint.endpoint.config.utils import get_config
@@ -59,7 +59,7 @@ class Endpoint:
 
     @staticmethod
     def user_config_template_path(
-        endpoint_dir: pathlib.Path, config: ManagerEndpointConfig | None = None
+        endpoint_dir: pathlib.Path, config: CoreEndpointConfig | None = None
     ) -> pathlib.Path:
         if config and config.user_config_template_path:
             return pathlib.Path(config.user_config_template_path)
@@ -67,7 +67,7 @@ class Endpoint:
 
     @staticmethod
     def user_config_schema_path(
-        endpoint_dir: pathlib.Path, config: ManagerEndpointConfig | None = None
+        endpoint_dir: pathlib.Path, config: CoreEndpointConfig | None = None
     ) -> pathlib.Path:
         if config and config.user_config_schema_path:
             return pathlib.Path(config.user_config_schema_path)
@@ -75,7 +75,7 @@ class Endpoint:
 
     @staticmethod
     def identity_mapping_config_path(
-        endpoint_dir: pathlib.Path, config: ManagerEndpointConfig
+        endpoint_dir: pathlib.Path, config: CoreEndpointConfig
     ) -> pathlib.Path:
         return (
             config.identity_mapping_config_path
@@ -164,7 +164,7 @@ class Endpoint:
     @staticmethod
     def init_endpoint_dir(
         endpoint_dir: pathlib.Path,
-        endpoint_config: pathlib.Path | None = None,
+        core_config: pathlib.Path | None = None,
         user_config_template: pathlib.Path | None = None,
         user_config_schema: pathlib.Path | None = None,
         user_environment: pathlib.Path | None = None,
@@ -179,8 +179,8 @@ class Endpoint:
         """Initialize a clean endpoint dir
 
         :param endpoint_dir: Path to the endpoint configuration dir
-        :param endpoint_config: Path to a config file to be used instead of
-            the Globus Compute default config file
+        :param core_config: Path to a config file to be used instead of
+            the Globus Compute default file for the Core Endpoint
         :param user_config_template: Path to a user config template file
             to be used instead of the Globus Compute default user config template
         :param user_config_schema: Path to a user config schema file to be used
@@ -206,8 +206,8 @@ class Endpoint:
             config_target_path = Endpoint._config_file_path(endpoint_dir)
             package_dir = pathlib.Path(__file__).resolve().parent
 
-            if endpoint_config is None:
-                endpoint_config = package_dir / "config/default_config.yaml"
+            if core_config is None:
+                core_config = package_dir / "config/default_config.yaml"
 
             owner_only = 0o0600
             world_readable = 0o0644
@@ -248,7 +248,7 @@ class Endpoint:
                 dst_user_tmpl_path.chmod(world_readable)
 
             Endpoint.update_config_file(
-                endpoint_config,
+                core_config,
                 config_target_path,
                 id_mapping,
                 dst_idmap_conf_path,
@@ -266,7 +266,7 @@ class Endpoint:
     @staticmethod
     def configure_endpoint(
         conf_dir: pathlib.Path,
-        endpoint_config: pathlib.Path | None = None,
+        core_config: pathlib.Path | None = None,
         user_config_template: pathlib.Path | None = None,
         user_config_schema: pathlib.Path | None = None,
         user_environment: pathlib.Path | None = None,
@@ -287,7 +287,7 @@ class Endpoint:
         try:
             Endpoint.init_endpoint_dir(
                 conf_dir,
-                endpoint_config,
+                core_config,
                 user_config_template,
                 user_config_schema,
                 user_environment,
@@ -319,7 +319,7 @@ class Endpoint:
 
         if id_mapping:
             config = get_config(conf_dir)
-            assert isinstance(config, ManagerEndpointConfig)  # mypy...
+            assert isinstance(config, CoreEndpointConfig)  # mypy...
             idmap_conf_path = Endpoint.identity_mapping_config_path(conf_dir, config)
             print(f"\n\tIdentity mapping configuration: {idmap_conf_path}")
 
@@ -334,7 +334,7 @@ class Endpoint:
     @staticmethod
     def migrate_to_template_capable(conf_dir: pathlib.Path):
         og_config_obj = get_config(conf_dir)
-        if isinstance(og_config_obj, ManagerEndpointConfig):
+        if isinstance(og_config_obj, CoreEndpointConfig):
             raise ValueError(f"Endpoint '{conf_dir.name}' is already template capable.")
 
         if Endpoint.check_pidfile(conf_dir)["active"]:

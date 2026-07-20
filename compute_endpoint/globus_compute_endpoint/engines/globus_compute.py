@@ -377,6 +377,7 @@ class GlobusComputeEngine(GlobusComputeEngineBase):
         """
         return self.executor.connected_managers()
 
+    # TODO Rename these 'manager' instances?
     def get_connected_managers_packages(self) -> t.Dict[str, t.Dict[str, str]]:
         """
         Returns
