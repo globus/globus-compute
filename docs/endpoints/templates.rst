@@ -260,8 +260,8 @@ rendered in user space, the administrator must:
 1. Move the template files to a directory that every mapped local user account
    has read access to.
 2. Specify the main template file path with the ``user_config_template_path``
-   variable in the :ref:`endpoint manager configuration
-   <endpoint-manager-config>`.
+   variable in the :ref:`core endpoint configuration
+   <core-endpoint-config>`.
 
 .. code-block:: yaml+jinja
    :caption: Example usage of ``extends`` and ``include`` in a template

@@ -90,7 +90,7 @@ virtual environment to submit tasks.
 "SystemExit" error
 ==================
 
-This happens when a manager endpoint process is unable to start a user endpoint process
+This happens when a core endpoint process is unable to start a user endpoint process
 for various reasons. The table below combines information from § :ref:`exit_code_table`
 and § :ref:`exit_code_table_admins`; see those sections for additional context.
 

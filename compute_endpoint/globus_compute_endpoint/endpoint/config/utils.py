@@ -13,7 +13,7 @@ import yaml
 from click import ClickException
 from globus_compute_endpoint.endpoint.identity_mapper import MappedPosixIdentity
 
-from .config import ManagerEndpointConfig, UserEndpointConfig
+from .config import CoreEndpointConfig, UserEndpointConfig
 from .dispatch import EngineDispatcher
 
 log = logging.getLogger(__name__)
@@ -66,7 +66,7 @@ def _read_config_file(config_path: pathlib.Path) -> str:
 
 def _load_config_py(
     conf_path: pathlib.Path,
-) -> UserEndpointConfig | ManagerEndpointConfig | None:
+) -> UserEndpointConfig | CoreEndpointConfig | None:
     if not conf_path.exists():
         return None
 
@@ -79,13 +79,13 @@ def _load_config_py(
             raise Exception(f"Unable to import configuration (no config): {conf_path}")
         spec.loader.exec_module(config)
         config.config.source_content = _read_config_file(conf_path)
-        if not isinstance(config.config, (UserEndpointConfig, ManagerEndpointConfig)):
+        if not isinstance(config.config, (UserEndpointConfig, CoreEndpointConfig)):
             tname = type(config.config).__name__
             exp = ", ".join(
                 f"`{type(cls).__name__}`"
                 for cls in (
                     UserEndpointConfig,
-                    ManagerEndpointConfig,
+                    CoreEndpointConfig,
                 )  # no hard-code in str
             )
             raise AttributeError(f"Received type `{tname}`; expected one of: {exp}")
@@ -116,14 +116,14 @@ def _load_config_py(
         raise
 
 
-def load_config_yaml(config_str: str) -> UserEndpointConfig | ManagerEndpointConfig:
+def load_config_yaml(config_str: str) -> UserEndpointConfig | CoreEndpointConfig:
     try:
         config_dict = dict(yaml.safe_load(config_str) or {})
     except Exception as err:
         raise ClickException(f"Invalid config syntax: {str(err)}") from err
 
     engine_dict = config_dict.pop("engine", None)
-    ConfigClass = ManagerEndpointConfig if engine_dict is None else UserEndpointConfig
+    ConfigClass = CoreEndpointConfig if engine_dict is None else UserEndpointConfig
 
     try:
         if engine_dict is not None:
@@ -149,7 +149,7 @@ def load_config_yaml(config_str: str) -> UserEndpointConfig | ManagerEndpointCon
 
 def get_config(
     endpoint_dir: pathlib.Path,
-) -> UserEndpointConfig | ManagerEndpointConfig:
+) -> UserEndpointConfig | CoreEndpointConfig:
     config_py_path = endpoint_dir / "config.py"
     config_yaml_path = endpoint_dir / "config.yaml"
 
@@ -293,7 +293,7 @@ def load_user_config_template(template_path: pathlib.Path) -> str:
 
 
 def render_config_user_template(
-    parent_config: ManagerEndpointConfig,
+    parent_config: CoreEndpointConfig,
     user_config_template: str,
     user_config_template_path: pathlib.Path,
     mapped_identity: MappedPosixIdentity,

@@ -63,7 +63,7 @@ if not _has_multi_user and "--debug" in sys.argv and sys.stderr.isatty():
     # We haven't set up logging yet so manually print for now
     _e = pyprctl_import_error
     print(
-        f"(DEBUG) {__file__}: pyprctl not available; MEPs will not work"
+        f"(DEBUG) {__file__}: pyprctl not available; Core Endpoints will not work"
         "\n(DEBUG) (Hints: Is pyprctl installed? Is this a Linux system?)"
         f"\n(DEBUG) [{type(_e).__name__}] {_e}",
         file=sys.stderr,
@@ -168,7 +168,7 @@ def common_options(f):
     return f
 
 
-def mep_start_options(f):
+def cep_start_options(f):
     f = click.option(
         "--endpoint-uuid",
         default=None,
@@ -461,13 +461,13 @@ def configure_endpoint(
     """
     if not _has_multi_user:
         raise ClickException(
-            "Unable to configure new endpoints; Manager Endpoint Processes are not"
+            "Unable to configure new endpoints; Core Endpoint Processes are not"
             " supported on this system"
         )
 
     if endpoint_config is not None:
         warnings.warn(
-            "--endpoint-config is deprecated; use --manager-config instead."
+            "--endpoint-config is deprecated; use --core-config instead."
             " If you want to configure user endpoint processes, use --template-config.",
             DeprecationWarning,
             stacklevel=2,
@@ -477,7 +477,7 @@ def configure_endpoint(
             manager_config = pathlib.Path(endpoint_config)
         else:
             warnings.warn(
-                "Both --endpoint-config and --manager-config were provided;"
+                "Both --endpoint-config and --core-config were provided;"
                 " --endpoint-config will be ignored.",
                 UserWarning,
                 stacklevel=2,
@@ -974,7 +974,7 @@ def _start_user_endpoint(
             raise ClickException(
                 "Missing or invalid endpoint information from stdin. (Hint: this"
                 " command is not meant to be invoked manually; it should only be run"
-                " by an endpoint manager process.)"
+                " by a core endpoint process.)"
             ) from e
 
     with contextlib.ExitStack() as stk:

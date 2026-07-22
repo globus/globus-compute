@@ -3,7 +3,7 @@ from __future__ import annotations
 import os
 from urllib.parse import urlparse
 
-# Same UUID for tutorial MEP in all environments
+# Same UUID for tutorial MUEP in all environments
 TUTORIAL_EP_UUID = "4b116d3c-1703-4f8f-9f6f-39921e5864df"
 
 
