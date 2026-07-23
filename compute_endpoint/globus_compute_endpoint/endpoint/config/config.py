@@ -403,6 +403,7 @@ class ManagerEndpointConfig(BaseConfig):
         audit_log_path: os.PathLike | str | None = None,
         pam: PamConfiguration | None = None,
         mu_child_ep_grace_period_s: float = 30.0,
+        email: str | None = None,
         **kwargs,
     ):
         super().__init__(**kwargs)
@@ -424,6 +425,8 @@ class ManagerEndpointConfig(BaseConfig):
         self.audit_log_path = _tmp  # type: ignore[assignment]
 
         self.pam = pam or PamConfiguration(enable=False)
+
+        self.email = email
 
     @property
     def user_config_template_path(self) -> pathlib.Path | None:

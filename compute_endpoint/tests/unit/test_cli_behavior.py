@@ -817,17 +817,98 @@ def test_start_ep_display_name_in_config(
     dir_name, display_name = display_test
 
     conf = gc_dir / dir_name / "config.yaml"
-    open("/tmp/err.txt", "a").write(f"XXX {conf=}\n")
     configure_arg = ""
     if display_name is not None:
         configure_arg = f" --display-name '{display_name}'"
     run_line(f"configure {dir_name}{configure_arg}")
 
-    open("/tmp/err.txt", "a").write(f"YYY {dir_name=} {conf=}")
     with open(conf) as f:
         conf_dict = yaml.safe_load(f)
 
     assert conf_dict["display_name"] == display_name
+
+
+@pytest.mark.parametrize(
+    ("is_privileged", "mu_flag"),
+    [
+        # All variations that do not result in id-mapping
+        [True, False],
+        [False, False],
+        [False, None],
+    ],
+)
+def test_email_not_required_for_non_identity_mapping(
+    run_line, gc_dir, make_endpoint_dir, is_privileged, mu_flag
+):
+    conf = gc_dir / "some_ep" / "config.yaml"
+
+    configure_arg = f" --multi-user {mu_flag}" if mu_flag is not None else ""
+
+    with mock.patch(f"{_MOCK_BASE}is_privileged", return_value=is_privileged):
+        run_line(f"configure some_ep {configure_arg}")
+
+    with open(conf) as f:
+        conf_dict = yaml.safe_load(f)
+        assert "email" not in conf_dict
+
+
+@pytest.mark.parametrize(
+    ("is_privileged", "mu_flag"),
+    [
+        # All variations that configures a multi-user (id-mapping) EP
+        [True, True],
+        [False, True],
+        [True, None],
+    ],
+)
+def test_multi_user_errors_without_email(
+    run_line, gc_dir, make_endpoint_dir, is_privileged, mu_flag
+):
+    configure_arg = f" --multi-user {mu_flag}" if mu_flag is not None else ""
+
+    with mock.patch(f"{_MOCK_BASE}is_privileged", return_value=is_privileged):
+        res = run_line(f"configure ep_name {configure_arg}", assert_exit_code=1)
+    assert "Email must be specified" in res.stderr, "Expect error message"
+
+
+def test_email_in_config_after_configure(
+    run_line, gc_dir, make_endpoint_dir, randomstring
+):
+    conf = gc_dir / "some_ep" / "config.yaml"
+
+    email = randomstring()
+
+    run_line(f"configure some_ep --contact-email {email}")
+    with open(conf) as f:
+        conf_dict = yaml.safe_load(f)
+
+    assert conf_dict["email"] == email
+
+
+def test_start_ep_config_missing_email_not_privileged_ok(
+    mocker, run_line, mock_command_ensure, make_endpoint_dir, ep_name
+):
+    conf = make_endpoint_dir() / "config.yaml"
+
+    conf.write_text("display_name:\n  foo")
+
+    mocker.patch(f"{_MOCK_BASE}_start_endpoint_manager")
+
+    with mock.patch(f"{_MOCK_BASE}is_privileged", return_value=False):
+        res = run_line(f"start {ep_name}")
+    assert f"require a contact email" not in res.stderr
+
+
+def test_start_ep_config_missing_email_error_privileged(
+    run_line, mock_command_ensure, make_endpoint_dir, ep_name
+):
+    conf = make_endpoint_dir() / "config.yaml"
+
+    conf.write_text("display_name:\n  foo")
+
+    with mock.patch(f"{_MOCK_BASE}is_privileged", return_value=True):
+        res = run_line(f"start {ep_name}", assert_exit_code=1)
+    assert f"Multi-user endpoints require a contact email" in res.stderr
 
 
 @pytest.mark.parametrize(
@@ -905,7 +986,7 @@ def test_configure_ep_public_visible_by_default(
 
     mu_arg_str = f" --multi-user {mu_arg}" if mu_arg is not None else ""
     with mock.patch(f"{_MOCK_BASE}is_privileged", return_value=is_privileged):
-        run_line(f"configure {mu_arg_str} {ep_name}")
+        run_line(f"configure --contact-email a@xyz.com {mu_arg_str} {ep_name}")
 
     with open(conf) as f:
         conf_dict = yaml.safe_load(f)
@@ -968,7 +1049,7 @@ def test_configure_ep_config_options(
 ):
     gc_dir.mkdir(parents=True, exist_ok=True)
 
-    cmd = f"configure {randomstring()}"
+    cmd = f"configure --contact-email a@xyz.com {randomstring()}"
     if manager_config:
         manager_config = gc_dir / manager_config
         manager_config.touch()
