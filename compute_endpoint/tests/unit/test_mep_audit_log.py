@@ -3,6 +3,7 @@ import io
 import json
 import logging
 import os
+import pathlib
 import textwrap
 import threading
 from unittest import mock
@@ -92,7 +93,7 @@ def reg_info(ep_uuid):
 
 
 @pytest.fixture
-def mock_os():
+def mock_os_log():
     with mock.patch(f"{_MOCK_BASE}os") as m:
         m.O_DIRECT = os.O_DIRECT
         m.fork.return_value = 0
@@ -106,7 +107,13 @@ def mock_os():
         m.dup2.side_effect = (0, 1, 2, AssertionError("dup2: unexpected?"))
         m.open.side_effect = (4, 5, AssertionError("open: unexpected?"))
 
-        with mock.patch.object(fcntl, "fcntl", return_value=8192):
+        with (
+            mock.patch.object(fcntl, "fcntl", return_value=8192),
+            mock.patch(
+                f"{_MOCK_BASE}ensure_log_path",
+                side_effect=lambda: pathlib.Path("/a/b/some_endpoint_name"),
+            ),
+        ):
             yield m
 
 
@@ -186,7 +193,7 @@ def test_audit_log_shutsdown_on_write_error(
 
 
 def test_audit_log_shutsdown_on_general_error(
-    tmp_path, ep_uuid, conf, reg_info, mock_os, randomstring
+    tmp_path, ep_uuid, conf, reg_info, mock_os_log, randomstring
 ):
     em = EndpointManager(tmp_path, ep_uuid, conf, reg_info)
 
@@ -199,13 +206,13 @@ def test_audit_log_shutsdown_on_general_error(
 
 
 def test_audit_log_pipe_hookup(
-    mock_log, tmp_path, ep_uuid, conf, reg_info, mock_os, mock_close_fds
+    mock_log, tmp_path, ep_uuid, conf, reg_info, mock_os_log, mock_close_fds
 ):
     em = EndpointManager(tmp_path, ep_uuid, conf, reg_info)
 
     m = mock.Mock()
-    mock_os.fdopen.return_value.__enter__.return_value = m
-    mock_os.pipe2.side_effect = os.pipe2  # need actual pipes ...
+    mock_os_log.fdopen.return_value.__enter__.return_value = m
+    mock_os_log.pipe2.side_effect = os.pipe2  # need actual pipes ...
 
     mpi = MappedPosixIdentity(em._mu_user, [], ep_uuid)
     kwargs = {

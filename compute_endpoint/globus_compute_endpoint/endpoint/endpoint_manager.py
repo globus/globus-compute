@@ -56,9 +56,10 @@ from globus_compute_endpoint.endpoint.utils import (
     update_url_port,
 )
 from globus_compute_endpoint.exceptions import MessageSystemExit
+from globus_compute_endpoint.logging_config import ensure_log_path
 from globus_compute_sdk import Client
 from globus_compute_sdk.sdk.auth.auth_client import ComputeAuthClient
-from globus_compute_sdk.sdk.compute_dir import ensure_compute_dir
+from globus_compute_sdk.sdk.compute_dir import COMPUTE_EP_DIR_ENV, ensure_compute_dir
 from packaging.version import Version
 from pydantic import BaseModel, ConfigDict
 
@@ -1056,7 +1057,11 @@ class EndpointManager:
             preexec_name = "UserEndpointProcess_Bootstrap(PreExec)"
             current_process().name = preexec_name
 
-            from globus_compute_endpoint.logging_config import LOG_TS_FMT, setup_logging
+            from globus_compute_endpoint.logging_config import (
+                LOG_PATH_ENV,
+                LOG_TS_FMT,
+                setup_logging,
+            )
 
             # We've closed all files (beyond std*), so log.* calls are not able to
             # access the parent's logs directly.  Now rely on stderr (not yet separated)
@@ -1145,6 +1150,7 @@ class EndpointManager:
             env.setdefault("HOME", udir)
             env.setdefault("USER", uname)
             env.setdefault("PATH", upath)
+            env.setdefault("GLOBUS_COMPUTE_ENDPOINT_NAME", ep_name)
 
             umask = 0o077  # Let child process set less restrictive, if desired
             log.debug("Setting process umask for %s to 0o%04o (%s)", pid, umask, uname)
@@ -1199,13 +1205,32 @@ class EndpointManager:
             startup_proc_title = f"Endpoint starting up for {uname} [{args_title}]"
             setproctitle.setproctitle(startup_proc_title)
 
-            gc_dir: pathlib.Path = ensure_compute_dir()
-            ep_dir = gc_dir / ep_name
-            ep_dir.mkdir(mode=0o700, parents=True, exist_ok=True)
-            ep_log = ep_dir / "endpoint.log"
-
             exit_code += 1
             _conf = yaml.safe_load(user_config)
+
+            ep_dir = ensure_compute_dir() / ep_name
+
+            # This sets two environment vars from paths:
+            # paths.endpoint_dir  --> GLOBUS_COMPUTE_ENDPOINT_DIR
+            # paths.endpoint_log  --> GLOBUS_COMPUTE_LOG_PATH
+            # Note that we allow env var expansion of values from Jinja for both
+            # log_path and ep_dir (e.g., "~/gc-$USER/a.log" -> "/home/foo/gc-foo/a.log"
+            if custom_ep_dir_str := _conf.get("paths", {}).get("endpoint_dir"):
+                log.info(f"Setting endpoint directory to {custom_ep_dir_str}")
+                ep_dir = pathlib.Path(
+                    os.path.expandvars(custom_ep_dir_str)
+                ).expanduser()
+            if log_path_str := _conf.get("paths", {}).get("endpoint_log"):
+                log_path = pathlib.Path(os.path.expandvars(log_path_str)).expanduser()
+                env[LOG_PATH_ENV] = str(log_path.resolve())
+
+            ep_dir.mkdir(mode=0o700, parents=True, exist_ok=True)
+            env[COMPUTE_EP_DIR_ENV] = str(ep_dir.resolve())
+
+            # Use the environment value set from default or customized log path
+            ep_log = ensure_log_path()
+            # Set the log path env in case log_path was constructed from ep_dir
+            env[LOG_PATH_ENV] = str(ep_log.resolve())
 
             _ha_key = "high_assurance"
             if _ha_key in _conf:
