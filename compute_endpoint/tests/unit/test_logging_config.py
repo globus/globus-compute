@@ -12,7 +12,7 @@ from globus_compute_endpoint.logging_config import (
     ensure_paths,
     setup_logging,
 )
-from globus_compute_sdk.sdk.compute_dir import COMPUTE_EP_DIR_ENV
+from globus_compute_sdk.sdk.compute_dir import COMPUTE_EP_DIR_ENV, ensure_compute_dir
 from pytest_mock import MockFixture
 
 _MOCK_BASE = "globus_compute_endpoint.logging_config."
@@ -24,6 +24,15 @@ def anon_pipe():
     yield read, write
     os.close(write)
     os.close(read)
+
+
+MOCK_COMPUTE = pathlib.Path("/tmp/.gc")
+
+
+@pytest.fixture
+def mock_ensure_compute():
+    with mock.patch(f"{_MOCK_BASE}ensure_compute_dir", return_value=MOCK_COMPUTE) as m:
+        yield m
 
 
 def test_verify_setup_logging_test_hookups_metatest(mocker):
@@ -94,11 +103,20 @@ def test_include_correct_loggers(logfile: t.Optional[str], mocker: MockFixture, 
     assert set(loggers) == expected, "Time to update this test?"
 
 
-def test_ensure_paths_no_default_error():
-    with mock.patch.dict(os.environ, {"random_env": "value"}):
-        with pytest.raises(ValueError) as actual_exc_msg:
-            ensure_paths("")
-        assert f"Endpoint name must be provided" in str(actual_exc_msg)
+@pytest.mark.parametrize("ep_dir_env", ("/path/to/ep_dir", None))
+def test_ensure_paths_no_name_provided(fs, mock_ensure_compute, ep_dir_env):
+    env_dict = {"random_env": "value"}
+    if ep_dir_env:
+        env_dict[COMPUTE_EP_DIR_ENV] = ep_dir_env
+
+    with mock.patch.dict(os.environ, env_dict):
+        if ep_dir_env:
+            # If the environment variable is set, ep_name is not required
+            assert f"{ep_dir_env}/endpoint.log" == str(ensure_paths("").resolve())
+        else:
+            with pytest.raises(ValueError) as actual_exc_msg:
+                ensure_paths("")
+            assert f"Endpoint name must be provided" in str(actual_exc_msg)
 
 
 @pytest.mark.parametrize(
@@ -163,39 +181,7 @@ def test_ensure_paths_ep_dir_not_file(fs, is_file, exc_msg):
 
 
 @pytest.mark.parametrize(
-    ("ep_env", "log_env", "expected_path_str"),
-    (
-        (None, "/a/b/c.txt", "/a/b/c.txt"),
-        ("/a/b/c", None, "/a/b/c/endpoint.log"),
-        ("/a/b/c", "/d/e/f.txt", "/d/e/f.txt"),
-    ),
-)
-def test_ensure_paths_env_order(fs, ep_env, log_env, expected_path_str):
-    expected_path = pathlib.Path(expected_path_str)
-
-    with mock.patch.dict(
-        os.environ,
-        {
-            "HOME": "/home/foo",
-            COMPUTE_EP_DIR_ENV: ep_env or "",
-            LOG_PATH_ENV: log_env or "",
-        },
-    ):
-        mock.patch(f"{_MOCK_BASE}ensure_compute_dir", return_value="/tmp/.gc")
-        paths_arg = {}
-        if ep_env:
-            paths_arg[COMPUTE_EP_DIR_ENV] = ep_env
-        if log_env:
-            paths_arg[LOG_PATH_ENV] = log_env
-
-        result_path = ensure_paths("xyz", paths_arg)
-        assert result_path == expected_path
-        assert expected_path.parent.exists()
-        assert expected_path.parent.is_dir()
-
-
-@pytest.mark.parametrize(
-    ("ep_name", "ep_env", "log_env", "exp_ep", "exp_log"),
+    ("ep_name", "ep_config", "log_config", "exp_ep", "exp_log"),
     (
         (
             "ep1",
@@ -207,26 +193,86 @@ def test_ensure_paths_env_order(fs, ep_env, log_env, expected_path_str):
         (
             "ep1",
             None,
-            "$HOME/a.b",
+            "~/$USER/a.log",
             "/home/foo/.globus_compute/ep1",
-            "/home/foo/a.b",
+            "/home/foo/bar/a.log",
+        ),
+        (
+            "ep1",
+            None,
+            None,
+            "/home/foo/.globus_compute/ep1",
+            "/home/foo/.globus_compute/ep1/endpoint.log",
         ),
     ),
 )
-@pytest.mark.skip("TODO FIX BEFORE PR SUBMISSION")
-def test_ensure_paths_set_expand_envs(fs, ep_name, ep_env, log_env, exp_ep, exp_log):
+def test_ensure_paths_expand_set(fs, ep_name, ep_config, log_config, exp_ep, exp_log):
     paths = {}
-    env_dict = {"HOME": "/home/foo", "USER": "bar"}
-    if ep_env:
-        paths["endpoint_dir"] = ep_env
-        env_dict[COMPUTE_EP_DIR_ENV] = ep_env
-    if log_env:
-        paths["endpoint_log"] = log_env
-        env_dict[LOG_PATH_ENV] = log_env
+    home = "/home/foo"
+    env_dict = {"HOME": home, "USER": "bar"}
+    if ep_config:
+        paths["endpoint_dir"] = ep_config
+        env_dict[COMPUTE_EP_DIR_ENV] = ep_config
+    if log_config:
+        paths["endpoint_log"] = log_config
+        env_dict[LOG_PATH_ENV] = log_config
 
     with mock.patch.dict(os.environ, env_dict):
         path_result = ensure_paths(ep_name, paths)
         assert str(path_result.resolve()) == exp_log
-        if ep_env:
+        if ep_config:
             assert os.environ[COMPUTE_EP_DIR_ENV] == exp_ep
+        else:
+            assert os.environ[COMPUTE_EP_DIR_ENV] == f"{home}/.globus_compute/{ep_name}"
         assert os.environ[LOG_PATH_ENV] == exp_log
+
+
+@pytest.mark.parametrize(
+    ("ep_env", "log_env", "ep_config", "log_config", "exp_ep", "exp_log"),
+    (
+        [
+            "/a/env_ep_dir",
+            "/x/env_file.log",
+            "/b/config_ep_dir",
+            "/y/log_file.log",
+            "/b/config_ep_dir",
+            "/y/log_file.log",
+        ],
+        [
+            None,
+            "/x/env_file.log",
+            "/b/config_ep_dir",
+            None,
+            "/b/config_ep_dir",
+            "/x/env_file.log",
+        ],
+    ),
+)
+def test_ensure_paths_config_overrides_env(
+    fs, ep_env, log_env, ep_config, log_config, exp_ep, exp_log
+):
+    paths = {}
+    env_dict = {"HOME": "/home/foo", "USER": "bar"}
+    if ep_env:
+        env_dict[COMPUTE_EP_DIR_ENV] = ep_env
+    if log_env:
+        env_dict[LOG_PATH_ENV] = log_env
+    if ep_config:
+        paths["endpoint_dir"] = ep_config
+    if log_config:
+        paths["endpoint_log"] = log_config
+
+    with mock.patch.dict(os.environ, env_dict):
+        log_result = str(ensure_paths(ep_env, paths).resolve())
+        assert log_result == exp_log
+        assert os.environ[COMPUTE_EP_DIR_ENV] == exp_ep
+
+
+def test_ensure_paths_default_uses_name_and_compute_dir(fs, mock_ensure_compute):
+    ep_name = "ep1"
+    expected_log_path = MOCK_COMPUTE / ep_name / "endpoint.log"
+    with mock.patch.dict(os.environ, {"HOME": "/home/foo"}):
+        log_result_path = ensure_paths(ep_name)
+        # Have to use str(..resolve()) as (expected_log_path == log_result_path) == False
+        assert str(expected_log_path.resolve()) == str(log_result_path.resolve())
+        assert str(expected_log_path.parent.resolve()) == os.environ[COMPUTE_EP_DIR_ENV]

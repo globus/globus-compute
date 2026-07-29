@@ -296,21 +296,18 @@ def ensure_paths(ep_name: str, custom_paths: dict | None = None) -> pathlib.Path
     log_path_str = os.environ.get(LOG_PATH_ENV, "")
 
     # Customized values from jinja user config
-    custom_ep_str = custom_paths.get("endpoint_log", "") if custom_paths else ""
-    custom_log_str = custom_paths.get("endpoint_dir", "") if custom_paths else ""
+    custom_ep_str = custom_paths.get("endpoint_dir", "") if custom_paths else ""
+    custom_log_str = custom_paths.get("endpoint_log", "") if custom_paths else ""
 
     # Possibly override ENV values with custom configs
     if custom_ep_str:
         ep_dir_str = custom_ep_str
-        print(f"ep_dir_str custom override to {ep_dir_str}")
-    else:
-        print(f"ep_dir_str DEFAULT {ep_dir_str}")
 
     if custom_log_str:
+        print(f"overriding with {custom_log_str=}")
         log_path_str = custom_log_str
-        print(f"log_dir_str custom override to {log_path_str}")
     else:
-        print(f"log_dir_str DEFAULT {log_path_str}")
+        print(f"Not overriding {log_path_str=}")
 
     # Use ep_name if nothing else is set
     if not ep_dir_str:
@@ -321,6 +318,7 @@ def ensure_paths(ep_name: str, custom_paths: dict | None = None) -> pathlib.Path
     ep_dir = pathlib.Path(os.path.expandvars(ep_dir_str)).expanduser()
     if ep_dir.is_file():
         raise ValueError(f"{COMPUTE_EP_DIR_ENV} can not be an existing file: {ep_dir}")
+    logger.info(f"Endpoint directory for {ep_name} set to {ep_dir}")
 
     # Now update the ep_dir ENV with the final value
     # Parent directory (default -> ~/.globus_compute) might have already
@@ -332,6 +330,8 @@ def ensure_paths(ep_name: str, custom_paths: dict | None = None) -> pathlib.Path
         log_path = pathlib.Path(os.path.expandvars(log_path_str)).expanduser()
         if log_path.is_dir():
             raise ValueError(f"{LOG_PATH_ENV} can not be a directory: {log_path}")
+        else:
+            print(f"Final {log_path=}")
     else:
         log_path = ep_dir / "endpoint.log"
 

@@ -1209,39 +1209,8 @@ class EndpointManager:
             exit_code += 1
             _conf = yaml.safe_load(user_config)
 
-            # Set EP dir to the default
-            ep_dir = ensure_compute_dir() / ep_name
-            env[COMPUTE_EP_DIR_ENV] = str(ep_dir.resolve())
-
-            # Check if the user specified custom paths
-            ep_log = ensure_paths(_conf.get("paths"))
-            # Set the log path env in case log_path was constructed from ep_dir
-            env[LOG_PATH_ENV] = str(ep_log.resolve())
-            log.info(f"Setting endpoint log to {env[LOG_PATH_ENV]}")
-
-            # This sets two environment vars from paths:
-            # paths.endpoint_dir  --> GLOBUS_COMPUTE_ENDPOINT_DIR
-            # paths.endpoint_log  --> GLOBUS_COMPUTE_LOG_PATH
-            # Note that we allow env var expansion of values from Jinja for both
-            # log_path and ep_dir (e.g., "~/gc-$USER/a.log" -> "/home/foo/gc-foo/a.log"
-
-            if custom_ep_dir_str := _conf.get("paths", {}).get("endpoint_dir"):
-                ep_dir = pathlib.Path(
-                    os.path.expandvars(custom_ep_dir_str)
-                ).expanduser()
-            if log_path_str := _conf.get("paths", {}).get("endpoint_log"):
-                log_path = pathlib.Path(os.path.expandvars(log_path_str)).expanduser()
-                env[LOG_PATH_ENV] = str(log_path.resolve())
-
-            ep_dir.mkdir(mode=0o700, parents=True, exist_ok=True)
-            env[COMPUTE_EP_DIR_ENV] = str(ep_dir.resolve())
-            log.info(f"Setting endpoint directory to {env[COMPUTE_EP_DIR_ENV]}")
-
-            # Use the environment value set from default or customized log path
-            ep_log = ensure_paths(_conf.get("paths"))
-            # Set the log path env in case log_path was constructed from ep_dir
-            env[LOG_PATH_ENV] = str(ep_log.resolve())
-            log.info(f"Setting endpoint log to {env[LOG_PATH_ENV]}")
+            # ensure_paths ensures the EP dir is created and returns the log path
+            ep_log = ensure_paths(ep_name, _conf.get("paths"))
 
             _ha_key = "high_assurance"
             if _ha_key in _conf:
