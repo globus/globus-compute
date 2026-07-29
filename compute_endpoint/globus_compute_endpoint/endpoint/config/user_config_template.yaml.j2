@@ -25,6 +25,76 @@
 # There are a number of example configurations available in the documentation:
 #    https://globus-compute.readthedocs.io/en/stable/endpoints.html#example-configurations
 
+{# to skip user-defined requirements/worker_init, comment this out or set to false.
+   if so, suggest also removing requirements/worker_init from user_config_schema.json. #}
+{%- set _arbitrary_user_interaction = true %}
+
+{%- set _rt = _GC.user_runtime %}
+{%- set py_ver =
+  (_rt.python.version_tuple | join("."))
+  if _rt.python is defined and _rt.python.version_tuple is defined
+  else none
+%}
+{%- set sdk_ver =
+  (_rt.globus_compute_sdk_version[1:-1])
+  if _rt.globus_compute_sdk_version is defined
+  else none
+%}
+{%- set requirements = requirements | default(none) %}
+{%- set env_name = [
+    ("py" ~ py_ver) if py_ver else none,
+    ("sdk" ~ sdk_ver) if sdk_ver else none,
+    ("reqs$(echo -e " ~ requirements ~ " | md5sum | awk '{print $1}')") if requirements else none,
+  ] | select | join("-") or none
+%}
+
+{%- set default_worker_init %}
+  {%- if env_name is not none %}
+# The environment initialization script creates (or reuses) a per-task Python
+# virtual environment with `uv`, matched to the submitting user's Python and
+# Globus Compute SDK versions.  If the user supplies a `requirements` option --
+# a requirements.txt file as a multi-line string -- those packages are installed
+# into the environment as well.
+
+export PATH="$HOME/.local/bin:$PATH"
+if ! command -v uv &> /dev/null; then
+  echo "uv command not found; installing from https://astral.sh/uv ..."
+  curl -LsSf https://astral.sh/uv/install.sh | sh
+fi
+
+# Enable some useful performance tuning and debugging options.  See
+# https://docs.astral.sh/uv/reference/environment/ for details.
+export UV_LINK_MODE=hardlink
+export UV_COMPILE_BYTECODE=1
+export UV_TORCH_BACKEND=auto
+
+# Dependency Cooldown (recommended):
+# Uncomment to prevent `uv` from installing packages published within a
+# certain timeframe, giving maintainers time to fix a compromised release.
+# See https://docs.astral.sh/uv/reference/cli/#uv-run--exclude-newer
+# export UV_EXCLUDE_NEWER="1 week"
+
+# Create the environment, if necessary, and activate it.
+ENV_PATH="$HOME/.globus_compute/venvs/{{ env_name }}"
+uv venv --allow-existing "$ENV_PATH"{% if py_ver %} --python {{ py_ver }}{% endif %}
+source "$ENV_PATH/bin/activate"
+
+# Install globus-compute-endpoint & user requirements, ignoring
+# dependency cooldowns for the former.
+UV_EXCLUDE_NEWER=false uv pip install globus-compute-endpoint{% if sdk_ver %}=={{ sdk_ver }}{% endif %}
+
+    {%- if _arbitrary_user_interaction and requirements %}
+# Install user requirements.
+uv pip install -r <(echo -e {{ requirements }})
+    {%- endif %} {# _arbitrary_user_interaction and requirements #}
+  {%- endif %} {# env_name is not none #}
+
+  {%- if _arbitrary_user_interaction and worker_init is defined %}
+# Run user-specified worker_init.
+eval '$(echo -e {{ worker_init }} )'
+  {%- endif %} {# _arbitrary_user_interaction and worker_init is defined #}
+{%- endset %} {# default_worker_init #}
+
 endpoint_setup: {{ endpoint_setup|default() }}
 
 engine:
@@ -38,7 +108,8 @@ engine:
     max_blocks: 1
     init_blocks: 1
 
-    worker_init: {{ worker_init|default() }}
+    worker_init: |
+      {{ default_worker_init | default("") | indent(6) }}
 
 # Endpoints will be restarted when a user submits new tasks to the
 # web-services, so eagerly shut down if endpoint is idle.  At 30s/hb (default
