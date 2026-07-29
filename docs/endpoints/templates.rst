@@ -13,6 +13,76 @@ which focuses on the unique features and peculiarities of Globus Compute
 configuration templates.
 
 
+.. _dynamic-uep-environments:
+
+Task-time Python Environments
+=============================
+
+Globus Compute ships functions and their arguments between the SDK and the
+endpoint as serialized bytes, and the underlying libraries make no
+compatibility guarantees across Python or SDK versions.  A mismatch between the
+submitting client's environment and the endpoint's environment can therefore
+surface as :ref:`deserialization errors, lost workers, or even incorrect
+results <avoiding-serde-errors>`.  Administrators cannot reasonably dictate the
+Python and SDK versions of every user who submits to their endpoint |nbsp| ---
+|nbsp| especially on a :doc:`multi-user <multi_user>` endpoint |nbsp| --- |nbsp|
+so, rather than ask users to match the endpoint, the endpoint builds an
+environment to match each user.
+
+The template that ``globus-compute-endpoint configure`` writes for a new
+endpoint includes a default ``worker_init`` that builds the user endpoint
+process' Python environment at task-submission time.  This script:
+
+#. ensures `uv`_ is available, installing it to ``~/.local/bin`` if necessary;
+#. creates (or reuses) a virtual environment under
+   ``~/.globus_compute/venvs/``, named after the submitting user's Python
+   version and SDK version, so distinct runtimes get distinct |nbsp| --- |nbsp|
+   but individually reusable |nbsp| --- |nbsp| environments;
+#. installs ``globus-compute-endpoint`` into that environment, pinned to the
+   submitting client's SDK version; and
+#. runs any additional user-specified ``worker_init`` commands.
+
+The Python and SDK versions come from the :ref:`reserved
+<reserved-template-variables>` ``_GC.user_runtime`` variable.  When either is
+unavailable, the template omits it from the environment name and falls back to
+``uv``'s defaults; if neither is available, the environment is simply named
+``default``.
+
+The template also accepts an optional ``requirements`` variable |nbsp| ---
+|nbsp| a ``requirements.txt`` file supplied as a multi-line string |nbsp| ---
+|nbsp| so that users can request task-specific Python packages.  When this
+variable is included, a hash of the requested requirements is appended to the
+environment name (so that each distinct set of packages gets its own reusable
+environment), and the requested packages are installed after ``globus-compute-endpoint``.
+
+A user requests packages by passing ``requirements`` alongside any other
+configuration variables:
+
+.. code-block:: python
+
+   from globus_compute_sdk import Executor
+
+   with Executor(
+       endpoint_id="...",
+       user_endpoint_config={
+           "requirements": "numpy==2.1.0\nscikit-learn\nrequests>=2.32",
+       },
+   ) as ex:
+       fut = ex.submit(my_function)
+       print(fut.result())
+
+.. tip::
+
+   Because the common user does not pin or lock their dependencies, consider
+   enabling a dependency *cooldown* to guard against freshly-published,
+   potentially-compromised releases.  The default template includes a
+   commented-out ``UV_EXCLUDE_NEWER`` export for this purpose.  For background,
+   see `this write-up on dependency cooldowns`__.
+
+   .. __: https://blog.yossarian.net/2025/11/21/We-should-all-be-using-dependency-cooldowns
+
+
+
 .. _testing-templates:
 
 Testing Templates
@@ -278,4 +348,8 @@ rendered in user space, the administrator must:
    {% endif %}
 
 
+.. |nbsp| unicode:: 0xA0
+   :trim:
+
 .. _Jinja template: https://jinja.palletsprojects.com/en/3.1.x/
+.. _uv: https://docs.astral.sh/uv/
