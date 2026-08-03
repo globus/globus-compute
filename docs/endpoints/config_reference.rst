@@ -170,7 +170,7 @@ in the ``user_config_template.yaml.j2`` Jinja2 template:
   home directory.
 
 - The ``endpoint_log`` example collates all endpoint logs for a particular user
-  to the same user-specific ``user_endpoints.log`` in ``/tmp/<username>`, instead
+  to the same user-specific ``user_endpoints.log`` in ``/tmp/<username>``, instead
   of ``endpoint.log`` in each UEP's directory.
 
 - In the case of ``endpoint_log``, the custom value can be any path that the
