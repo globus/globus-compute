@@ -163,22 +163,22 @@ in the ``user_config_template.yaml.j2`` Jinja2 template:
    engine:
      ...
 
-For more information on the reserved ``_GC`` template variables used above,
-see :ref:`reserved-template-variables`.
+- The example above use the reserved :ref:`_GC template variables <reserved-template-variables>`
+  to colocate all UEP directories.  The custom value collects them all in
+  ``/scratch/compute/<username>/uep.<UUID>.<UUID>`` instead of the default
+  ``/home/<username>/.globus_compute/uep.<UUID>.<UUID>`` within each user's
+  home directory.
 
-In the above example, all endpoint logs for a particular user are appended to the
-same user_endpoints.log in ``/tmp/<username>``, instead of ``endpoint.log` in
-each UEP's directory.
+- The ``endpoint_log`` example collates all endpoint logs for a particular user
+  to the same user-specific ``user_endpoints.log`` in ``/tmp/<username>`, instead
+  of ``endpoint.log`` in each UEP's directory.
 
-The individual user endpoint directories, are also customized above to be created in
-``/scratch/compute/<username>/UEP.<UUID>.<UUID>`` instead of the default
-(``/home/<username>/.globus_compute/UEP.<UUID>.<UUID>``)
+- In the case of ``endpoint_log``, the custom value can be any path that the
+  user identity has write access to, including named pipes.
 
-In the case of ``endpoint_log``, the custom value can be any path that the
-user identity has write access to, including named pipes.
+- See :ref:`user-environment-yaml` for more information about customizing environment
+  variables available to the UEP.:w
 
-See :ref:`user-environment-yaml` for more information about customizing environment
-variables available to the UEP.
 
 
 Retries
