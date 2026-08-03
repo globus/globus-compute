@@ -215,7 +215,7 @@ Three additional environment variables are automatically injected into the UEP
 process as part of the endpoint lifecycle:
 
 * ``GLOBUS_COMPUTE_ENDPOINT_NAME`` The name of the user endpoint.  For identity
-  mapping endpoints, this is auto generated in the format UEP.<CEP_UUID>.<UEP_UUID>.
+  mapping endpoints, this is auto generated in the format ``uep.<CEP_UUID>.<UEP_UUID>``.
   For non identity mapping (single-user) endpoints, this will be the endpoint name
   specified when doing the initial configure e.g. ``gce configure my_custom_ep_name``.
 * ``GLOBUS_COMPUTE_ENDPOINT_DIR`` - The path of the directory where UEP logs and
@@ -226,8 +226,8 @@ process as part of the endpoint lifecycle:
   the expanded, resolved path customizable by ``paths: endpoint_log``, default
   ``$GLOBUS_COMPUTE_ENDPOINT_DIR/endpoint.log``
 
-If :ref:`user_runtime <reserved-template-variables>` is set (automatic if submitting
-tasks via the Globus Compute SDK):
+Additionally, if :ref:`user_runtime <reserved-template-variables>` is set (automatic
+if submitting tasks via the Globus Compute SDK):
 
 * ``GC_USER_PYTHON_VERSION`` and ``GC_USER_SDK_VERSION`` as described in
   :ref:`Advanced Environment Customization <manager_export_env>`
