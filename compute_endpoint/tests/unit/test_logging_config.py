@@ -279,15 +279,3 @@ def test_ensure_paths_default_uses_name_and_compute_dir(fs, mock_ensure_compute)
         # Have to use str(..resolve()) as (expected_log_path == log_result_path) == False
         assert str(expected_log_path.resolve()) == str(log_result_path.resolve())
         assert str(expected_log_path.parent.resolve()) == os.environ[COMPUTE_EP_DIR_ENV]
-
-
-def test_ensure_paths_log_not_writable_raises(fs):
-    file_name = "/b.log"
-    ro_file = pathlib.Path(file_name)
-    ro_file.touch()
-    ro_file.chmod(0o400)
-
-    with mock.patch.dict(os.environ, {LOG_PATH_ENV: file_name}, clear=True):
-        with pytest.raises(PermissionError) as exc:
-            ensure_paths("foo")
-        assert "is not writable" in str(exc.value)

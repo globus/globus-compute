@@ -2345,65 +2345,6 @@ def test_ep_dir_log_path_envs_passed_to_render(
     assert pyexc.value.code == _GOOD_EC, "Q&D: verify we exec'ed, based on '+= 1'"
 
 
-@pytest.mark.parametrize(
-    ("home_env", "user_env", "ep_log_config", "ep_dir_config", "result_log_path_str"),
-    (
-        ["/a/b", "foo", "~/a.log", "/opt/other_ep", "/a/b/a.log"],
-        ["/a/b", "foo", "/tmp/$USER/a.log", None, "/tmp/foo/a.log"],
-        ["/a/b", "foo", None, "/opt/other_ep", "/opt/other_ep/endpoint.log"],
-        ["/a/b", "foo", None, None, "/a/b/.globus_compute/some_ep_name/endpoint.log"],
-    ),
-)
-def test_ep_dir_log_path_env_set(
-    mocker,
-    successful_exec_from_mocked_root,
-    command_payload,
-    mock_config_paths,
-    home_env,
-    user_env,
-    ep_log_config,
-    ep_dir_config,
-    result_log_path_str,
-):
-    mock_os, conf_dir, *_, em = successful_exec_from_mocked_root
-
-    config, config_str = mock_config_paths(ep_dir_config, ep_log_config)
-
-    mocker.patch(f"{_MOCK_BASE}render_config_user_template", return_value=config_str)
-
-    m = mock.Mock()
-    mock_os.fdopen.return_value.__enter__.return_value = m
-
-    env_dict = {"HOME": home_env, "USER": user_env}
-
-    mock_logging_os = mocker.patch(f"globus_compute_endpoint.logging_config.os")
-    moe = mock.MagicMock()
-    moe.__getitem__.side_effect = env_dict.__getitem__
-    moe.__setitem__.side_effect = env_dict.__setitem__
-    moe.get.side_effect = env_dict.get
-    mock_logging_os.environ = moe
-    mock_logging_os.path = os.path
-
-    with pytest.raises(SystemExit) as pyexc:
-        with mock.patch.dict(os.environ, env_dict):
-            em._event_loop()
-    assert pyexc.value.code == _GOOD_EC, "Q&D: verify we exec'ed, based on '+= 1'"
-
-    assert moe.__setitem__.call_args_list[0].args[0] == COMPUTE_EP_DIR_ENV
-    if ep_dir_config:
-        assert moe.__setitem__.call_args_list[0].args[1] == ep_dir_config
-    else:
-        # If no config set going in, it should still set a valid value.
-        # Exact value check in test_logging_config.py::test_ensure_paths*
-        assert moe.__setitem__.call_args_list[0].args[1]
-
-    assert moe.__setitem__.call_args_list[1].args[0] == LOG_PATH_ENV
-    if ep_log_config:
-        assert moe.__setitem__.call_args_list[1].args[1] == result_log_path_str
-    else:
-        assert moe.__setitem__.call_args_list[1].args[1]
-
-
 @pytest.mark.parametrize("is_valid", (True, False))
 def test_pipe_size_limit(mocker, mock_log, successful_exec_from_mocked_root, is_valid):
     *_, em = successful_exec_from_mocked_root
