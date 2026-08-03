@@ -280,8 +280,20 @@ def setup_logging(
 
 def ensure_paths(ep_name: str | None, custom_paths: dict | None = None) -> pathlib.Path:
     """
-    Ensures that both the UEP directory and the UEP log path are present and valid,
-    possibly creating them, then returns the Path to the log file.
+    Use jinja2 user config values from paths.endpoint_dir and paths.endpoint_log
+    as the UEP directory and UEP log path respectively.
+
+    Ensures that both the directory and the log path are present and valid,
+    possibly creating parent directories as well, then returns the Path to the
+    log file.
+
+    If no custom config was provided, the endpoint directory is constructed
+    from ensure_compute_dir() and ep_name, with the log path default of
+    "$GLOBUS_COMPUTE_ENDPOINT_DIR/endpoint.log"
+
+    Note that this method expands user and env vars in the configuration
+    strings i.e. ~/abc, $HOME/abc -> /home/some_user/abc and updates the env
+    vars in place with the expanded values
 
     :param ep_name:      The name of the user endpoint.  The default UEP directory
                            is ~/.globus_compute/<ep_name> unless customized
@@ -297,15 +309,10 @@ def ensure_paths(ep_name: str | None, custom_paths: dict | None = None) -> pathl
     log_path_str = os.environ.get(LOG_PATH_ENV, "")
 
     # Customized values from jinja user config
-    custom_ep_str = custom_paths.get("endpoint_dir", "") if custom_paths else ""
-    custom_log_str = custom_paths.get("endpoint_log", "") if custom_paths else ""
-
+    custom_paths = custom_paths or {}
     # Possibly override ENV values with custom configs
-    if custom_ep_str:
-        ep_dir_str = custom_ep_str
-
-    if custom_log_str:
-        log_path_str = custom_log_str
+    ep_dir_str = custom_paths.get("endpoint_dir") or ep_dir_str
+    log_path_str = custom_paths.get("endpoint_log") or log_path_str
 
     # Use ep_name if nothing else is set
     if not ep_dir_str:
@@ -333,17 +340,12 @@ def ensure_paths(ep_name: str | None, custom_paths: dict | None = None) -> pathl
     else:
         log_path = ep_dir / "endpoint.log"
 
-    # Update the log path ENV with the final value
+    # Update the log path ENV with the final value and ensure parent is created
+    # Testing of the path's write access is left to the caller in endpoint_manager.py
     log_path_str = str(log_path.resolve())
     log_path.parent.mkdir(mode=0o700, parents=True, exist_ok=True)
-    try:
-        with open(log_path, "a"):
-            os.environ[LOG_PATH_ENV] = log_path_str
-            log.info(f"{LOG_PATH_ENV} has been set to {os.environ[LOG_PATH_ENV]}")
-            return log_path
-    except PermissionError as e:
-        msg = f"Endpoint log path {log_path_str} is not writable!\n{e}"
-        log.error(msg)
-        if sys.stderr.isatty():
-            print(msg, file=sys.stderr)
-        raise PermissionError(msg)
+
+    os.environ[LOG_PATH_ENV] = log_path_str
+    log.info(f"{LOG_PATH_ENV} has been set to {log_path_str}")
+
+    return log_path

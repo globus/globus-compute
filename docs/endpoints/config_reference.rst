@@ -157,19 +157,22 @@ in the ``user_config_template.yaml.j2`` Jinja2 template:
    :caption: ``~/.globus_compute/<endpoint_name>/user_config_template.yaml.j2``
 
    paths:
-     endpoint_dir: {{ _GC.env.HOME }}/compute/{{ _GC.env.GLOBUS_COMPUTE_ENDPOINT_NAME }}
+     endpoint_dir: /scratch/compute/{{ _GC.env.USER }}/{{ _GC.env.GLOBUS_COMPUTE_ENDPOINT_NAME }}
      endpoint_log: /tmp/{{ _GC.env.USER }}/user_endpoints.log
 
    engine:
      ...
 
-The example above uses the reserved ``_GC`` template variable as described at
-:ref:`reserved-template-variables`.
+For more information on the reserved ``_GC`` template variables used above,
+see :ref:`reserved-template-variables`.
 
-For non-identity-mapping(single-user) endpoints, ``_GC.env`` includes all variables
-from the parent process.  For identity mapping endpoints, ``_GC.env`` only contains
-a few select values such as ``HOME`` - the user's home directory e.g. ``/home/foobar``
-and ``USER`` - the user's username e.g. `$ whoami` -> ``foobar``
+In the above example, all endpoint logs for a particular user are appended to the
+same user_endpoints.log in ``/tmp/<username>``, instead of ``endpoint.log` in
+each UEP's directory.
+
+The individual user endpoint directories, are also customized above to be created in
+``/scratch/compute/<username>/UEP.<UUID>.<UUID>`` instead of the default
+(``/home/<username>/.globus_compute/UEP.<UUID>.<UUID>``)
 
 In the case of ``endpoint_log``, the custom value can be any path that the
 user identity has write access to, including named pipes.
