@@ -7,7 +7,7 @@ New Functionality
   for more details
 
 - For User Endpoints, the endpoint's base directory can be configured via the
-  optional ``paths: endpoint_dir`` parameter in ``user_config_config_template.yaml.j2``
+  optional ``paths: endpoint_dir`` parameter in ``user_config_template.yaml.j2``
 
   .. code-block:: yaml+jinja
 
@@ -21,7 +21,7 @@ New Functionality
   .. code-block:: yaml+jinja
 
      paths:
-       endpoint_log: /tmp/{{ _GC.env.USER }}/user_endpoints.log
+       endpoint_log: /var/log/{{ _GC.env.USER }}/user_endpoints.log
 
 For more information, please see :ref:`endpoint-paths`
 
