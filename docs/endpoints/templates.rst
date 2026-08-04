@@ -197,14 +197,17 @@ user or admin.  These are accessible from the Globus-Compute-supplied variable o
   submitting tasks.  (e.g., ``_GC.env.HOME``)
 
   - In identity-mapping (i.e., multi-user) Compute endpoints, user endpoints (UEPs)
-    will be initialized with the following environment variables:
+    will be initialized with a few select environment variables:
 
     - ``HOME`` - the user's home directory
     - ``USER`` - the username i.e. the result of ``whoami`` or ``id -un``
     - ``PATH`` - a limited set of default paths:  ``/usr/local/bin:/usr/bin:/bin:<Python3 executable's parent directory>``
-    - ``GLOBUS_COMPUTE_ENDPOINT_NAME`` - The default name of the endpoint directory, as assigned by the web service
+    - ``GLOBUS_COMPUTE_ENDPOINT_NAME``, ``GLOBUS_COMPUTE_ENDPOINT_DIR``,
+      ``GLOBUS_COMPUTE_LOG_PATH`` and others as described in :ref:`user-environment-yaml`
+
   - In non identity-mapping endpoints (i.e., "single user endpoints"), the UEP will
-    inherit all environment variables of the parent process.
+    inherit all environment variables of the parent process in addition to the newly
+    created Globus Compute entries.
 
 
 - ``_GC.user_runtime``: Contains information about the runtime environment of the
