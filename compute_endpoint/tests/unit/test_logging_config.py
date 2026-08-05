@@ -16,6 +16,7 @@ from globus_compute_sdk.sdk.compute_dir import COMPUTE_EP_DIR_ENV, ensure_comput
 from pytest_mock import MockFixture
 
 _MOCK_BASE = "globus_compute_endpoint.logging_config."
+_MOCK_GCC_DIR = "/tmp/.gc"
 
 
 @pytest.fixture
@@ -26,12 +27,11 @@ def anon_pipe():
     os.close(read)
 
 
-MOCK_COMPUTE = pathlib.Path("/tmp/.gc")
-
-
 @pytest.fixture
-def mock_ensure_compute():
-    with mock.patch(f"{_MOCK_BASE}ensure_compute_dir", return_value=MOCK_COMPUTE) as m:
+def mock_ensure_compute(fs):
+    with mock.patch(
+        f"{_MOCK_BASE}ensure_compute_dir", return_value=pathlib.Path(_MOCK_GCC_DIR)
+    ) as m:
         yield m
 
 
@@ -114,9 +114,9 @@ def test_ensure_paths_no_name_provided(fs, mock_ensure_compute, ep_dir_env):
             # If the environment variable is set, ep_name is not required
             assert f"{ep_dir_env}/endpoint.log" == str(ensure_paths("").resolve())
         else:
-            with pytest.raises(ValueError) as actual_exc_msg:
+            with pytest.raises(ValueError) as pyt_exc:
                 ensure_paths("")
-            assert f"Endpoint name must be provided" in str(actual_exc_msg)
+            assert f"Endpoint name must be provided" in str(pyt_exc.value)
 
 
 @pytest.mark.parametrize(
@@ -140,9 +140,9 @@ def test_ensure_path_log_path_not_dir(fs, is_dir, exc_msg):
 
     with mock.patch.dict(os.environ, {LOG_PATH_ENV: str(a_path.resolve())}):
         if exc_msg:
-            with pytest.raises(ValueError) as actual_exc_msg:
+            with pytest.raises(ValueError) as pyt_exc:
                 ensure_paths("ep1")
-            assert exc_msg in str(actual_exc_msg)
+            assert exc_msg in str(pyt_exc.value)
         else:
             # Should create the dir structure
             result_path = ensure_paths("ep1")
@@ -160,21 +160,20 @@ def test_ensure_path_log_path_not_dir(fs, is_dir, exc_msg):
 )
 def test_ensure_paths_ep_dir_not_file(fs, is_file, exc_msg):
     a_path = pathlib.Path("/a/b/c")
-    if is_file is None:
-        a_path.parent.mkdir(parents=True)
-    elif is_file:
-        a_path.parent.mkdir(parents=True)
+
+    a_path.parent.mkdir(parents=True)
+    if is_file:
         a_path.touch(exist_ok=True)
     else:
-        a_path.mkdir(parents=True)
+        a_path.mkdir()
 
     with mock.patch.dict(
         os.environ, {COMPUTE_EP_DIR_ENV: str(a_path.resolve())}, clear=True
     ):
         if exc_msg:
-            with pytest.raises(ValueError) as actual_exc_msg:
+            with pytest.raises(ValueError) as pyt_exc:
                 ensure_paths("ep1")
-            assert exc_msg in str(actual_exc_msg)
+            assert exc_msg in str(pyt_exc.value)
         else:
             # Should create the dir structure
             result_path = ensure_paths("ep1")
@@ -272,7 +271,7 @@ def test_ensure_paths_config_overrides_env(
 
 def test_ensure_paths_default_uses_name_and_compute_dir(fs, mock_ensure_compute):
     ep_name = "ep1"
-    expected_log_path = MOCK_COMPUTE / ep_name / "endpoint.log"
+    expected_log_path = pathlib.Path(_MOCK_GCC_DIR) / ep_name / "endpoint.log"
     with mock.patch.dict(os.environ, {"HOME": "/home/foo"}, clear=True):
         log_result_path = ensure_paths(ep_name)
         # Have to use str(..resolve()) as (expected_log_path == log_result_path) == False

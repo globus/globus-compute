@@ -38,8 +38,8 @@ in the form of ``uep.<ManagerEndpointUUID>.<Generated.UEP.UUID>``.
 
 As detailed in :ref:`config-dir`, ``$HOME/.globus_compute`` is the default base
 directory for all Globus Compute endpoints. Endpoint logs will be appended to
-the file ``endpoint.log`` in each UEP's sub-directory under the base, e.g.,
-``/home/<username>/.globus_compute/uep.<UUID>.<UUID>/endpoint.log``
+the file ``endpoint.log`` in each UEP's sub-directory under the base (e.g.,
+``/home/<username>/.globus_compute/uep.<UUID>.<UUID>/endpoint.log``).
 
 Both the UEP directory and the endpoint log destination can be set in the ``paths``
 configuration section, via ``endpoint_dir`` and ``endpoint_log`` respectively
