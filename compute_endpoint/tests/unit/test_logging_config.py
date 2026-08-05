@@ -1,4 +1,3 @@
-import json
 import logging.config
 import os
 import pathlib

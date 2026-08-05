@@ -12,7 +12,7 @@ New Functionality
   .. code-block:: yaml+jinja
 
      paths:
-       endpoint_dir: /opt/compute_dirs/custom_endpoint_dir
+       endpoint_dir: {{ _GC.env.HOME }}/gc_ueps/{{ _GC.env.GLOBUS_COMPUTE_ENDPOINT_NAME }}
 
 - The User Endpoint log path can also be customized via ``paths: endpoint_log``;
   if not specified, the default value is
