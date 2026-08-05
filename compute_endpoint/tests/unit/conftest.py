@@ -12,7 +12,6 @@ from globus_compute_endpoint.endpoint import endpoint
 from globus_compute_endpoint.endpoint.config import (
     PamConfiguration,
     PathConfiguration,
-    UserEndpointConfig,
 )
 from globus_compute_endpoint.engines import ThreadPoolEngine
 from globus_compute_endpoint.engines.helper import execute_task
