@@ -3,7 +3,6 @@ import io
 import json
 import logging
 import os
-import pathlib
 import textwrap
 import threading
 from unittest import mock
@@ -107,9 +106,7 @@ def mock_os():
         m.dup2.side_effect = (0, 1, 2, AssertionError("dup2: unexpected?"))
         m.open.side_effect = (4, 5, AssertionError("open: unexpected?"))
 
-        with (
-            mock.patch.object(fcntl, "fcntl", return_value=8192),
-        ):
+        with mock.patch.object(fcntl, "fcntl", return_value=8192):
             yield m
 
 
