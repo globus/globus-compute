@@ -55,7 +55,11 @@ from globus_compute_sdk import Client
 from globus_compute_sdk.sdk.auth.auth_client import ComputeAuthClient
 from globus_compute_sdk.sdk.auth.whoami import print_whoami_info
 from globus_compute_sdk.sdk.batch import create_user_runtime
-from globus_compute_sdk.sdk.compute_dir import ensure_compute_dir, get_compute_dir
+from globus_compute_sdk.sdk.compute_dir import (
+    COMPUTE_DIR_ENV,
+    ensure_compute_dir,
+    get_compute_dir,
+)
 from globus_compute_sdk.sdk.utils.gare import gare_handler
 from globus_sdk import MISSING, AuthClient, GlobusAPIError, MissingType, NetworkError
 
@@ -106,7 +110,7 @@ class CommandState:
 def config_dir_callback(ctx, param, value) -> pathlib.Path:
     try:
         if value:
-            os.environ["GLOBUS_COMPUTE_USER_DIR"] = value
+            os.environ[COMPUTE_DIR_ENV] = value
         return ensure_compute_dir()
     except (FileExistsError, PermissionError) as e:
         raise ClickException(str(e))
