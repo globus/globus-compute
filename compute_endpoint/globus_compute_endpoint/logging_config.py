@@ -321,7 +321,7 @@ def ensure_paths(ep_name: str | None, custom_paths: dict | None = None) -> pathl
         ep_dir_str = str((ensure_compute_dir() / ep_name).resolve())
 
     ep_dir = pathlib.Path(os.path.expandvars(ep_dir_str)).expanduser()
-    if ep_dir.exists() and ep_dir.is_file():
+    if ep_dir.exists() and not ep_dir.is_dir():
         raise ValueError(f"{COMPUTE_EP_DIR_ENV} can not be an existing file: {ep_dir}")
 
     uep_desc = f" for UEP {ep_name}" if ep_name else ""
