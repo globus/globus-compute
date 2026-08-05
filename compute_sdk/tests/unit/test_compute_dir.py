@@ -4,7 +4,7 @@ import os
 import pathlib
 
 import pytest
-from globus_compute_sdk.sdk.compute_dir import ensure_compute_dir
+from globus_compute_sdk.sdk.compute_dir import COMPUTE_DIR_ENV, ensure_compute_dir
 from pyfakefs.fake_filesystem import FakeFilesystem
 
 
@@ -26,10 +26,10 @@ def test_ensure_compute_dir(
     if env_dir is not None:
         # Override ~/.globus_compute if env var is set
         dirname = pathlib.Path(env_dir)
-        monkeypatch.setenv("GLOBUS_COMPUTE_USER_DIR", str(dirname))
+        monkeypatch.setenv(COMPUTE_DIR_ENV, str(dirname))
         expected_dirname = pathlib.Path(env_dir)
     else:
-        monkeypatch.delenv("GLOBUS_COMPUTE_USER_DIR", raising=False)
+        monkeypatch.delenv(COMPUTE_DIR_ENV, raising=False)
 
     actual_compute_dir = ensure_compute_dir()
 
@@ -46,9 +46,9 @@ def test_conflicting_compute_file(
 
     with pytest.raises(FileExistsError) as exc:
         if user_dir_defined:
-            monkeypatch.setenv("GLOBUS_COMPUTE_USER_DIR", str(filename))
+            monkeypatch.setenv(COMPUTE_DIR_ENV, str(filename))
         else:
-            monkeypatch.delenv("GLOBUS_COMPUTE_USER_DIR", raising=False)
+            monkeypatch.delenv(COMPUTE_DIR_ENV, raising=False)
         ensure_compute_dir()
 
     assert "Error creating directory" in str(exc)
@@ -62,7 +62,7 @@ def test_restricted_user_dir(fs: FakeFilesystem, monkeypatch: pytest.MonkeyPatch
     os.chmod(parent_dirname, 0o000)
 
     with pytest.raises(PermissionError) as exc:
-        monkeypatch.setenv("GLOBUS_COMPUTE_USER_DIR", str(compute_dirname))
+        monkeypatch.setenv(COMPUTE_DIR_ENV, str(compute_dirname))
         ensure_compute_dir()
 
     assert "Permission denied" in str(exc)
