@@ -214,10 +214,8 @@ These will be injected into the user endpoint process as environment variables.
 Three additional environment variables are automatically injected into the UEP
 process as part of the endpoint lifecycle:
 
-* ``GLOBUS_COMPUTE_ENDPOINT_NAME`` The name of the user endpoint.  For identity
-  mapping endpoints, this is auto generated in the format ``uep.<CEP_UUID>.<UEP_UUID>``.
-  For non identity mapping (single-user) endpoints, this will be the endpoint name
-  specified when doing the initial configure e.g. ``gce configure my_custom_ep_name``.
+* ``GLOBUS_COMPUTE_ENDPOINT_NAME`` The name of the user endpoint.  This is auto
+  generated in the format ``uep.<EP_UUID>.<UEP_UUID>``.
 * ``GLOBUS_COMPUTE_ENDPOINT_DIR`` - The path of the directory where UEP logs and
   configurations are stored.  This is the expanded, resolved path customizable by
   ``paths: endpoint_dir`` in ``user_config_template.yaml.j2``.
