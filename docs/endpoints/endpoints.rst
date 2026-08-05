@@ -8,6 +8,8 @@ The Compute Endpoint may be installed via PyPI in the usual manner, as well as
 via system packages.  See :doc:`installation` for more information.
 
 
+.. _endpoint_user_guide_overview:
+
 Overview
 ========
 
@@ -32,6 +34,27 @@ A Globus Compute Endpoint consists of three main process types:
 
 For a detailed look at how a task makes its way to a user endpoint process, see
 :ref:`tracing-a-task`.
+
+
+Disambiguation of "Endpoint"
+----------------------------
+
+The word ``Endpoint`` is overloaded with several meanings, and without context
+it can refer to any of several entities. While the three types of endpoint
+*process* are described above, we may also use "Globus Compute Endpoint" to
+refer to the entirety of the Compute software package: the Python software
+that runs on the login and compute nodes, using CEPs, UEPs, and worker
+processes to receive and execute tasks.
+
+A Core endpoint process started by a privileged user with identity mapping
+enabled is running in *Multi-User* mode.  Without identity mapping, or if
+started by a non-privileged user, it is running in *Single-User* mode.  These
+are sometimes referred to as Multi-User and Single-User endpoints.
+
+This documentation attempts to be as specific as possible when referring to
+the overall 'endpoint', or to its constituent parts, such as Core endpoints
+or User endpoints. However, as language itself is imperfect, please contact
+us with any suggestions if any specific references are unclear.
 
 
 Quickstart
