@@ -11,4 +11,4 @@ Changed
    *NOTE* As log output now refer to Core Endpoints instead of Manager Endpoints, any
    scripts that looked for/monitored the exact spelling in logs will have to be updated.
 
-   For more information, please see |CoreEndpoint|_.
+   For more information, please see the :ref:`Endpoint User Guide <endpoint_user_guide_overview>`
