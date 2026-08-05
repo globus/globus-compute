@@ -2337,12 +2337,12 @@ def test_ep_dir_log_path_envs_passed_to_render(
     with pytest.raises(SystemExit) as pyexc:
         em._event_loop()
 
-    assert mock_ensure.call_args[0][0] == command_payload["kwargs"]["name"]
-    if config.get("paths"):
-        assert mock_ensure.call_args[0][1] == config["paths"]
-    else:
-        assert mock_ensure.call_args[0][1] is None
     assert pyexc.value.code == _GOOD_EC, "Q&D: verify we exec'ed, based on '+= 1'"
+
+    (passed_name, passed_paths), _ = mock_ensure.call_args
+    assert passed_name == command_payload["kwargs"]["name"]
+    # If there are no custom configs the arg should also be None
+    assert passed_paths == config.get("paths")
 
 
 @pytest.mark.parametrize("is_valid", (True, False))
