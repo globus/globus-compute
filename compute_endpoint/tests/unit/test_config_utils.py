@@ -102,12 +102,14 @@ def render_default_uep_template(fs, mapped_ident, conf_no_engine):
     template = load_user_config_template(template_path)
     schema = load_user_config_schema(schema_path)
 
-    def _render(user_opts=None, user_runtime=None):
-        if user_runtime is None:
-            user_runtime = {
-                "globus_compute_sdk_version": "2.3.4",
-                "python": {"version_tuple": [3, 11, 9]},
-            }
+    default_user_runtime = {
+        "globus_compute_sdk_version": "2.3.4",
+        "python": {"version_tuple": [3, 11, 9]},
+    }
+
+    def _render(
+        user_opts: dict | None = None, user_runtime: dict = default_user_runtime
+    ):
         return render_config_user_template(
             conf_no_engine,
             template,
@@ -793,6 +795,10 @@ def test_render_user_config(
         assert "Missing required" in a[0]
 
 
+def _env_path(env_name: str) -> str:
+    return f'ENV_PATH="$HOME/.globus_compute/venvs/{env_name}"'
+
+
 def test_default_template_matches_submitter_runtime(render_default_uep_template):
     rendered_template = render_default_uep_template()
     wi = yaml.safe_load(rendered_template)["engine"]["provider"]["worker_init"]
@@ -803,13 +809,11 @@ def test_default_template_matches_submitter_runtime(render_default_uep_template)
         "endpoint package is never held back by a dependency cooldown"
     )
     assert "globus-compute-endpoint==2.3.4" in wi
-    assert 'ENV_NAME=""' in wi, (
-        "python and sdk versions are known, so ENV_NAME builds up from an empty "
-        "string rather than falling back to 'default'"
+    assert _env_path("py3.11.9-sdk2.3.4") in wi, (
+        "python and sdk versions are known, so the env name is built from them"
+        " rather than falling back to 'default'"
     )
-    assert 'ENV_NAME="$ENV_NAME-py3.11.9"' in wi
-    assert 'ENV_NAME="$ENV_NAME-sdk2.3.4"' in wi
-    assert 'ENV_NAME="default"' not in wi
+    assert _env_path("default") not in wi
     assert "uv pip install -r" not in wi, "no requirements -> no user-package install"
     assert "md5sum" not in wi, "no requirements -> no per-reqs env hash"
 
@@ -824,7 +828,7 @@ def test_default_template_user_requirements(render_default_uep_template, require
     wi = yaml.safe_load(rendered_template)["engine"]["provider"]["worker_init"]
 
     if requirements is not None:
-        assert "$ENV_NAME-$(echo -e" in wi, "requirements are folded into the env name"
+        assert "-reqs$(echo -e" in wi, "requirements are folded into the env name"
         assert "uv pip install -r <(echo -e" in wi, (
             "requested requirements are installed"
         )
@@ -853,16 +857,8 @@ def test_default_template_worker_init(render_default_uep_template, worker_init):
         assert "eval '$(echo -e" not in wi, "no worker_init -> nothing evaluated"
 
 
-@pytest.mark.parametrize(
-    "user_runtime",
-    (
-        {},
-        {"python": {}},
-        {"python": {"version_tuple": [3, 11, 9]}},  # no SDK version
-        {"globus_compute_sdk_version": "2.3.4"},  # no Python version
-    ),
-)
-def test_default_template_tolerates_missing_user_runtime(
+@pytest.mark.parametrize("user_runtime", ({}, {"python": {}}))
+def test_default_template_tolerates_missing_user_runtime_all_unknown(
     render_default_uep_template, user_runtime
 ):
     rendered_template = render_default_uep_template(user_runtime=user_runtime)
@@ -873,24 +869,55 @@ def test_default_template_tolerates_missing_user_runtime(
         "older SDKs may not report runtime, but the template must still render a "
         "valid config that installs globus-compute-endpoint"
     )
+    assert "--python" not in wi, "no known python version -> uv picks the default"
+    assert "globus-compute-endpoint==" not in wi, (
+        "no known sdk version -> install the latest release"
+    )
+    assert _env_path("default") in wi
 
-    has_py = bool(user_runtime.get("python", {}).get("version_tuple"))
-    has_sdk = bool(user_runtime.get("globus_compute_sdk_version"))
 
-    if has_py:
-        assert "--python 3.11.9" in wi
-        assert 'ENV_NAME="$ENV_NAME-py3.11.9"' in wi
-    else:
-        assert "--python" not in wi, "no known python version -> uv picks the default"
+@pytest.mark.parametrize(
+    "user_runtime, expected_uv_venv, expected_endpoint_spec, expected_env_name",
+    (
+        (
+            {"python": {"version_tuple": [3, 11, 9]}},
+            'uv venv --allow-existing "$ENV_PATH" --python 3.11.9',
+            "globus-compute-endpoint",
+            "py3.11.9",
+        ),
+        (
+            {"globus_compute_sdk_version": "2.3.4"},
+            'uv venv --allow-existing "$ENV_PATH"',
+            "globus-compute-endpoint==2.3.4",
+            "sdk2.3.4",
+        ),
+    ),
+)
+def test_default_template_tolerates_partially_known_user_runtime(
+    render_default_uep_template,
+    user_runtime,
+    expected_uv_venv,
+    expected_endpoint_spec,
+    expected_env_name,
+):
+    rendered_template = render_default_uep_template(user_runtime=user_runtime)
+    wi = yaml.safe_load(rendered_template)["engine"]["provider"]["worker_init"]
 
-    if has_sdk:
-        assert "globus-compute-endpoint==2.3.4" in wi
-        assert 'ENV_NAME="$ENV_NAME-sdk2.3.4"' in wi
-    else:
-        assert "globus-compute-endpoint==" not in wi, (
-            "no known sdk version -> install the latest release"
-        )
+    assert expected_uv_venv in wi
+    assert expected_endpoint_spec in wi
+    assert _env_path(expected_env_name) in wi
 
-    default = not has_py and not has_sdk
-    assert ('ENV_NAME="default"' in wi) == default
-    assert ('ENV_NAME=""' in wi) == (not default)
+    if "version_tuple" not in user_runtime.get("python", {}):
+        assert "--python" not in wi
+
+    if "globus_compute_sdk_version" not in user_runtime:
+        assert "globus-compute-endpoint==" not in wi
+
+
+def test_default_template_rejects_empty_string_requirements(
+    render_default_uep_template,
+):
+    user_opts = {"requirements": ""}
+    with pytest.raises(jsonschema.ValidationError) as pyt_exc:
+        render_default_uep_template(user_opts)
+    assert pyt_exc.value.validator == "minLength", "reject empty requirements noop"

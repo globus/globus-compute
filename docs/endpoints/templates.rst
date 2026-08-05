@@ -31,7 +31,7 @@ environment to match each user.
 
 The template that ``globus-compute-endpoint configure`` writes for a new
 endpoint includes a default ``worker_init`` that builds the user endpoint
-process' Python environment at task-submission time.  This script:
+process' Python environment dynamically.  This script:
 
 #. ensures `uv`_ is available, installing it to ``~/.local/bin`` if necessary;
 #. creates (or reuses) a virtual environment under

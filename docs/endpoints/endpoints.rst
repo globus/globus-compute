@@ -124,9 +124,11 @@ setting in the manager's :ref:`config.yaml <endpoint-manager-config>`.
 The default template includes a basic single-worker configuration and a
 ``worker_init`` script that :ref:`manages the Python environment
 <dynamic-uep-environments>` for each worker process. That script honors two
-additional user-supplied variables: ``requirements``, which drives the Python
-packages available to the environment, and ``worker_init``, which runs at the
-end of the default ``worker_init`` script.
+additional user-supplied variables:
+
+* ``requirements``, which declares the environment's Python packages; and
+* ``worker_init`` (not to be confused with the template's ``worker_init`` key),
+  where users can supply additional custom shell logic for configuring a worker node.
 
 .. code-block:: yaml+jinja
    :caption: ``user_config_template.yaml.j2`` (with abridged ``worker_init`` script)

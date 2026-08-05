@@ -4,7 +4,7 @@
   "properties": {
     "endpoint_setup": { "type": "string" },
     "worker_init": { "type": "string" },
-    "requirements": { "type": "string" }
+    "requirements": { "type": "string", "minLength": 1 }
   },
   "additionalProperties": true
 }
