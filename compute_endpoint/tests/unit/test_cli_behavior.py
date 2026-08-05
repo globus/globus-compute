@@ -47,7 +47,7 @@ from globus_compute_endpoint.exceptions import MessageSystemExit
 from globus_compute_sdk import Client
 from globus_compute_sdk.sdk.auth.auth_client import ComputeAuthClient
 from globus_compute_sdk.sdk.auth.globus_app import UserApp
-from globus_compute_sdk.sdk.compute_dir import ensure_compute_dir
+from globus_compute_sdk.sdk.compute_dir import COMPUTE_DIR_ENV, ensure_compute_dir
 from globus_sdk import MISSING, GlobusAPIError, NetworkError
 from pytest_mock import MockFixture
 
@@ -64,9 +64,7 @@ def reset_umask():
 
 @pytest.fixture
 def mock_user_dir_env(tmp_path):
-    with mock.patch.dict(
-        os.environ, {"GLOBUS_COMPUTE_USER_DIR": str(tmp_path.resolve())}
-    ):
+    with mock.patch.dict(os.environ, {COMPUTE_DIR_ENV: str(tmp_path.resolve())}):
         yield tmp_path
 
 
@@ -326,9 +324,7 @@ def test_init_config_dir(fs, dir_exists, user_dir):
 
     if user_dir is not None:
         config_dirname = pathlib.Path(user_dir)
-        with mock.patch.dict(
-            os.environ, {"GLOBUS_COMPUTE_USER_DIR": str(config_dirname)}
-        ):
+        with mock.patch.dict(os.environ, {COMPUTE_DIR_ENV: str(config_dirname)}):
             dirname = ensure_compute_dir()
     else:
         dirname = ensure_compute_dir()
@@ -354,9 +350,7 @@ def test_init_config_dir_permission_error(fs):
     os.chmod(parent_dirname, 0o000)
 
     with pytest.raises(ClickException) as exc:
-        with mock.patch.dict(
-            os.environ, {"GLOBUS_COMPUTE_USER_DIR": str(config_dirname)}
-        ):
+        with mock.patch.dict(os.environ, {COMPUTE_DIR_ENV: str(config_dirname)}):
             config_dir_callback(None, None, str(config_dirname))
 
     assert "Permission denied" in str(exc)

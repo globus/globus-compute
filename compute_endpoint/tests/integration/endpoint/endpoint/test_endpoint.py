@@ -15,6 +15,7 @@ from globus_compute_endpoint.endpoint.config import UserEndpointConfig
 from globus_compute_endpoint.engines.base import GlobusComputeEngineBase
 from globus_compute_sdk import Client
 from globus_compute_sdk.sdk.client import _ComputeWebClient
+from globus_compute_sdk.sdk.compute_dir import COMPUTE_DIR_ENV
 from globus_sdk import GlobusAPIError, UserApp
 from pytest_mock import MockFixture
 
@@ -62,7 +63,7 @@ def patch_compute_client(mocker: MockFixture):
 
 
 def test_non_configured_endpoint(tmp_path):
-    env = {"GLOBUS_COMPUTE_USER_DIR": str(tmp_path)}
+    env = {COMPUTE_DIR_ENV: str(tmp_path)}
     with mock.patch.dict(os.environ, env):
         result = CliRunner().invoke(app, ["start", "newendpoint"])
         assert "newendpoint" in result.stderr
