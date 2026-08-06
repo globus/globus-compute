@@ -264,6 +264,5 @@ def test_ensure_paths_default_uses_name_and_compute_dir(fs, mock_ensure_compute)
     expected_log_path = pathlib.Path(_MOCK_GCC_DIR) / ep_name / "endpoint.log"
     with mock.patch.dict(os.environ, {"HOME": "/home/foo"}, clear=True):
         log_result_path = ensure_paths(ep_name)
-        # Have to use str(..resolve()) as (expected_log_path == log_result_path) == False
         assert str(expected_log_path) == str(log_result_path)
         assert str(expected_log_path.parent) == os.environ[COMPUTE_EP_DIR_ENV]
