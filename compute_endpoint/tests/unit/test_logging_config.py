@@ -182,49 +182,44 @@ def test_ensure_paths_ep_dir_not_file(fs, is_file, exc_msg):
 
 
 @pytest.mark.parametrize(
-    ("ep_name", "ep_config", "log_config", "exp_ep", "exp_log"),
+    ("env_dict", "paths", "exp_ep", "exp_log"),
     (
         (
-            "ep1",
-            "$HOME/ep2",
-            None,
+            {COMPUTE_EP_DIR_ENV: "$HOME/ep1"},
+            {"endpoint_dir": "~/ep2"},
             "/home/foo/ep2",
             "/home/foo/ep2/endpoint.log",
         ),
         (
-            "ep1",
-            None,
-            "~/$USER/a.log",
+            {COMPUTE_EP_DIR_ENV: "$HOME/ep1"},
+            {"endpoint_dir": "$HOME/ep2"},
+            "/home/foo/ep2",
+            "/home/foo/ep2/endpoint.log",
+        ),
+        (
+            {LOG_PATH_ENV: "$HOME/ep1/b.log"},
+            {"endpoint_log": "~/$USER/a.log"},
             "/home/foo/.globus_compute/ep1",
             "/home/foo/bar/a.log",
         ),
         (
-            "ep1",
-            None,
-            None,
+            {},
+            {},
             "/home/foo/.globus_compute/ep1",
             "/home/foo/.globus_compute/ep1/endpoint.log",
         ),
     ),
 )
-def test_ensure_paths_expand_set(fs, ep_name, ep_config, log_config, exp_ep, exp_log):
-    paths = {}
+def test_ensure_paths_expand_set(fs, env_dict, paths, exp_ep, exp_log):
+    ep_name = "ep1"
     home = "/home/foo"
-    env_dict = {"HOME": home, "USER": "bar"}
-    if ep_config:
-        paths["endpoint_dir"] = ep_config
-        env_dict[COMPUTE_EP_DIR_ENV] = ep_config
-    if log_config:
-        paths["endpoint_log"] = log_config
-        env_dict[LOG_PATH_ENV] = log_config
+    env = {"HOME": home, "USER": "bar"}
+    env.update(env_dict)
 
-    with mock.patch.dict(os.environ, env_dict, clear=True):
+    with mock.patch.dict(os.environ, env, clear=True):
         path_result = ensure_paths(ep_name, paths)
-        assert str(path_result.resolve()) == exp_log
-        if ep_config:
-            assert os.environ[COMPUTE_EP_DIR_ENV] == exp_ep
-        else:
-            assert os.environ[COMPUTE_EP_DIR_ENV] == f"{home}/.globus_compute/{ep_name}"
+        assert str(path_result) == exp_log
+        assert os.environ[COMPUTE_EP_DIR_ENV] == exp_ep
         assert os.environ[LOG_PATH_ENV] == exp_log
 
 
