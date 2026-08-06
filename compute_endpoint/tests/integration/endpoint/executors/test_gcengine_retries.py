@@ -1,5 +1,6 @@
 import concurrent.futures
 import importlib
+import os
 import random
 import uuid
 from unittest import mock
@@ -77,7 +78,8 @@ def test_success_after_fails(mock_gce, serde, ez_pack_task, fail_count):
 
     engine.executor.fail_count = fail_count
     f = GCFuture(task_id)
-    engine.submit(f, task_bytes, resource_specification={})
+    with mock.patch.dict(os.environ):
+        engine.submit(f, task_bytes, resource_specification={})
 
     packed_result: bytes = f.result()
     result = messagepack.unpack(packed_result)

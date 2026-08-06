@@ -71,6 +71,17 @@ def reset_signals():
         signal.signal(sig, sigh)
 
 
+@pytest.fixture(autouse=True)
+def verify_all_tests_reset_environ():
+    orig_environ = dict(os.environ)
+    yield
+    assert set(orig_environ.keys()) == set(os.environ.keys())
+    for k in os.environ:
+        if k.startswith("PYTEST_"):
+            continue
+        assert os.environ[k] == orig_environ[k], f"Environ {k} not reset"
+
+
 @pytest.fixture(scope="session")
 def endpoint_uuid():
     return str(uuid.UUID(int=0))
