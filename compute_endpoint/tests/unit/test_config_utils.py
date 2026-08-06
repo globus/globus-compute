@@ -917,7 +917,11 @@ def test_default_template_tolerates_partially_known_user_runtime(
 def test_default_template_rejects_empty_string_requirements(
     render_default_uep_template,
 ):
-    user_opts = {"requirements": ""}
+    # SHOULD render with requirements either missing or at least 1 char long
+    render_default_uep_template({})
+    render_default_uep_template({"requirements": "a"})
+
+    # should NOT render with an empty string
     with pytest.raises(jsonschema.ValidationError) as pyt_exc:
-        render_default_uep_template(user_opts)
+        render_default_uep_template({"requirements": ""})
     assert pyt_exc.value.validator == "minLength", "reject empty requirements noop"
