@@ -1,3 +1,4 @@
+import os
 import random
 import typing as t
 from unittest import mock
@@ -49,7 +50,8 @@ def test_engine_submit(
     arg = random.randint(0, 10000)
     task_bytes = ez_pack_task(double, arg)
     f = GCFuture(task_uuid)
-    engine.submit(f, task_bytes, resource_specification={})
+    with mock.patch.dict(os.environ):
+        engine.submit(f, task_bytes, resource_specification={})
     packed_result = f.result()
 
     # Confirm that the future got the right answer
@@ -80,12 +82,13 @@ def test_engine_working_dir(
     task_args: tuple = (ez_pack_task(get_cwd), {})
 
     fut1 = GCFuture(task_uuid)
-    engine.submit(fut1, *task_args)
-    unpacked1 = messagepack.unpack(fut1.result())  # blocks; avoid race condition
-
     fut2 = GCFuture(task_uuid)
-    engine.submit(fut2, *task_args)  # exact same task
-    unpacked2 = messagepack.unpack(fut2.result())
+    with mock.patch.dict(os.environ):
+        engine.submit(fut1, *task_args)
+        unpacked1 = messagepack.unpack(fut1.result())  # blocks; avoid race condition
+
+        engine.submit(fut2, *task_args)  # exact same task
+        unpacked2 = messagepack.unpack(fut2.result())
 
     # data is enough for test, but in error case, be kind to dev
     assert isinstance(unpacked1, Result)

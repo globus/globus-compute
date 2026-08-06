@@ -124,7 +124,10 @@ def test_execute_task_working_dir(
 ):
     assert os.getcwd() != str(tmp_path)
     task_bytes = ez_pack_task(get_cwd)
-    packed_result = execute_task(task_bytes, task_uuid, endpoint_uuid, run_dir=tmp_path)
+    with mock.patch.dict(os.environ):
+        packed_result = execute_task(
+            task_bytes, task_uuid, endpoint_uuid, run_dir=tmp_path
+        )
 
     message = messagepack.unpack(packed_result)
     assert message.task_id == task_uuid
@@ -139,13 +142,14 @@ def test_sandbox(tmp_path, reset_cwd, serde, endpoint_uuid, task_uuid, ez_pack_t
     os.chdir(tmp_path)
 
     task_bytes = ez_pack_task(get_cwd)
-    packed_result = execute_task(
-        task_bytes,
-        task_uuid,
-        endpoint_uuid,
-        run_dir=tmp_path,
-        run_in_sandbox=True,
-    )
+    with mock.patch.dict(os.environ):
+        packed_result = execute_task(
+            task_bytes,
+            task_uuid,
+            endpoint_uuid,
+            run_dir=tmp_path,
+            run_in_sandbox=True,
+        )
 
     message = messagepack.unpack(packed_result)
     assert message.task_id == task_uuid

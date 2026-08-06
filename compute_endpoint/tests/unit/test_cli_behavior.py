@@ -1284,8 +1284,9 @@ def test_name_or_uuid_decorator(tmp_path, mocker, run_line, name, uuid):
 
     mock__start_epm = mocker.patch(f"{_MOCK_BASE}_start_endpoint_manager")
 
-    run_line(f"-c {gc_conf_dir} start {name}")
-    run_line(f"-c {gc_conf_dir} start {uuid}")
+    with mock.patch.dict(os.environ):
+        run_line(f"-c {gc_conf_dir} start {name}")
+        run_line(f"-c {gc_conf_dir} start {uuid}")
 
     assert mock__start_epm.call_count == 2
 
