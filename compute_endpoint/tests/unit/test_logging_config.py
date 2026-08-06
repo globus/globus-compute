@@ -264,6 +264,44 @@ def test_ensure_paths_default_uses_name_and_compute_dir(fs, mock_ensure_compute)
     expected_log_path = pathlib.Path(_MOCK_GCC_DIR) / ep_name / "endpoint.log"
     with mock.patch.dict(os.environ, {"HOME": "/home/foo"}, clear=True):
         log_result_path = ensure_paths(ep_name)
-        # Have to use str(..resolve()) as (expected_log_path == log_result_path) == False
         assert str(expected_log_path) == str(log_result_path)
         assert str(expected_log_path.parent) == os.environ[COMPUTE_EP_DIR_ENV]
+
+
+@pytest.mark.parametrize(
+    ("env_set", "paths", "exp_ep", "exp_log"),
+    (
+        (
+            {COMPUTE_EP_DIR_ENV: "/home/foo/abc/../def"},
+            {},
+            "/home/foo/def",
+            "/home/foo/def/endpoint.log",
+        ),
+        (
+            {},
+            {"endpoint_dir": "/home/foo/abc/../def"},
+            "/home/foo/def",
+            "/home/foo/def/endpoint.log",
+        ),
+        (
+            {LOG_PATH_ENV: "/home/foo/abc/../def.log"},
+            {},
+            "/home/foo/.globus_compute/ep1",
+            "/home/foo/def.log",
+        ),
+        (
+            {},
+            {"endpoint_log": "/home/foo/abc/../def.log"},
+            "/home/foo/.globus_compute/ep1",
+            "/home/foo/def.log",
+        ),
+    ),
+)
+def test_ensure_paths_resolves_paths(fs, env_set, paths, exp_ep, exp_log):
+    env = {"HOME": "/home/foo", "USER": "bar"}
+    env.update(env_set)
+    with mock.patch.dict(os.environ, env, clear=True):
+        result_log_path = ensure_paths("ep1", paths)
+        assert exp_log == str(result_log_path)
+        assert os.environ[COMPUTE_EP_DIR_ENV] == exp_ep
+        assert os.environ[LOG_PATH_ENV] == str(result_log_path)
