@@ -62,11 +62,12 @@ def sleeper(t: float):
 
 @pytest.mark.parametrize("run_dir", ("", ".", "./", "../", "tmp", "$HOME"))
 def test_bad_run_dir(endpoint_uuid, task_uuid, run_dir):
-    with pytest.raises(ValueError):  # not absolute
-        execute_task(task_uuid, b"", endpoint_uuid, run_dir=run_dir)
+    with mock.patch.dict(os.environ):
+        with pytest.raises(ValueError):  # not absolute
+            execute_task(task_uuid, b"", endpoint_uuid, run_dir=run_dir)
 
-    with pytest.raises(TypeError):  # not anything, allow-any-type language
-        execute_task(task_uuid, b"", endpoint_uuid, run_dir=None)
+        with pytest.raises(TypeError):  # not anything, allow-any-type language
+            execute_task(task_uuid, b"", endpoint_uuid, run_dir=None)
 
 
 def test_happy_path(serde, caplog, task_uuid, ez_pack_task, execute_task_runner):
@@ -75,8 +76,9 @@ def test_happy_path(serde, caplog, task_uuid, ez_pack_task, execute_task_runner)
 
     task_bytes = ez_pack_task(divide, divisor * out, divisor)
 
-    with caplog.at_level(logging.DEBUG):
-        packed_result = execute_task_runner(task_bytes)
+    with mock.patch.dict(os.environ):
+        with caplog.at_level(logging.DEBUG):
+            packed_result = execute_task_runner(task_bytes)
     assert isinstance(packed_result, bytes)
 
     result = messagepack.unpack(packed_result)
@@ -103,14 +105,15 @@ def test_happy_path(serde, caplog, task_uuid, ez_pack_task, execute_task_runner)
 
 
 def test_sandbox(task_10_2, execute_task_runner, task_uuid, tmp_path):
-    packed_result = execute_task_runner(task_10_2, run_in_sandbox=True)
-    result = messagepack.unpack(packed_result)
-    assert result.task_id == task_uuid
-    assert result.error_details is None, "Verify test setup: execution successful"
+    with mock.patch.dict(os.environ):
+        packed_result = execute_task_runner(task_10_2, run_in_sandbox=True)
+        result = messagepack.unpack(packed_result)
+        assert result.task_id == task_uuid
+        assert result.error_details is None, "Verify test setup: execution successful"
 
-    exp_dir = tmp_path / str(task_uuid)
-    assert os.environ.get("GC_TASK_SANDBOX_DIR") == str(exp_dir), "Share dir w/ func"
-    assert os.getcwd() == str(exp_dir), "Expect sandbox dir entered"
+        exp_dir = tmp_path / str(task_uuid)
+        assert os.environ.get("GC_TASK_SANDBOX_DIR") == str(exp_dir), "Shared w/ func"
+        assert os.getcwd() == str(exp_dir), "Expect sandbox dir entered"
 
 
 def test_nested_run_dir(task_10_2, task_uuid, tmp_path):
@@ -118,7 +121,8 @@ def test_nested_run_dir(task_10_2, task_uuid, tmp_path):
     nested_path = nested_root / "b/c/d"
     assert not nested_root.exists(), "Verify test setup"
 
-    packed_result = execute_task(task_10_2, task_uuid, run_dir=nested_path)
+    with mock.patch.dict(os.environ):
+        packed_result = execute_task(task_10_2, task_uuid, run_dir=nested_path)
 
     result = messagepack.unpack(packed_result)
     assert result.error_details is None, "Verify test setup: execution successful"
@@ -134,16 +138,17 @@ def test_result_size_limit(serde, task_10_2, execute_task_runner, size_limit):
 
     with mock.patch(f"{_MOCK_BASE}ComputeSerializer.serialize_from_list") as mock_ser:
         with mock.patch(f"{_MOCK_BASE}log.exception"):  # silence tests
-            mock_ser.return_value = res_data_good
-            res_bytes = execute_task_runner(task_10_2, result_size_limit=size_limit)
-            result = messagepack.unpack(res_bytes)
-            assert result.data == res_data_good
+            with mock.patch.dict(os.environ):
+                mock_ser.return_value = res_data_good
+                res_bytes = execute_task_runner(task_10_2, result_size_limit=size_limit)
+                result = messagepack.unpack(res_bytes)
+                assert result.data == res_data_good
 
-            mock_ser.return_value = res_data_bad
-            res_bytes = execute_task_runner(task_10_2, result_size_limit=size_limit)
-            result = messagepack.unpack(res_bytes)
-            assert exp_data == result.data
-            assert result.error_details.code == "MaxResultSizeExceeded"
+                mock_ser.return_value = res_data_bad
+                res_bytes = execute_task_runner(task_10_2, result_size_limit=size_limit)
+                result = messagepack.unpack(res_bytes)
+                assert exp_data == result.data
+                assert result.error_details.code == "MaxResultSizeExceeded"
 
 
 def test_default_result_size_limit(task_10_2, execute_task_runner):
@@ -154,29 +159,32 @@ def test_default_result_size_limit(task_10_2, execute_task_runner):
 
     with mock.patch(f"{_MOCK_BASE}ComputeSerializer.serialize_from_list") as mock_ser:
         with mock.patch(f"{_MOCK_BASE}log.exception"):  # silence tests
-            mock_ser.return_value = res_data_good
-            res_bytes = execute_task_runner(task_10_2)
-            result = messagepack.unpack(res_bytes)
-            assert result.data == res_data_good
+            with mock.patch.dict(os.environ):
+                mock_ser.return_value = res_data_good
+                res_bytes = execute_task_runner(task_10_2)
+                result = messagepack.unpack(res_bytes)
+                assert result.data == res_data_good
 
-            mock_ser.return_value = res_data_bad
-            res_bytes = execute_task_runner(task_10_2)
-            result = messagepack.unpack(res_bytes)
-            assert exp_data == result.data
-            assert result.error_details.code == "MaxResultSizeExceeded"
+                mock_ser.return_value = res_data_bad
+                res_bytes = execute_task_runner(task_10_2)
+                result = messagepack.unpack(res_bytes)
+                assert exp_data == result.data
+                assert result.error_details.code == "MaxResultSizeExceeded"
 
 
 @pytest.mark.parametrize("size_limit", (-5, 0, 1, 65, 127))
 def test_invalid_result_size_limit(size_limit):
     with pytest.raises(ValueError) as pyt_e:
-        execute_task("test_tid", b"", run_dir="/", result_size_limit=5)
+        with mock.patch.dict(os.environ):
+            execute_task("test_tid", b"", run_dir="/", result_size_limit=5)
     assert "must be at least" in str(pyt_e.value)
 
 
 def test_task_excepts(ez_pack_task, execute_task_runner, mock_log):
     task_bytes = ez_pack_task(divide, 10, 0)
 
-    packed_result = execute_task_runner(task_bytes)
+    with mock.patch.dict(os.environ):
+        packed_result = execute_task_runner(task_bytes)
 
     assert mock_log.exception.called
     a, _k = mock_log.exception.call_args
@@ -218,13 +226,14 @@ def test_deserializers_enforced(mock_log, execute_task_runner, task_uuid, ser, d
 
     task_bytes = pack_task(divide, 10, 2)
 
-    packed_result = execute_task_runner(
-        task_bytes,
-        task_deserializers=[
-            f"{des.__module__}.{des.__qualname__}",
-            "globus_compute_sdk.serialize.JSONData",
-        ],
-    )
+    with mock.patch.dict(os.environ):
+        packed_result = execute_task_runner(
+            task_bytes,
+            task_deserializers=[
+                f"{des.__module__}.{des.__qualname__}",
+                "globus_compute_sdk.serialize.JSONData",
+            ],
+        )
 
     result = messagepack.unpack(packed_result)
     assert isinstance(result, messagepack.message_types.Result)
@@ -234,9 +243,10 @@ def test_deserializers_enforced(mock_log, execute_task_runner, task_uuid, ser, d
 
 
 def test_result_serializers(task_10_2, execute_task_runner, task_uuid):
-    packed_result = execute_task_runner(
-        task_10_2, result_serializers=["globus_compute_sdk.serialize.JSONData"]
-    )
+    with mock.patch.dict(os.environ):
+        packed_result = execute_task_runner(
+            task_10_2, result_serializers=["globus_compute_sdk.serialize.JSONData"]
+        )
 
     result = messagepack.unpack(packed_result)
     assert isinstance(result, messagepack.message_types.Result)
@@ -252,10 +262,11 @@ def test_result_serializers(task_10_2, execute_task_runner, task_uuid):
 def test_bad_result_serializer_list(
     task_10_2, execute_task_runner, task_uuid, unknown_strategy
 ):
-    packed_result = execute_task_runner(
-        task_10_2,
-        result_serializers=["not a strategy", unknown_strategy, CombinedCode],
-    )
+    with mock.patch.dict(os.environ):
+        packed_result = execute_task_runner(
+            task_10_2,
+            result_serializers=["not a strategy", unknown_strategy, CombinedCode],
+        )
 
     result = messagepack.unpack(packed_result)
     assert isinstance(result, messagepack.message_types.Result)
@@ -276,7 +287,8 @@ def test_bad_result_serializer_list(
 
 def test_not_a_task_handled_gracefully(tmp_path, mock_log, task_uuid):
     task_bytes = messagepack.pack(TaskCancel(task_id=task_uuid))
-    raw = execute_task(task_bytes, task_uuid, run_dir=tmp_path)
+    with mock.patch.dict(os.environ):
+        raw = execute_task(task_bytes, task_uuid, run_dir=tmp_path)
     res = messagepack.unpack(raw)
 
     assert res.task_id == task_uuid, "Sanity check"
