@@ -811,9 +811,7 @@ def test_default_template_matches_submitter_runtime(render_default_uep_template)
     assert "globus-compute-endpoint==2.3.4" in wi
     assert _env_path("py3.11.9-sdk2.3.4") in wi, (
         "python and sdk versions are known, so the env name is built from them"
-        " rather than falling back to 'default'"
     )
-    assert _env_path("default") not in wi
     assert "uv pip install -r" not in wi, "no requirements -> no user-package install"
     assert "md5sum" not in wi, "no requirements -> no per-reqs env hash"
 
@@ -858,22 +856,39 @@ def test_default_template_worker_init(render_default_uep_template, worker_init):
 
 
 @pytest.mark.parametrize("user_runtime", ({}, {"python": {}}))
-def test_default_template_tolerates_missing_user_runtime_all_unknown(
+def test_default_template_worker_init_missing_runtime(
     render_default_uep_template, user_runtime
 ):
     rendered_template = render_default_uep_template(user_runtime=user_runtime)
     wi = yaml.safe_load(rendered_template)["engine"]["provider"]["worker_init"]
 
-    assert "uv venv" in wi
+    assert not wi, (
+        "older SDKs may not report runtime; with nothing to match against and no "
+        "requirements to install, there is no environment to build -- but the "
+        "template must still render a valid config"
+    )
+
+
+@pytest.mark.parametrize("user_runtime", ({}, {"python": {}}))
+def test_default_template_builds_env_for_requirements_alone(
+    render_default_uep_template, user_runtime
+):
+    user_opts = {"requirements": "numpy==2.1.0"}
+    rendered_template = render_default_uep_template(
+        user_opts, user_runtime=user_runtime
+    )
+    wi = yaml.safe_load(rendered_template)["engine"]["provider"]["worker_init"]
+
+    assert "uv venv" in wi, "requirements alone are enough to warrant an environment"
+    assert "md5sum" in wi, "requirements are folded into the env name"
+    assert "uv pip install -r <(echo -e" in wi, "requested requirements are installed"
     assert "globus-compute-endpoint" in wi, (
-        "older SDKs may not report runtime, but the template must still render a "
-        "valid config that installs globus-compute-endpoint"
+        "an environment we build must be able to run tasks"
     )
     assert "--python" not in wi, "no known python version -> uv picks the default"
     assert "globus-compute-endpoint==" not in wi, (
         "no known sdk version -> install the latest release"
     )
-    assert _env_path("default") in wi
 
 
 @pytest.mark.parametrize(

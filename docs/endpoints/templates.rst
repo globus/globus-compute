@@ -30,30 +30,36 @@ so, rather than ask users to match the endpoint, the endpoint builds an
 environment to match each user.
 
 The template that ``globus-compute-endpoint configure`` writes for a new
-endpoint includes a default ``worker_init`` that builds the user endpoint
-process' Python environment dynamically.  This script:
+endpoint includes an environment initialization script that runs during
+``worker_init``, before any user-specified ``worker_init`` behavior.  This script:
 
 #. ensures `uv`_ is available, installing it to ``~/.local/bin`` if necessary;
-#. creates (or reuses) a virtual environment under
+#. creates (or reuses) and activates a virtual environment under
    ``~/.globus_compute/venvs/``, named after the submitting user's Python
    version and SDK version, so distinct runtimes get distinct |nbsp| --- |nbsp|
    but individually reusable |nbsp| --- |nbsp| environments;
 #. installs ``globus-compute-endpoint`` into that environment, pinned to the
    submitting client's SDK version; and
-#. runs any additional user-specified ``worker_init`` commands.
+#. installs any user-requested ``requirements`` into that environment.
 
 The Python and SDK versions come from the :ref:`reserved
-<reserved-template-variables>` ``_GC.user_runtime`` variable.  When either is
-unavailable, the template omits it from the environment name and falls back to
-``uv``'s defaults; if neither is available, the environment is simply named
-``default``.
+<reserved-template-variables>` ``_GC.user_runtime`` variable; if either is
+unavailable, the script falls back to `uv`_ defaults instead.
 
 The template also accepts an optional ``requirements`` variable |nbsp| ---
 |nbsp| a ``requirements.txt`` file supplied as a multi-line string |nbsp| ---
 |nbsp| so that users can request task-specific Python packages.  When this
 variable is included, a hash of the requested requirements is appended to the
 environment name (so that each distinct set of packages gets its own reusable
-environment), and the requested packages are installed after ``globus-compute-endpoint``.
+environment), and the requested packages are installed to the environment.
+
+.. note::
+
+   As declared in the :ref:`default user config schema <user-config-schema-json>`,
+   ``requirements`` must have at least one character to be valid. This prevents
+   the environment setup script from creating an env with ``requirements=""``,
+   which is functionally equivalent to "no environment" while still incurring
+   environment overhead.
 
 A user requests packages by passing ``requirements`` alongside any other
 configuration variables:

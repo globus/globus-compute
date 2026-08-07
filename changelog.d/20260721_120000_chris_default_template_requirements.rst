@@ -11,8 +11,8 @@ New Functionality
   takes a multi-line ``requirements.txt``-style string. When specified, the
   user's task-time environment is built with these requirements installed.
 
-  Existing endpoints are not affected by this change, and new endpoints can opt
-  out by flipping a flag in the template or commenting it out entirely/
+  Existing endpoints are not affected by this change, and it's designed to be easy
+  to remove from the template so admins can opt out.
 
   For more information, see `Task-time Python Environments
   <https://globus-compute.readthedocs.io/en/4.16.0/endpoints/templates.html#task-time-python-environments>`_.

@@ -186,10 +186,14 @@ template variables are strings, then allowing any other user-defined properties:
      "properties": {
        "endpoint_setup": { "type": "string" },
        "worker_init": { "type": "string" },
-       "requirements": { "type": "string" }
+       "requirements": { "type": "string", "minLength": 1 }
      },
      "additionalProperties": true
    }
+
+Additionally, ``requirements`` is validated as having at least one character
+via ``"minLength": 1``; see the :ref:`docs on dynamic task-time environments
+<dynamic-uep-environments>` for why.
 
 .. important::
 
