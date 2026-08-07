@@ -9,10 +9,10 @@ class PamConfiguration:
     :param enable: Whether to initiate a PAM session for each UEP start request.
 
     :param service_name: What PAM service name with which to initialize the PAM
-        session.  If a particular MEP has different requirements, define those PAM
+        session.  If a particular CEP has different requirements, define those PAM
         requirements in ``/etc/pam.d/``, and specify the service name with this field.
 
-        See :ref:`MEP § PAM <pam>` for more information
+        See :ref:`CEP § PAM <pam>` for more information
     """
 
     enable: bool = True

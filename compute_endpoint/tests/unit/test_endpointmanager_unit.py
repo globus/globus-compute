@@ -680,10 +680,10 @@ def test_log_contains_sentinel_lines(mock_log, epmanager_as_root, noop, reset_si
     em.start()
 
     uuid_pat = r"[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}"
-    beg_re_sentinel = re.compile(r"\n\n=+ Endpoint Manager begins: ")
-    beg_re_uuid = re.compile(rf"\n\n=+ Endpoint Manager begins: {uuid_pat}\n")
-    end_re_sentinel = re.compile(r"\n-+ Endpoint Manager ends: ")
-    end_re_uuid = re.compile(rf"\n-+ Endpoint Manager ends: {uuid_pat}\n\n")
+    beg_re_sentinel = re.compile(r"\n\n=+ Core Endpoint begins: ")
+    beg_re_uuid = re.compile(rf"\n\n=+ Core Endpoint begins: {uuid_pat}\n")
+    end_re_sentinel = re.compile(r"\n-+ Core Endpoint ends: ")
+    end_re_uuid = re.compile(rf"\n-+ Core Endpoint ends: {uuid_pat}\n\n")
     log_str = "\n".join(a[0] for a, _ in mock_log.info.call_args_list)
     assert log_str.startswith("\n\n"), "Expect visual separation for log trawlers"
     assert beg_re_sentinel.search(log_str) is not None, "Expected visual begin sentinel"
@@ -2009,7 +2009,7 @@ def test_ha_disallowed_in_uep_conf(
     assert pyt_e.value.code != _GOOD_EC, "Q&D: verify we failed, based on '+= 1'"
 
     (efmt,), _ = mock_log.error.call_args_list[0]
-    assert "`high_assurance` may not be" in efmt, "expect specific to MEP logs"
+    assert "`high_assurance` may not be" in efmt, "expect specific to CEP logs"
     (efmt,), _ = mock_log.error.call_args
     assert "contact MEP administrator" in efmt, "expect opaque to user"
 
