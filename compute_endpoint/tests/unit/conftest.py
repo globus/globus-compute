@@ -8,7 +8,12 @@ import uuid
 from unittest import mock
 
 import pytest
-from globus_compute_endpoint.endpoint.config import PamConfiguration
+from globus_compute_endpoint.endpoint import endpoint
+from globus_compute_endpoint.endpoint.config import (
+    PamConfiguration,
+    PathConfiguration,
+)
+from globus_compute_endpoint.engines import ThreadPoolEngine
 from globus_compute_endpoint.engines.helper import execute_task
 from parsl import HighThroughputExecutor
 from parsl.executors import MPIExecutor
@@ -38,13 +43,11 @@ known_user_config_opts = {
     "idle_heartbeats_hard": int,
     "endpoint_setup": str,
     "endpoint_teardown": str,
-    "log_dir": str,
-    "stdout": str,
-    "stderr": str,
     "local_compute_services": True,
     "environment": str,
     "high_assurance": False,
     "engine": None,
+    "paths": PathConfiguration,
 }
 
 known_manager_config_opts = {
@@ -94,6 +97,8 @@ def get_random_of_datatype_impl(cls):
         return random.random() * 1_000_000
     elif issubclass(cls, PamConfiguration):
         return PamConfiguration(True, "some-service-name")
+    elif issubclass(cls, PathConfiguration):
+        return PathConfiguration(endpoint_dir="/a/b", endpoint_log="/a/b/ep.log")
 
     raise NotImplementedError(f"Missing test branch for type: {repr(cls)}")
 

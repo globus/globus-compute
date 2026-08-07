@@ -211,6 +211,30 @@ will probably not behave as expected.  Example:
 
 These will be injected into the user endpoint process as environment variables.
 
+Three additional environment variables are automatically injected into the UEP
+process as part of the endpoint lifecycle:
+
+* ``GLOBUS_COMPUTE_ENDPOINT_NAME`` The name of the user endpoint.  This is auto
+  generated in the format ``uep.<EP_UUID>.<UEP_UUID>``.
+* ``GLOBUS_COMPUTE_ENDPOINT_DIR`` - The path of the directory where UEP logs and
+  configurations are stored.  This is the expanded, resolved path customizable by
+  ``paths: endpoint_dir`` in ``user_config_template.yaml.j2``.
+  (default ``$HOME/.globus_compute/<endpoint_name>``)
+* ``GLOBUS_COMPUTE_LOG_PATH`` - The destination that the UEP will write log output to,
+  the expanded, resolved path customizable by ``paths: endpoint_log``, default
+  ``$GLOBUS_COMPUTE_ENDPOINT_DIR/endpoint.log``
+
+Additionally, if :ref:`user_runtime <reserved-template-variables>` is set (automatic
+if submitting tasks via the Globus Compute SDK):
+
+* ``GC_USER_PYTHON_VERSION`` and ``GC_USER_SDK_VERSION`` as described in
+  :ref:`Advanced Environment Customization <manager_export_env>`
+
+
+For more information on customizing the values of ``GLOBUS_COMPUTE_ENDPOINT_DIR``
+and ``GLOBUS_COMPUTE_LOG_PATH`` in the ``paths`` configuration section see
+:ref:`endpoint-paths`
+
 
 .. _config-dir:
 
@@ -722,6 +746,8 @@ and writing a custom ``globus-compute-endpoint`` wrapper:
    exec /usr/sbin/globus-compute-endpoint "$@"
 
 (The use of ``exec`` is not critical, but keeps the process tree tidy.)
+
+.. _manager_export_env:
 
 The manager endpoint process exports the following two environment variables that
 shim‑authors may use to fine‑tune customizations:

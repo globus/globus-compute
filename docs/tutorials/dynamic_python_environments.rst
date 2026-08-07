@@ -28,6 +28,8 @@ the ``configure`` subcommand:
    :ref:`multi-user-configuration` for additional configuration steps.
 
 
+.. _modify-configuration:
+
 Modify the Configuration Template
 ---------------------------------
 
