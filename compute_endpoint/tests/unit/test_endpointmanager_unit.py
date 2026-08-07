@@ -2425,7 +2425,7 @@ def test_set_uep_allowed_functions(
 
 
 def test_redirect_stdstreams_to_user_log(
-    successful_exec_from_mocked_root, conf_dir, command_payload, mock_ensure_path_patch
+    successful_exec_from_mocked_root, conf_dir, command_payload
 ):
     mock_os, *_, em = successful_exec_from_mocked_root
 
