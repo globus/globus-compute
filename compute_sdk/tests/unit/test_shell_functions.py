@@ -273,7 +273,6 @@ def test_sandbox_warning_with_missing_env_vars(run_in_tmp_dir):
     assert "WARNING: Task sandboxing will not work" in result.stderr
 
 
-@pytest.mark.skip("REMOVE SKIP")
 def test_skip_redundant_sandbox(run_in_tmp_dir, monkeypatch):
     """Confirm that sandbox is not created if executor is set to create sandbox"""
     task_id = str(uuid.uuid4())
@@ -301,7 +300,6 @@ def test_backward_compat(run_in_tmp_dir):
         assert std_file.split(".")[-1] in ["stdout", "stderr"]
 
 
-@pytest.mark.skip("REMOVE SKIP")
 def test_stdout_naming(run_in_tmp_dir, monkeypatch):
     """Confirm stdout/err paths are prefixed with task_uuid"""
     task_id = str(uuid.uuid4())
@@ -317,7 +315,6 @@ def test_stdout_naming(run_in_tmp_dir, monkeypatch):
         assert std_file.split(".")[0] == task_id
 
 
-@pytest.mark.skip("REMOVE SKIP")
 def test_bad_walltime(run_in_tmp_dir, monkeypatch):
     """ShellFunction should raise an error on negative walltime"""
     task_id = str(uuid.uuid4())
