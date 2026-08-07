@@ -1750,7 +1750,9 @@ def test_non_root_keeps_original_environment(
     assert all(env[k] and env[k] == expected_env[k] for k in exp_keys)
 
 
-def test_environment_default_path(successful_exec_from_mocked_root):
+def test_environment_default_path(
+    successful_exec_from_mocked_root, mock_ensure_path_patch
+):
     mock_os, *_, em = successful_exec_from_mocked_root
 
     with pytest.raises(SystemExit) as pyexc:
@@ -1767,7 +1769,9 @@ def test_environment_default_path(successful_exec_from_mocked_root):
         assert expected_dir == found_dir, "Expected sane default path order"
 
 
-def test_loads_user_environment(successful_exec_from_mocked_root, randomstring):
+def test_loads_user_environment(
+    successful_exec_from_mocked_root, mock_ensure_path_patch, randomstring
+):
     mock_os, conf_dir, *_, em = successful_exec_from_mocked_root
 
     sentinel_key = randomstring()
@@ -1783,7 +1787,9 @@ def test_loads_user_environment(successful_exec_from_mocked_root, randomstring):
     assert env[sentinel_key] == expected_env[sentinel_key]
 
 
-def test_notify_if_environment_file_empty(successful_exec_from_mocked_root, caplog):
+def test_notify_if_environment_file_empty(
+    successful_exec_from_mocked_root, mock_ensure_path_patch, caplog
+):
     _, conf_dir, *_, em = successful_exec_from_mocked_root
 
     conf_path = conf_dir / "user_environment.yaml"
@@ -1796,7 +1802,7 @@ def test_notify_if_environment_file_empty(successful_exec_from_mocked_root, capl
 
 
 def test_handles_invalid_user_environment_file_gracefully(
-    successful_exec_from_mocked_root, mocker
+    successful_exec_from_mocked_root, mock_ensure_path_patch, mocker
 ):
     mock_os, conf_dir, *_, em = successful_exec_from_mocked_root
     mock_warn = mocker.patch(f"{_MOCK_BASE}log.warning")
@@ -1817,7 +1823,7 @@ def test_handles_invalid_user_environment_file_gracefully(
 
 
 def test_environment_default_path_set_if_not_specified(
-    successful_exec_from_mocked_root,
+    successful_exec_from_mocked_root, mock_ensure_path_patch
 ):
     mock_os, conf_dir, *_, em = successful_exec_from_mocked_root
 
@@ -1833,7 +1839,7 @@ def test_environment_default_path_set_if_not_specified(
 
 
 def test_environment_includes_user_versions(
-    command_payload, successful_exec_from_mocked_root
+    command_payload, successful_exec_from_mocked_root, mock_ensure_path_patch
 ):
     mock_os, conf_dir, *_, em = successful_exec_from_mocked_root
 
@@ -1850,7 +1856,7 @@ def test_environment_includes_user_versions(
 
 @pytest.mark.no_mock_shutil
 def test_warns_if_executable_not_found(
-    mock_log, successful_exec_from_mocked_root, randomstring
+    mock_log, successful_exec_from_mocked_root, mock_ensure_path_patch, randomstring
 ):
     mock_os, conf_dir, *_, em = successful_exec_from_mocked_root
     exc_text = f"Some error: {randomstring()}"
@@ -1889,7 +1895,9 @@ def test_warns_if_executable_not_found(
     assert not k.get("fork", True)
 
 
-def test_start_endpoint_children_correct_command(successful_exec_from_mocked_root):
+def test_start_endpoint_children_correct_command(
+    successful_exec_from_mocked_root, mock_ensure_path_patch
+):
     mock_os, *_, em = successful_exec_from_mocked_root
     with pytest.raises(SystemExit) as pyexc:
         em._event_loop()
@@ -1902,7 +1910,10 @@ def test_start_endpoint_children_correct_command(successful_exec_from_mocked_roo
 
 
 def test_start_endpoint_children_backward_compatible_command(
-    command_payload, successful_exec_from_mocked_root, mock_props
+    command_payload,
+    successful_exec_from_mocked_root,
+    mock_ensure_path_patch,
+    mock_props,
 ):
     mock_os, *_, em = successful_exec_from_mocked_root
 
@@ -1922,7 +1933,9 @@ def test_start_endpoint_children_backward_compatible_command(
     assert k["args"][-1] == "--die-with-parent", "Expect differentiating flag"
 
 
-def test_start_endpoint_children_have_own_session(successful_exec_from_mocked_root):
+def test_start_endpoint_children_have_own_session(
+    successful_exec_from_mocked_root, mock_ensure_path_patch
+):
     mock_os, *_, em = successful_exec_from_mocked_root
     with pytest.raises(SystemExit) as pyexc:
         em._event_loop()
@@ -1931,7 +1944,9 @@ def test_start_endpoint_children_have_own_session(successful_exec_from_mocked_ro
     assert mock_os.setsid.called
 
 
-def test_start_endpoint_privileges_dropped(successful_exec_from_mocked_root):
+def test_start_endpoint_privileges_dropped(
+    successful_exec_from_mocked_root, mock_ensure_path_patch
+):
     mock_os, *_, em = successful_exec_from_mocked_root
     with pytest.raises(SystemExit) as pyexc:
         em._event_loop()
@@ -2010,7 +2025,9 @@ def test_start_endpoint_paranoid_reassumption_check(
     assert "regained original privileges" in a[0], "Expect explanation in logs"
 
 
-def test_start_endpoint_logs_to_std(mocker, successful_exec_from_mocked_root):
+def test_start_endpoint_logs_to_std(
+    mocker, successful_exec_from_mocked_root, mock_ensure_path_patch
+):
     *_, em = successful_exec_from_mocked_root
     mock_logging = mocker.patch("globus_compute_endpoint.logging_config.logging")
     with pytest.raises(SystemExit) as pyexc:
@@ -2026,7 +2043,11 @@ def test_start_endpoint_logs_to_std(mocker, successful_exec_from_mocked_root):
 
 @pytest.mark.parametrize("uep_ha", (True, False, "asdf"))
 def test_ha_disallowed_in_uep_conf(
-    mock_log, successful_exec_from_mocked_root, user_conf_template, uep_ha
+    mock_log,
+    successful_exec_from_mocked_root,
+    mock_ensure_path_patch,
+    user_conf_template,
+    uep_ha,
 ):
     tmpl_text = user_conf_template.read_text()
     tmpl_text += f"\nhigh_assurance: {str(uep_ha).lower()}"
@@ -2046,7 +2067,9 @@ def test_ha_disallowed_in_uep_conf(
 
 
 @pytest.mark.parametrize("mep_ha", (None, True, False))
-def test_ha_aligned(successful_exec_from_mocked_root, user_conf_template, mep_ha):
+def test_ha_aligned(
+    successful_exec_from_mocked_root, user_conf_template, mep_ha, mock_ensure_path_patch
+):
     em: EndpointManager
     mock_os, *_, em = successful_exec_from_mocked_root
     if mep_ha is not None:
@@ -2138,7 +2161,9 @@ def test_run_as_same_user_fails_if_admin(successful_exec_from_mocked_root):
     assert f"\n  Via identity:   {mpi.matched_identity}" in e_str
 
 
-def test_run_as_same_user_does_not_change_uid(successful_exec_from_mocked_root):
+def test_run_as_same_user_does_not_change_uid(
+    successful_exec_from_mocked_root, mock_ensure_path_patch
+):
     mock_os, *_, mock_pwd, em = successful_exec_from_mocked_root
     mock_pwd.getpwnam.return_value = em._mu_user
     mock_pwd.getpwnam.side_effect = None
@@ -2156,7 +2181,9 @@ def test_run_as_same_user_does_not_change_uid(successful_exec_from_mocked_root):
     assert not mock_os.setresgid.called
 
 
-def test_default_to_secure_umask(successful_exec_from_mocked_root):
+def test_default_to_secure_umask(
+    successful_exec_from_mocked_root, mock_ensure_path_patch
+):
     mock_os, *_, em = successful_exec_from_mocked_root
     with pytest.raises(SystemExit) as pyexc:
         em._event_loop()
@@ -2168,7 +2195,7 @@ def test_default_to_secure_umask(successful_exec_from_mocked_root):
     assert umask == 0o77
 
 
-def test_start_from_user_dir(successful_exec_from_mocked_root):
+def test_start_from_user_dir(successful_exec_from_mocked_root, mock_ensure_path_patch):
     mock_os, *_, em = successful_exec_from_mocked_root
     with pytest.raises(SystemExit) as pyexc:
         em._event_loop()
@@ -2180,7 +2207,9 @@ def test_start_from_user_dir(successful_exec_from_mocked_root):
     assert udir == expected_udir
 
 
-def test_ep_info_contains_candidates(successful_exec_from_mocked_root, ident):
+def test_ep_info_contains_candidates(
+    successful_exec_from_mocked_root, mock_ensure_path_patch, ident
+):
     mock_os, *_, em = successful_exec_from_mocked_root
 
     m = mock.Mock()
@@ -2240,7 +2269,7 @@ def test_ep_info_not_root_gets_no_matched_identity(
     assert ep_info["posix_ppid"] == mock_os.getppid()
 
 
-def test_all_files_closed(successful_exec_from_mocked_root):
+def test_all_files_closed(successful_exec_from_mocked_root, mock_ensure_path_patch):
     mock_os, *_, em = successful_exec_from_mocked_root
     with pytest.raises(SystemExit) as pyexc:
         with mock.patch(f"{_MOCK_BASE}close_all_fds") as mock_close:
@@ -2259,7 +2288,9 @@ def test_all_files_closed(successful_exec_from_mocked_root):
     assert closed == [0, 1, 2]
 
 
-def test_respects_config_template_and_schema(mocker, successful_exec_from_mocked_root):
+def test_respects_config_template_and_schema(
+    mocker, successful_exec_from_mocked_root, mock_ensure_path_patch
+):
     mock_os, conf_dir, _, _, _, em = successful_exec_from_mocked_root
 
     template_path = conf_dir / "my_template.yaml.j2"
@@ -2294,7 +2325,7 @@ def test_respects_config_template_and_schema(mocker, successful_exec_from_mocked
 
 
 def test_includes_mapped_identity_in_user_config(
-    mocker, successful_exec_from_mocked_root, ident
+    mocker, successful_exec_from_mocked_root, mock_ensure_path_patch, ident
 ):
     mock_os, *_, em = successful_exec_from_mocked_root
 
@@ -2346,7 +2377,9 @@ def test_ep_dir_log_path_envs_passed_to_render(
 
 
 @pytest.mark.parametrize("is_valid", (True, False))
-def test_pipe_size_limit(mocker, mock_log, successful_exec_from_mocked_root, is_valid):
+def test_pipe_size_limit(
+    mocker, mock_log, successful_exec_from_mocked_root, mock_ensure_path_patch, is_valid
+):
     *_, em = successful_exec_from_mocked_root
 
     stdin_data_size = 224  # Empirically/designed size of `stdin_data` string
@@ -2366,7 +2399,9 @@ def test_pipe_size_limit(mocker, mock_log, successful_exec_from_mocked_root, is_
         assert f"{stdin_data_size} bytes" in mock_log.error.call_args[0][0]
 
 
-def test_able_to_render_user_config_sc28360(successful_exec_from_mocked_root, conf_dir):
+def test_able_to_render_user_config_sc28360(
+    successful_exec_from_mocked_root, mock_ensure_path_patch, conf_dir
+):
     def _restrict_template_dir(*args, **kwargs):
         conf_dir.chmod(0o000)
 
@@ -2380,7 +2415,7 @@ def test_able_to_render_user_config_sc28360(successful_exec_from_mocked_root, co
 
 
 def test_mep_not_restricted_uep_allowed_functions_not_overridden(
-    successful_exec_from_mocked_root, mock_conf_root
+    successful_exec_from_mocked_root, mock_ensure_path_patch, mock_conf_root
 ):
     mock_os, *_, em = successful_exec_from_mocked_root
 
@@ -2401,7 +2436,7 @@ def test_mep_not_restricted_uep_allowed_functions_not_overridden(
 
 @pytest.mark.parametrize("fn_count", (0, 1, 2, 3, random.randint(4, 100)))
 def test_set_uep_allowed_functions(
-    successful_exec_from_mocked_root, mock_conf_root, fn_count
+    successful_exec_from_mocked_root, mock_ensure_path_patch, mock_conf_root, fn_count
 ):
     mock_os, *_, em = successful_exec_from_mocked_root
 
@@ -2450,7 +2485,13 @@ def test_redirect_stdstreams_to_user_log(
 
 @pytest.mark.parametrize("debug", (True, False))
 def test_user_debug_emits_ephemeral_config_to_user_log(
-    mocker, mock_log, successful_exec_from_mocked_root, conf_dir, command_payload, debug
+    mocker,
+    mock_log,
+    successful_exec_from_mocked_root,
+    mock_ensure_path_patch,
+    conf_dir,
+    command_payload,
+    debug,
 ):
     mock_os, *_, em = successful_exec_from_mocked_root
 
@@ -2597,7 +2638,7 @@ def test_pam_error(
 
 
 def test_do_auth_change_uid_then_close(
-    mock_conf_root, successful_exec_from_mocked_root, mock_pam
+    mock_conf_root, successful_exec_from_mocked_root, mock_ensure_path_patch, mock_pam
 ):
     mock_os, *_, em = successful_exec_from_mocked_root
 
