@@ -121,13 +121,17 @@ The template file lives in the manager endpoint directory by default, but users
 can specify a different template path using the ``user_config_template_path``
 setting in the manager's :ref:`config.yaml <endpoint-manager-config>`.
 
-The default template includes a basic single-worker configuration and defines
-two variables: ``endpoint_setup`` and ``worker_init``.  Both variables default
-to empty strings when not specified by the user, as indicated by the
-``...|default()`` filter.
+The default template includes a basic single-worker configuration and a
+``worker_init`` script that :ref:`manages the Python environment
+<dynamic-uep-environments>` for each worker process. That script honors two
+additional user-supplied variables:
+
+* ``requirements``, which declares the environment's Python packages; and
+* ``worker_init`` (not to be confused with the template's ``worker_init`` key),
+  where users can supply additional custom shell logic for configuring a worker node.
 
 .. code-block:: yaml+jinja
-   :caption: Default ``user_config_template.yaml.j2``
+   :caption: ``user_config_template.yaml.j2`` (with abridged ``worker_init`` script)
 
    endpoint_setup: {{ endpoint_setup|default() }}
 
@@ -140,7 +144,10 @@ to empty strings when not specified by the user, as indicated by the
          min_blocks: 0
          max_blocks: 1
          init_blocks: 1
-         worker_init: {{ worker_init|default() }}
+
+         worker_init: |
+            # installs `requirements` and runs the user's `worker_init`
+            ...
 
    idle_heartbeats_soft: 10
    idle_heartbeats_hard: 5760
@@ -167,8 +174,8 @@ by default, but users can specify a different schema path using the
 ``user_config_schema_path`` variable in the manager's :ref:`config.yaml
 <endpoint-manager-config>`.
 
-The default schema is quite permissive, enforcing that the two default template
-variables are strings, then allowing any other user-defined properties:
+The default schema is quite permissive, enforcing that the three default
+template variables are strings, then allowing any other user-defined properties:
 
 .. code-block:: json
    :caption: Default ``user_config_schema.json``
@@ -178,10 +185,15 @@ variables are strings, then allowing any other user-defined properties:
      "type": "object",
      "properties": {
        "endpoint_setup": { "type": "string" },
-       "worker_init": { "type": "string" }
+       "worker_init": { "type": "string" },
+       "requirements": { "type": "string", "minLength": 1 }
      },
      "additionalProperties": true
    }
+
+Additionally, ``requirements`` is validated as having at least one character
+via ``"minLength": 1``; see the :ref:`docs on dynamic task-time environments
+<dynamic-uep-environments>` for why.
 
 .. important::
 

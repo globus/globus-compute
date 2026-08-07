@@ -29,7 +29,7 @@ from globus_compute_endpoint.endpoint.config.utils import (
 )
 from globus_compute_endpoint.endpoint.endpoint import Endpoint
 from globus_compute_endpoint.endpoint.identity_mapper import MappedPosixIdentity
-from tests.conftest import randomstring_impl
+from tests.conftest import DEF_CONFIG_DIR, randomstring_impl
 from tests.unit.conftest import known_manager_config_opts, known_user_config_opts
 
 _MOCK_BASE = "globus_compute_endpoint.endpoint.config.utils."
@@ -90,6 +90,37 @@ def mapped_ident(mocker):
 def conf_no_engine():
     # empty so as to avoid unnecessary network lookup
     yield UserEndpointConfig(engine=None)
+
+
+@pytest.fixture
+def render_default_uep_template(fs, mapped_ident, conf_no_engine):
+    template_path = DEF_CONFIG_DIR / "user_config_template.yaml.j2"
+    schema_path = DEF_CONFIG_DIR / "user_config_schema.json"
+    fs.add_real_file(template_path)
+    fs.add_real_file(schema_path)
+
+    template = load_user_config_template(template_path)
+    schema = load_user_config_schema(schema_path)
+
+    default_user_runtime = {
+        "globus_compute_sdk_version": "2.3.4",
+        "python": {"version_tuple": [3, 11, 9]},
+    }
+
+    def _render(
+        user_opts: dict | None = None, user_runtime: dict = default_user_runtime
+    ):
+        return render_config_user_template(
+            conf_no_engine,
+            template,
+            template_path,
+            mapped_ident,
+            schema,
+            user_opts,
+            user_runtime,
+        )
+
+    return _render
 
 
 def _get_cls_kwds(cls: type) -> set[str]:
@@ -762,3 +793,150 @@ def test_render_user_config(
             )
         a, _k = mock_log.debug.call_args
         assert "Missing required" in a[0]
+
+
+def _env_path(env_name: str) -> str:
+    return f'ENV_PATH="$HOME/.globus_compute/venvs/{env_name}"'
+
+
+def test_default_template_matches_submitter_runtime(render_default_uep_template):
+    rendered_template = render_default_uep_template()
+    wi = yaml.safe_load(rendered_template)["engine"]["provider"]["worker_init"]
+
+    assert "uv venv" in wi
+    assert "--python 3.11.9" in wi
+    assert "UV_EXCLUDE_NEWER=false uv pip install" in wi, (
+        "endpoint package is never held back by a dependency cooldown"
+    )
+    assert "globus-compute-endpoint==2.3.4" in wi
+    assert _env_path("py3.11.9-sdk2.3.4") in wi, (
+        "python and sdk versions are known, so the env name is built from them"
+    )
+    assert "uv pip install -r" not in wi, "no requirements -> no user-package install"
+    assert "md5sum" not in wi, "no requirements -> no per-reqs env hash"
+
+
+@pytest.mark.parametrize(
+    "requirements", ("numpy==2.1.0\nscikit-learn\n# comment\nrequests>=2.32", None)
+)
+def test_default_template_user_requirements(render_default_uep_template, requirements):
+    user_opts = {"requirements": requirements} if requirements is not None else {}
+
+    rendered_template = render_default_uep_template(user_opts)
+    wi = yaml.safe_load(rendered_template)["engine"]["provider"]["worker_init"]
+
+    if requirements is not None:
+        assert "-reqs$(echo -e" in wi, "requirements are folded into the env name"
+        assert "uv pip install -r <(echo -e" in wi, (
+            "requested requirements are installed"
+        )
+        assert json.dumps(requirements) in wi, (
+            "sanitized requirements survive verbatim into shell"
+        )
+    else:
+        assert "uv pip install -r" not in wi, (
+            "no requirements -> no user-package install"
+        )
+        assert "md5sum" not in wi, "no requirements -> no per-reqs env hash"
+
+
+@pytest.mark.parametrize("worker_init", ("module load cuda", None))
+def test_default_template_worker_init(render_default_uep_template, worker_init):
+    user_opts = {"worker_init": worker_init} if worker_init is not None else {}
+
+    rendered_template = render_default_uep_template(user_opts)
+    wi = yaml.safe_load(rendered_template)["engine"]["provider"]["worker_init"]
+
+    if worker_init is not None:
+        assert json.dumps(worker_init) in wi, (
+            "sanitized worker_init appears when the user supplies it"
+        )
+    else:
+        assert "eval '$(echo -e" not in wi, "no worker_init -> nothing evaluated"
+
+
+@pytest.mark.parametrize("user_runtime", ({}, {"python": {}}))
+def test_default_template_worker_init_missing_runtime(
+    render_default_uep_template, user_runtime
+):
+    rendered_template = render_default_uep_template(user_runtime=user_runtime)
+    wi = yaml.safe_load(rendered_template)["engine"]["provider"]["worker_init"]
+
+    assert not wi, (
+        "older SDKs may not report runtime; with nothing to match against and no "
+        "requirements to install, there is no environment to build -- but the "
+        "template must still render a valid config"
+    )
+
+
+@pytest.mark.parametrize("user_runtime", ({}, {"python": {}}))
+def test_default_template_builds_env_for_requirements_alone(
+    render_default_uep_template, user_runtime
+):
+    user_opts = {"requirements": "numpy==2.1.0"}
+    rendered_template = render_default_uep_template(
+        user_opts, user_runtime=user_runtime
+    )
+    wi = yaml.safe_load(rendered_template)["engine"]["provider"]["worker_init"]
+
+    assert "uv venv" in wi, "requirements alone are enough to warrant an environment"
+    assert "md5sum" in wi, "requirements are folded into the env name"
+    assert "uv pip install -r <(echo -e" in wi, "requested requirements are installed"
+    assert "globus-compute-endpoint" in wi, (
+        "an environment we build must be able to run tasks"
+    )
+    assert "--python" not in wi, "no known python version -> uv picks the default"
+    assert "globus-compute-endpoint==" not in wi, (
+        "no known sdk version -> install the latest release"
+    )
+
+
+@pytest.mark.parametrize(
+    "user_runtime, expected_uv_venv, expected_endpoint_spec, expected_env_name",
+    (
+        (
+            {"python": {"version_tuple": [3, 11, 9]}},
+            'uv venv --allow-existing "$ENV_PATH" --python 3.11.9',
+            "globus-compute-endpoint",
+            "py3.11.9",
+        ),
+        (
+            {"globus_compute_sdk_version": "2.3.4"},
+            'uv venv --allow-existing "$ENV_PATH"',
+            "globus-compute-endpoint==2.3.4",
+            "sdk2.3.4",
+        ),
+    ),
+)
+def test_default_template_tolerates_partially_known_user_runtime(
+    render_default_uep_template,
+    user_runtime,
+    expected_uv_venv,
+    expected_endpoint_spec,
+    expected_env_name,
+):
+    rendered_template = render_default_uep_template(user_runtime=user_runtime)
+    wi = yaml.safe_load(rendered_template)["engine"]["provider"]["worker_init"]
+
+    assert expected_uv_venv in wi
+    assert expected_endpoint_spec in wi
+    assert _env_path(expected_env_name) in wi
+
+    if "version_tuple" not in user_runtime.get("python", {}):
+        assert "--python" not in wi
+
+    if "globus_compute_sdk_version" not in user_runtime:
+        assert "globus-compute-endpoint==" not in wi
+
+
+def test_default_template_rejects_empty_string_requirements(
+    render_default_uep_template,
+):
+    # SHOULD render with requirements either missing or at least 1 char long
+    render_default_uep_template({})
+    render_default_uep_template({"requirements": "a"})
+
+    # should NOT render with an empty string
+    with pytest.raises(jsonschema.ValidationError) as pyt_exc:
+        render_default_uep_template({"requirements": ""})
+    assert pyt_exc.value.validator == "minLength", "reject empty requirements noop"
