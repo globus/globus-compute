@@ -2171,24 +2171,9 @@ def test_ep_info_contains_candidates(successful_exec_from_mocked_root, ident):
 
 
 def test_ep_info_not_root_gets_no_matched_identity(
-    epmanager_as_user, mock_props, randomstring, mock_auth_client
+    successful_exec_from_mocked_user, mock_props, randomstring, mock_auth_client
 ):
-    *_, mock_os, _, em = epmanager_as_user
-    ident_rv = mock_auth_client.userinfo.return_value
-
-    cmd_payload = {
-        "globus_effective_identity": "abc",
-        "globus_identity_set": ident_rv["identity_set"],
-        "globus_username": "a@b.com",
-        "command": "cmd_start_endpoint",
-        "kwargs": {
-            "name": "some_ep_name",
-            "user_opts": {"heartbeat": 10},
-            "amqp_creds": {},
-        },
-    }
-    queue_item = (1, mock_props, json.dumps(cmd_payload).encode())
-    em._command_queue.get.side_effect = (queue_item, queue.Empty())
+    mock_os, *_, em = successful_exec_from_mocked_user
 
     m = mock.Mock()
     mock_os.fdopen.return_value.__enter__.return_value = m
