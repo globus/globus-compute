@@ -52,7 +52,7 @@ def test_engine_submit(
     f = GCFuture(task_uuid)
     with mock.patch.dict(os.environ):
         engine.submit(f, task_bytes, resource_specification={})
-    packed_result = f.result()
+        packed_result = f.result()
 
     # Confirm that the future got the right answer
     assert isinstance(packed_result, bytes)
