@@ -303,8 +303,8 @@ class UserEndpointConfig(BaseConfig):
 Config = UserEndpointConfig
 
 
-class ManagerEndpointConfig(BaseConfig):
-    """Holds the configuration items for an endpoint manager.
+class CoreEndpointConfig(BaseConfig):
+    """Holds the configuration items for a core endpoint.
 
     Typically, one does not instantiate this configuration directly, but specifies
     the relevant options in the endpoint's ``config.yaml`` file.  In fact, the way that
@@ -315,7 +315,7 @@ class ManagerEndpointConfig(BaseConfig):
        :caption: ``config.yaml`` for Managers
 
        # this file left empty; with no engine block, Compute interprets this
-       # as a manager endpoint
+       # as a core endpoint
 
     .. code-block:: yaml
        :caption: ``config.yaml`` for task-processing endpoints (i.e., non-Managers)
@@ -326,7 +326,7 @@ class ManagerEndpointConfig(BaseConfig):
        # with an engine block, Compute will instantiate a task-processing endpoint
        # (i.e., a user-endpoint process, or UEP)
 
-    Note that for manager endpoints that will not be run with privileges, identity
+    Note that for core endpoints that will not be run with privileges, identity
     mapping is disabled (hence not specified above).  Conversely, if the process will
     have elevated privileges (e.g., run by ``root`` user or has |setuid(2)|_
     privileges) then identity mapping is required:
@@ -361,7 +361,7 @@ class ManagerEndpointConfig(BaseConfig):
         does not exist.
 
     :param audit_log_path: Path to the audit log.  If specified, and the endpoint is
-        marked as High-Assurance (HA), then the MEP will write auditing records here.
+        marked as High-Assurance (HA), then the CEP will write auditing records here.
         An auditing record is a single-line of text, received from child endpoints at
         "interesting" points in a task lifetime.  For example, when the UEP interchange
         first receives a task, it will emit an auditing record of ``RECEIVED`` for that
@@ -377,10 +377,10 @@ class ManagerEndpointConfig(BaseConfig):
         specified, PAM authorization defaults to disabled.
 
     :param mu_child_ep_grace_period_s: The web-services send a start-user-endpoint to
-        the endpoint manager ahead of tasks for the target user endpoint.  If the
+        the core endpoint ahead of tasks for the target user endpoint.  If the
         user-endpoint is already running, these requests are ignored.  To account for
         the inherent race-condition of receiving a start request just before the
-        user-endpoint shuts down, the endpoint manager will hold on to the most recent
+        user-endpoint shuts down, the core endpoint will hold on to the most recent
         start request for the user-endpoint for this grace period.
 
     .. |BaseConfig| replace:: :class:`BaseConfig <globus_compute_endpoint.endpoint.config.config.BaseConfig>`

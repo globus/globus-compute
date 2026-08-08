@@ -177,7 +177,7 @@ fields, to specify the contact email and identity mapping file path respectively
    email: admin@example.edu
    identity_mapping_config_path: /root/.globus_compute/my_mu_ep/example_identity_mapping_config.json
 
-Please refer to :ref:`endpoint-manager-config` for details on each field.
+Please refer to :ref:`core-endpoint-config` for details on each field.
 
 
 .. _example-idmap-config:
@@ -196,7 +196,7 @@ to the regex before searching, so the actual regular expression used would be
 ``^(.*)@example.com$``.  Finally, if a match is found, the first saved group is
 the output (i.e., ``{0}``).  As an example, if a ``username`` field contained
 ``mickey97@example.com``, then this configuration would return ``mickey97``, and
-the MEP would then use |getpwnam(3)|_ to look up ``mickey97``.  But if no
+the CEP would then use |getpwnam(3)|_ to look up ``mickey97``.  But if no
 username field in any of the identities in the set ended with ``@example.com``,
 then it would not match and the start request would fail.
 
@@ -262,9 +262,9 @@ trying multiple avenues to ascertain a proper mapping.
    ``globus-idm-validator`` tool.  This script is installed as part of the
    |globus-identity-mapping|_ dependency.
 
-The manager endpoint process watches this file for changes.  If an administrator
+The core endpoint process watches this file for changes.  If an administrator
 needs to make a live change, simply update the content of the identity mapping
-file specified by the ``config.yaml`` configuration.  The manager endpoint
+file specified by the ``config.yaml`` configuration.  The core endpoint
 process will note the change and atomically apply it: if the new identity
 mapping configuration is invalid, the previously loaded configuration will
 remain in place.  In both cases (valid or invalid), the endpoint will emit a
@@ -407,7 +407,7 @@ Starting the Multi-User Endpoint
 ================================
 
 A multi-user endpoint requires a privileged local user account (e.g., ``root``)
-to start, enabling the manager endpoint process to perform identity mapping and
+to start, enabling the core endpoint process to perform identity mapping and
 drop privileges to mapped user accounts.  Apart from this initial setup
 requirement, multi-user endpoints operate identically to regular endpoints for
 starting and stopping:
@@ -424,7 +424,7 @@ isolation of execution environments:
 .. code-block:: text
    :caption: Multi-user endpoint process hierarchy
 
-   Manager Endpoint Process (root)
+   Core Endpoint Process (root)
    ├── User Endpoint Process (alice, UID: 1001)
    ├── User Endpoint Process (bob, UID: 1002)
    └── User Endpoint Process (eve, UID: 1003)
@@ -548,7 +548,7 @@ As a brief intro to PAM, the architecture is designed with four phases:
 The multi-user endpoint implements *account* and *session management*.  If
 enabled, then the child process will create a PAM session, check the account
 (|pam_acct_mgmt(3)|_), and then open a session (|pam_open_session(3)|_).  If
-these two steps succeed, then the manager endpoint process will continue to drop
+these two steps succeed, then the core endpoint process will continue to drop
 privileges.  But in these two steps is where the administrator can implement
 custom configuration.
 
@@ -855,7 +855,7 @@ Administrator Quickstart
    .. code-block:: console
 
       # globus-compute-endpoint start prod_gpu_large
-      > Endpoint Manager initialization
+      > Core Endpoint initialization
       Please authenticate with Globus here:
       ------------------------------------
       https://auth.globus.org/v2/oauth2/authorize?clie...&prompt=login
@@ -872,7 +872,7 @@ Administrator Quickstart
       # globus-compute-endpoint start prod_gpu_large --log-to-console
       >
 
-      ========== Endpoint Manager begins: 1ed568ab-79ec-4f7c-be78-a704439b2266
+      ========== Core Endpoint begins: 1ed568ab-79ec-4f7c-be78-a704439b2266
               >>> Multi-User Endpoint ID: 1ed568ab-79ec-4f7c-be78-a704439b2266 <<<
 
    Additionally, for even noisier output, there is ``--debug``.
