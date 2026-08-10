@@ -1,5 +1,3 @@
-from __future__ import annotations
-
 import functools
 import inspect
 import os
@@ -10,12 +8,7 @@ import uuid
 from unittest import mock
 
 import pytest
-from globus_compute_endpoint.endpoint import endpoint
-from globus_compute_endpoint.endpoint.config import (
-    PamConfiguration,
-    UserEndpointConfig,
-)
-from globus_compute_endpoint.engines import ThreadPoolEngine
+from globus_compute_endpoint.endpoint.config import PamConfiguration
 from globus_compute_endpoint.engines.helper import execute_task
 from parsl import HighThroughputExecutor
 from parsl.executors import MPIExecutor
@@ -45,6 +38,9 @@ known_user_config_opts = {
     "idle_heartbeats_hard": int,
     "endpoint_setup": str,
     "endpoint_teardown": str,
+    "log_dir": str,
+    "stdout": str,
+    "stderr": str,
     "local_compute_services": True,
     "environment": str,
     "high_assurance": False,

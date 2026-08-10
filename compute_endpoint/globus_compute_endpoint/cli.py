@@ -582,7 +582,7 @@ def configure_endpoint(
 
 @app.command(name="start", help="Start an endpoint")
 @name_or_uuid_arg
-@mep_start_options
+@cep_start_options
 @common_options
 @handle_auth_errors
 @click.option(
@@ -1072,7 +1072,7 @@ def _do_stop_endpoint(*, ep_dir: pathlib.Path, remote: bool = False) -> None:
 @app.command("restart")
 @name_or_uuid_arg
 @common_options
-@mep_start_options
+@cep_start_options
 def restart_endpoint(*, ep_dir: pathlib.Path, **_kwargs):
     """Restarts an endpoint"""
     state = CommandState.ensure()

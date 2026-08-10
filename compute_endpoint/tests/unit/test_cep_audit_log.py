@@ -93,7 +93,7 @@ def reg_info(ep_uuid):
 
 
 @pytest.fixture
-def mock_os_log():
+def mock_os():
     with mock.patch(f"{_MOCK_BASE}os") as m:
         m.O_DIRECT = os.O_DIRECT
         m.fork.return_value = 0
@@ -107,13 +107,7 @@ def mock_os_log():
         m.dup2.side_effect = (0, 1, 2, AssertionError("dup2: unexpected?"))
         m.open.side_effect = (4, 5, AssertionError("open: unexpected?"))
 
-        with (
-            mock.patch.object(fcntl, "fcntl", return_value=8192),
-            mock.patch(
-                f"{_MOCK_BASE}ensure_log_path",
-                side_effect=lambda: pathlib.Path("/a/b/some_endpoint_name"),
-            ),
-        ):
+        with mock.patch.object(fcntl, "fcntl", return_value=8192):
             yield m
 
 

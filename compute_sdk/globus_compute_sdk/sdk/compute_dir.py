@@ -4,7 +4,6 @@ import os
 from pathlib import Path
 
 COMPUTE_DIR_ENV = "GLOBUS_COMPUTE_USER_DIR"
-COMPUTE_EP_DIR_ENV = "GLOBUS_COMPUTE_ENDPOINT_DIR"
 
 
 def get_compute_dir() -> Path:

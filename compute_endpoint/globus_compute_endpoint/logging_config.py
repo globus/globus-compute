@@ -13,8 +13,6 @@ import sys
 from collections import defaultdict
 from datetime import datetime
 
-from globus_compute_sdk.sdk.compute_dir import COMPUTE_EP_DIR_ENV
-
 log = logging.getLogger(__name__)
 
 LOG_TS_FMT = "%Y-%m-%d %H:%M:%S,%f"
@@ -23,7 +21,6 @@ DEFAULT_FORMAT = (
     "%(threadName)s-%(thread)d %(name)s:%(lineno)d %(funcName)s "
     "%(message)s"
 )
-LOG_PATH_ENV = "GLOBUS_COMPUTE_LOG_PATH"
 
 _und = "\033[4m"
 _ital = "\033[3m"

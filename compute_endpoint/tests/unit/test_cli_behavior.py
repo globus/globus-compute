@@ -23,7 +23,6 @@ import yaml
 from click import ClickException
 from click import File as ClickFile
 from click.testing import CliRunner
-from endpoint.config import CoreEndpointConfig
 from globus_compute_endpoint import cli
 from globus_compute_endpoint.cli import (
     _AUTH_POLICY_DEFAULT_DESC,
