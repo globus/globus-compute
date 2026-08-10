@@ -67,7 +67,7 @@ if not _has_multi_user and "--debug" in sys.argv and sys.stderr.isatty():
     # We haven't set up logging yet so manually print for now
     _e = pyprctl_import_error
     print(
-        f"(DEBUG) {__file__}: pyprctl not available; CEPs will not work"
+        f"(DEBUG) {__file__}: pyprctl not available; endpoint may fail to start"
         "\n(DEBUG) (Hints: Is pyprctl installed? Is this a Linux system?)"
         f"\n(DEBUG) [{type(_e).__name__}] {_e}",
         file=sys.stderr,
@@ -471,7 +471,7 @@ def configure_endpoint(
     """
     if not _has_multi_user:
         raise ClickException(
-            "Unable to configure new endpoints; Core Endpoint Processes are not"
+            "Unable to configure new endpoints; Compute endpoints are not"
             " supported on this system"
         )
 
