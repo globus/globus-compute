@@ -1167,7 +1167,7 @@ class CoreEndpoint:
                 env.setdefault("GC_USER_PYTHON_VERSION", py_version)
             if gce_version := user_runtime.get("globus_compute_sdk_version"):
                 env.setdefault("GC_USER_SDK_VERSION", gce_version)
-                # assuming (as in the TMEP case) that if this env var is set, the UEP
+                # assuming (as in the TEP case) that if this env var is set, the UEP
                 # will run on this version of GCE. therefore, update proc args here
                 # for backward compatibility with UEP code that expects
                 # `gce start --die-with-parent` instead of `gce _start-user-endpoint`.
@@ -1207,10 +1207,11 @@ class CoreEndpoint:
             exit_code += 1
             _conf = yaml.safe_load(user_config)
 
+            contact_msg = "Error generating template; contact endpoint administrator"
             _ha_key = "high_assurance"
             if _ha_key in _conf:
                 log.error(f"`{_ha_key}` may not be specified in template")
-                raise ValueError("Error generating template; contact EP administrator")
+                raise ValueError(contact_msg)
 
             if self._config.high_assurance:
                 user_config = f"{_ha_key}: true\n{user_config}"
@@ -1218,7 +1219,7 @@ class CoreEndpoint:
             if bool(_conf.get(_ha_key)) ^ self._config.high_assurance:
                 # final check that the configuration HAness aligns
                 log.error(f"Unknown error generating correct template: `{_ha_key}`")
-                raise ValueError("Error generating template; contact EP administrator")
+                raise ValueError(contact_msg)
 
             ep_info: dict = {"posix_ppid": os.getppid()}
             if ident.matched_identity:

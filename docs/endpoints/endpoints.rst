@@ -32,6 +32,10 @@ A Globus Compute Endpoint consists of three main process types:
   resources (e.g., HPC cluster nodes) according to the rendered configuration
   template.
 
+.. note::
+  The ``Core`` endpoint was previously known as the ``Manager`` endpoint, changed
+  in 4.16.0, released August 2026
+
 For a detailed look at how a task makes its way to a user endpoint process, see
 :ref:`tracing-a-task`.
 

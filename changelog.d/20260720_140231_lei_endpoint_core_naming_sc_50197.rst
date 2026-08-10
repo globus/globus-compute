@@ -1,8 +1,8 @@
 Changed
 ^^^^^^^
 
-- The Compute "parent" endpoint process responsible for maintaining the lifecycle
-  of individual user endpoints has been renamed from the ``Manager Endpoint``
+- The Compute "parent" endpoint process, responsible for maintaining the lifecycle
+  of individual user endpoints, has been renamed from the ``Manager Endpoint``
   (MEP) to the ``Core Endpoint`` (CEP).
 
    This change merely renames classes, variables and updates documentation and
