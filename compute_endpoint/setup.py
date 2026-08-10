@@ -24,10 +24,7 @@ REQUIRES = [
     "click>=8.3.3,<8.4.0",
     "click-option-group>=0.5.6,<1",
     "pyzmq>=24,<=28",
-    # 'parsl' is a core requirement of the globus-compute-endpoint, essential to a range
-    # of different features and functions
-    # pin exact versions because it does not use semver
-    "parsl==2026.4.20",
+    "parsl>=2026.7.27",
     # May 2026: Parsl 1.4.0 just released; has an as-yet undiagnosed iteration bug
     "pika>=1.2,<1.5",
     "pyprctl<0.2.0",
