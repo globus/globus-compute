@@ -152,8 +152,9 @@ class GlobusComputeEngine(GlobusComputeEngineBase):
         self.executor.launch_cmd = self._get_compute_launch_cmd()
 
         # This flag serves as a temporary workaround to support different
-        # Python versions at the endpoint and worker layers. We can drop
-        # the flag once Parsl supports modular internal message protocols.
+        # Python and Parsl versions at the endpoint and worker layers.  We
+        # can drop this flag once Parsl supports modular internal message
+        # protocols.
         self.executor._check_python_mismatch = False
 
         self.run_in_sandbox = run_in_sandbox
@@ -306,6 +307,7 @@ class GlobusComputeEngine(GlobusComputeEngineBase):
     ):
         assert endpoint_id, "GCExecutor requires kwarg:endpoint_id at start"
         assert run_dir, "GCExecutor requires kwarg:run_dir at start"
+        assert self.executor.provider is not None, "GCExecutor requires a provider"
 
         self.set_working_dir(run_dir=run_dir)
 
@@ -508,6 +510,8 @@ class GlobusComputeEngine(GlobusComputeEngineBase):
     @property
     def scaling_enabled(self) -> bool:
         """Indicates whether scaling is possible"""
+        assert self.executor.provider is not None, "much earlier problems if None"
+
         max_blocks = self.executor.provider.max_blocks
         return max_blocks > 0
 
@@ -524,6 +528,8 @@ class GlobusComputeEngine(GlobusComputeEngineBase):
         -------
         Object containing info on the current status of the endpoint
         """
+        assert self.executor.provider is not None, "much earlier problems if None"
+
         managers = self.get_connected_managers()
         managers_packages = self.get_connected_managers_packages()
         manager_info: dict[str, list] = {}
