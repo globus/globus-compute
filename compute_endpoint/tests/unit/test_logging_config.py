@@ -12,7 +12,7 @@ from globus_compute_endpoint.logging_config import (
     ensure_paths,
     setup_logging,
 )
-from globus_compute_sdk.sdk.compute_dir import COMPUTE_EP_DIR_ENV, ensure_compute_dir
+from globus_compute_sdk.sdk.compute_dir import COMPUTE_EP_DIR_ENV
 from pytest_mock import MockFixture
 
 _MOCK_BASE = "globus_compute_endpoint.logging_config."
@@ -103,80 +103,37 @@ def test_include_correct_loggers(logfile: t.Optional[str], mocker: MockFixture, 
     assert set(loggers) == expected, "Time to update this test?"
 
 
-@pytest.mark.parametrize("ep_dir_env", ("/path/to/ep_dir", None))
-def test_ensure_paths_no_name_provided(fs, mock_ensure_compute, ep_dir_env):
-    env_dict = {"random_env": "value"}
-    if ep_dir_env:
-        env_dict[COMPUTE_EP_DIR_ENV] = ep_dir_env
-
-    with mock.patch.dict(os.environ, env_dict, clear=True):
-        if ep_dir_env:
-            # If the environment variable is set, ep_name is not required
-            assert f"{ep_dir_env}/endpoint.log" == str(ensure_paths("").resolve())
-        else:
-            with pytest.raises(ValueError) as pyt_exc:
-                ensure_paths("")
-            assert f"Endpoint name must be provided" in str(pyt_exc.value)
+@pytest.mark.parametrize("ep_name", ("", None))
+def test_ensure_paths_no_name_provided(fs, mock_ensure_compute, ep_name):
+    with mock.patch.dict(os.environ, {}, clear=True):
+        with pytest.raises(ValueError) as pyt_exc:
+            ensure_paths(ep_name)
+    assert f"Endpoint name must be provided" in str(pyt_exc.value)
 
 
-@pytest.mark.parametrize(
-    ("is_dir", "exc_msg"),
-    (
-        [True, "can not be a directory"],
-        [False, None],
-        [None, None],
-    ),
-)
-def test_ensure_path_log_path_not_dir(fs, is_dir, exc_msg):
+def test_ensure_path_log_path_not_dir(fs):
+    a_path = pathlib.Path("/a/b/c/d")
+    a_path.mkdir(parents=True)
+    with mock.patch.dict(os.environ, {LOG_PATH_ENV: str(a_path)}, clear=True):
+        with pytest.raises(ValueError) as pyt_exc:
+            ensure_paths("ep1")
+        exc_msg = str(pyt_exc.value)
+        assert LOG_PATH_ENV in exc_msg, "Expect relevant env var referenced"
+        assert "can not be a directory" in exc_msg, "Expect cause"
+        assert str(a_path) in exc_msg, "Expect problem value in msg"
+
+
+def test_ensure_path_ep_dir_not_dir(fs):
     a_path = pathlib.Path("/a/b/c/d")
     a_path.parent.mkdir(parents=True)
-    if is_dir:
-        a_path.mkdir()
-    elif is_dir is not None:
-        # False means it's a file, None means the file doesn't exist
-        a_path.touch()
-
-    with mock.patch.dict(os.environ, {LOG_PATH_ENV: str(a_path.resolve())}):
-        if exc_msg:
-            with pytest.raises(ValueError) as pyt_exc:
-                ensure_paths("ep1")
-            assert exc_msg in str(pyt_exc.value)
-        else:
-            # Should create the dir structure
-            result_path = ensure_paths("ep1")
-            assert result_path == a_path
-            assert result_path.parent.exists()
-
-
-@pytest.mark.parametrize(
-    ("is_file", "exc_msg"),
-    (
-        [True, "can not be an existing file"],
-        [False, None],
-        [None, None],
-    ),
-)
-def test_ensure_paths_ep_dir_not_file(fs, is_file, exc_msg):
-    a_path = pathlib.Path("/a/b/c")
-
-    a_path.parent.mkdir(parents=True)
-    if is_file:
-        a_path.touch(exist_ok=True)
-    else:
-        a_path.mkdir()
-
-    with mock.patch.dict(
-        os.environ, {COMPUTE_EP_DIR_ENV: str(a_path.resolve())}, clear=True
-    ):
-        if exc_msg:
-            with pytest.raises(ValueError) as pyt_exc:
-                ensure_paths("ep1")
-            assert exc_msg in str(pyt_exc.value)
-        else:
-            # Should create the dir structure
-            result_path = ensure_paths("ep1")
-            assert result_path == a_path / "endpoint.log"
-            assert result_path.parent.exists()
+    a_path.touch()
+    with mock.patch.dict(os.environ, {COMPUTE_EP_DIR_ENV: str(a_path)}, clear=True):
+        with pytest.raises(ValueError) as pyt_exc:
+            ensure_paths("ep1")
+        exc_msg = str(pyt_exc.value)
+        assert COMPUTE_EP_DIR_ENV in exc_msg, "Expect relevant env var referenced"
+        assert "must be a directory" in exc_msg, "Expect cause"
+        assert str(a_path) in exc_msg, "Expect problem value in msg"
 
 
 @pytest.mark.parametrize(
@@ -210,7 +167,7 @@ def test_ensure_paths_expand_resolve_config_overrides_env(fs, env, paths, ep_nam
         3) Env vars such as $HOME gets expanded, as are ~/a/b/c format
     """
     if not (ep_name or paths.get("endpoint_dir") or env.get(COMPUTE_EP_DIR_ENV)):
-        # This (nothing given) errors, tested in test_ensure_paths_no_named_provided
+        # This (nothing given) errors, tested in test_ensure_paths_no_name_provided
         return
 
     env.update({"HOME": "/home/foo", "USER": "bar"})
@@ -219,11 +176,15 @@ def test_ensure_paths_expand_resolve_config_overrides_env(fs, env, paths, ep_nam
     exp_log = paths.get("endpoint_log", env.get(LOG_PATH_ENV, f"{exp_ep}/endpoint.log"))
 
     with mock.patch.dict(os.environ, env):
-        exp_ep = pathlib.Path(os.path.expandvars(exp_ep)).expanduser()
-        exp_log = pathlib.Path(os.path.expandvars(exp_log)).expanduser()
-        log_result = str(ensure_paths(ep_name, paths).resolve())
-        assert log_result == str(pathlib.Path(exp_log).resolve())
-        assert os.environ.get(COMPUTE_EP_DIR_ENV) == str(pathlib.Path(exp_ep).resolve())
+        exp_ep = pathlib.Path(os.path.expandvars(exp_ep)).expanduser().resolve()
+        exp_log = pathlib.Path(os.path.expandvars(exp_log)).expanduser().resolve()
+        log_result = ensure_paths(ep_name, paths)
+        assert os.environ[COMPUTE_EP_DIR_ENV] == str(exp_ep), "Expect env always set"
+        assert os.environ[LOG_PATH_ENV] == str(exp_log), "Expect env always set"
+        assert str(log_result) == str(exp_log)
+
+        assert exp_ep.stat().st_mode & 0o777 == 0o700
+        assert exp_log.parent.stat().st_mode & 0o777 == 0o700
 
 
 def test_ensure_paths_default_uses_name_and_compute_dir(fs, mock_ensure_compute):
