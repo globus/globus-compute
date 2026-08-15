@@ -199,49 +199,36 @@ def get_ep_dir_by_name_or_uuid(ctx, param, value, require_local: bool = True):
                              If this is False, an unrecognized UUID is ok,
                              presumably used to interact with the web-service.
     """
+
     if not value:
         ctx.params["ep_dir"] = None
         return
 
-    conf_dir = get_compute_dir()
-    try:
-        uuid.UUID(value)
-    except ValueError:
-        # value is a name
-        path = conf_dir / value
-        uuid_provided = False
+    ep_dir: pathlib.Path | None
+    if _ep_dir := os.environ.get(COMPUTE_EP_DIR_ENV):
+        ep_dir = pathlib.Path(_ep_dir)
     else:
-        uuid_provided = True
-        path = Endpoint.get_endpoint_dir_by_uuid(conf_dir, value)
+        conf_dir = get_compute_dir()
+        try:
+            uuid.UUID(value)
 
-        # pass the UUID value as a param to be used later, but only if
-        # the endpoint isn't necessarily local.  This require_local check
-        # also avoids adding the `ep_uuid` as a param to some endpoint commands
-        if not require_local:
-            ctx.params["ep_uuid"] = value
+            if not require_local:
+                # pass the UUID value as a param to be used later, but only if
+                # the endpoint isn't necessarily local.  This require_local check
+                # also avoids adding the `ep_uuid` as a param to some endpoint commands
+                ctx.params["ep_uuid"] = value
 
-    if (path and not path.exists()) or (path is None and require_local):
-        # If a EP name is given but dir doesn't exist, or if a UUID
-        # is given but a local dir is required but missing, error out.
-        # (Otherwise, proceed with at least one of ep_dir/ep_uuid set)
-        if uuid_provided:
-            ep_info = f"with ID {value}"
-            ep_name = "<endpoint_name>"
-        else:
-            ep_info = f"at {path}"
-            ep_name = value
+            ep_dir = Endpoint.get_endpoint_dir_by_uuid(conf_dir, value)
+            ep_info = value
+        except ValueError:
+            ep_dir = conf_dir / value
+            ep_info = ep_dir
 
-        msg = textwrap.dedent(f"""
-            There is no endpoint configuration on this machine {ep_info}
-
-            1. Please create a configuration template with:
-                globus-compute-endpoint configure {ep_name}
-            2. Update the configuration
-            3. Start the endpoint
-            """)
+    if (ep_dir and not ep_dir.is_dir()) or (ep_dir is None and require_local):
+        msg = textwrap.dedent(f"Failed to find endpoint configuration ({ep_info})")
         raise ClickException(msg)
 
-    ctx.params["ep_dir"] = path
+    ctx.params["ep_dir"] = ep_dir
 
 
 def get_ep_dir_uuid_only_ok(ctx, param, value):

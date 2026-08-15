@@ -67,7 +67,7 @@ def test_non_configured_endpoint(tmp_path):
     with mock.patch.dict(os.environ, env):
         result = CliRunner().invoke(app, ["start", "newendpoint"])
         assert "newendpoint" in result.stderr
-        assert "no endpoint configuration" in result.stderr
+        assert "Failed to find endpoint configuration" in result.stderr
 
 
 def test_stop_remote_endpoint(mocker):
