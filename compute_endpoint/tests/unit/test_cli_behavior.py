@@ -358,7 +358,7 @@ def test_init_config_dir_permission_error(fs):
 def test_start_endpoint_no_such_ep(run_line, mock_ep, ep_name):
     res = run_line(f"start {ep_name}", assert_exit_code=1)
     mock_ep.start_endpoint.assert_not_called()
-    assert "no endpoint configuration on this machine at " in res.stderr
+    assert "Failed to find endpoint configuration " in res.stderr
     assert ep_name in res.stderr
 
 
@@ -1300,19 +1300,18 @@ def test_name_or_uuid_decorator(tmp_path, mocker, run_line, name, uuid):
 
 
 @pytest.mark.parametrize(
-    "data",
+    "ep_name, msg",
     [
-        ("foo", "no endpoint configuration on this machine"),
-        (str(uuid.uuid4()), "no endpoint configuration on this machine with ID"),
+        ("foo", "Failed to find endpoint configuration"),
+        (str(uuid.uuid4()), "Failed to find endpoint configuration"),
     ],
 )
-def test_get_endpoint_by_name_or_uuid_error_message(tmp_path, run_line, data):
-    value, error = data
-
+def test_get_endpoint_by_name_or_uuid_error_message(tmp_path, run_line, ep_name, msg):
     with mock.patch(f"{_MOCK_BASE}get_compute_dir", return_value=tmp_path):
-        result = run_line(f"start {value}", assert_exit_code=1)
+        result = run_line(f"start {ep_name}", assert_exit_code=1)
 
-    assert error in result.stderr
+    assert msg in result.stderr
+    assert ep_name in result.stderr
 
 
 @pytest.mark.parametrize("is_tty", [True, False])
@@ -1855,22 +1854,11 @@ def test_delete_endpoint_local_uuid(mocker, run_line, mock_ep):
     assert not mock_ep.delete_endpoint.called
 
 
-@pytest.mark.parametrize(
-    ("delete_args", "err_msg"),
-    [
-        (
-            "--yes fake_uuid",
-            "no endpoint configuration",
-        ),
-    ],
-)
-def test_delete_endpoint_no_local_config(
-    run_line, mock_ep, make_endpoint_dir, delete_args, err_msg
-):
-    line = f"delete --yes {delete_args}"
+def test_delete_endpoint_no_local_config(run_line, mock_ep, make_endpoint_dir):
+    line = f"delete --yes fake_uuid"
     result = run_line(line, assert_exit_code=1)
     assert not mock_ep.delete_endpoint.called
-    assert err_msg in result.stderr
+    assert "Failed to find endpoint configuration" in result.stderr
 
 
 def test_render_user_config_happy_path(
