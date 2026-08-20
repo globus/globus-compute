@@ -103,8 +103,8 @@ def mock_os():
         m.read = os.read
 
         m.pipe.return_value = 40, 41
-        m.dup2.side_effect = (0, 1, 2, AssertionError("dup2: unexpected?"))
-        m.open.side_effect = (4, 5, AssertionError("open: unexpected?"))
+        m.dup2.side_effect = (3, 4, 0, 1, 2, AssertionError("dup2: unexpected?"))
+        m.open.side_effect = (5, 6, 7, 8, AssertionError("open: unexpected?"))
 
         with mock.patch.object(fcntl, "fcntl", return_value=8192):
             yield m
@@ -202,10 +202,23 @@ def test_audit_log_pipe_hookup(
     mock_log, tmp_path, ep_uuid, conf, reg_info, mock_os, mock_close_fds
 ):
     em = EndpointManager(tmp_path, ep_uuid, conf, reg_info)
+    audit_w = -1
+
+    def test_os_pipe2(*a, **k):
+        # As a measure of not leaking information, the code ensures that all child
+        # UEPs receive the same set of open fds.  Just because the CEP creates audit
+        # pipes of, say, 257 and 258 for the UEP, doesn't mean the UEP also
+        # needs the same fd number.  All UEPs will have fd 4 be their audit pipe.
+        # But this test needs to write to that pipe to show the plumbing is hooked
+        # up, so MitM the creation.
+        nonlocal audit_w
+        r, w = os.pipe2(os.O_DIRECT)
+        audit_w = w
+        return r, w
 
     m = mock.Mock()
     mock_os.fdopen.return_value.__enter__.return_value = m
-    mock_os.pipe2.side_effect = os.pipe2  # need actual pipes ...
+    mock_os.pipe2.side_effect = test_os_pipe2
 
     mpi = MappedPosixIdentity(em._mu_user, [], ep_uuid)
     kwargs = {
@@ -221,7 +234,7 @@ def test_audit_log_pipe_hookup(
 
     (stdin_str,), _ = m.write.call_args
     stdin_data = json.loads(stdin_str)
-    audit_w = stdin_data["audit_fd"]
+    assert stdin_data["audit_fd"] == 4, "Child processes get same fd numbers"
     os.write(audit_w, b"FROM CHILD, THROUGH KERNEL PIPE")
 
     t = threading.Thread(target=em._audit_log_impl, daemon=True)
