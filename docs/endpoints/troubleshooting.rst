@@ -146,5 +146,44 @@ and § :ref:`exit_code_table_admins`; see those sections for additional context.
    +-----------------------------+---------------+-------------------------------------+
 
 
+"(ModuleNotFoundError) No module named 'jinja2'" error
+======================================================
+
+When a user‑endpoint process is forked from the core endpoint process, the first action
+it takes is to drop privileges (i.e., become the non‑``root`` POSIX user).  If the
+endpoint's virtual environment is installed in a directory that regular users cannot
+read |nbsp| -- |nbsp| such as ``/root/`` |nbsp| -- |nbsp| the user‑endpoint process will
+be unable to import modules from it.  Though the ``jinja2`` module may be installed in
+the virtual environment (in ``/root/``), the user‑process does not have the privileges
+to read the module from disk, making it appear to Python as missing:
+
+.. code-block:: text
+
+   ... ERROR UserEndpointProcess_Bootstrap(PreExec)-... Unable to start user endpoint process for USER [exit code: 77; (ModuleNotFoundError) No module named 'jinja2']
+
+The parent process intentionally does not load the ``jinja2`` module, so when the child
+user‑endpoint attempts to, it will appear to not exist.  With debugging enabled, the
+traceback may show a path under ``/root/``, for example:
+
+.. code-block:: text
+
+   ... DEBUG UserEndpointProcess_Bootstrap(PreExec)-... Failed to exec for USER
+   Traceback (most recent call last):
+     File "/root/test-venv/.../globus_compute_endpoint/endpoint/endpoint_manager.py", line 1146, in cmd_start_endpoint
+     File "/root/test-venv/.../globus_compute_endpoint/endpoint/config/utils.py", line 285, in render_config_user_template
+   ModuleNotFoundError: No module named 'jinja2'
+
+The solution is to move the virtual environment to a location that the endpoint user
+can read (e.g., ``/opt/``) and configure the endpoint to use the new installation path.
+Note that Globus Compute's binary packages take exactly this approach, installing their
+virtual environment under ``/opt/``.
+
+Ensure that the virtual environment directory and all of its parent directories have
+appropriate read and execute permissions for the users running endpoint tasks.
+
+
+.. |nbsp| unicode:: 0xA0
+   :trim:
+
 .. |globus-idm-validator| replace:: ``globus-idm-validator``
 .. _globus-idm-validator: https://docs.globus.org/globus-connect-server/v5.4/identity-mapping-guide/#validating-identity-mappings
