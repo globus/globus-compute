@@ -174,6 +174,12 @@ def mock_reg_info(ep_uuid) -> str:
 
 
 @pytest.fixture(autouse=True)
+def log_shutdown():
+    with mock.patch(f"{_MOCK_BASE}logging.shutdown") as m:
+        yield m
+
+
+@pytest.fixture(autouse=True)
 def mock_app(mocker: MockFixture) -> UserApp:
     _app = mock.Mock(spec=UserApp)
     mocker.patch(f"{_MOCK_BASE}get_globus_app_with_scopes", return_value=_app)
@@ -256,8 +262,8 @@ def mock_os():
         m.getpid.return_value = 22222222
         m.memfd_create.return_value = 37
 
-        m.dup2.side_effect = (0, 1, 2, AssertionError("dup2: unexpected?"))
-        m.open.side_effect = (4, 5, AssertionError("open: unexpected?"))
+        m.dup2.side_effect = (3, 0, 1, 2, AssertionError("dup2: unexpected?"))
+        m.open.side_effect = (5, 6, 7, 8, AssertionError("open: unexpected?"))
         m.pipe.return_value = 40, 41
         m.waitpid.return_value = (0, 0)
         m.O_RDONLY = os.O_RDONLY
@@ -1722,7 +1728,7 @@ def test_root_clears_environment_immediately_after_fork(
 
     for fd in (0, 1, 2):
         assert fd in k["preserve_fds"], "Expect std streams preserved, for now"
-    assert len(k["preserve_fds"]) == 4, "Expect audit path kept"
+    assert len(k["preserve_fds"]) == 5, "Expect audit and cred_ro fds kept"
 
 
 def test_non_root_keeps_original_environment(
@@ -2235,6 +2241,27 @@ def test_audit_pipe_cloexec(successful_exec_from_mocked_root):
     assert a == (audit_r,), "Expect parent process audit fd cloexec"
 
 
+def test_cred_fd_cloexec(successful_exec_from_mocked_root):
+    mock_os, *_, em = successful_exec_from_mocked_root
+    test_fds = (random.randint(100, 1000000) for _ in range(3))
+    cred_fd, cred_r, cred_w = test_fds
+    exp_open_p = f"/proc/1234/fd/{cred_fd}"
+    mock_os.memfd_create.return_value = cred_fd
+    mock_os.open.side_effect = cred_r, cred_w
+    mock_os.getpid.side_effect = (1234, SystemExit)
+
+    with mock.patch(f"{_MOCK_BASE}make_close_on_exec") as mock_cloexec:
+        with pytest.raises(SystemExit):
+            em._event_loop()
+
+    ro_args = next(a for a, _ in mock_os.open.call_args_list if a[1] == os.O_RDONLY)
+    wo_args = next(a for a, _ in mock_os.open.call_args_list if a[1] & os.O_WRONLY)
+    assert (exp_open_p, os.O_RDONLY) == ro_args, "Verify test setup"
+    assert (exp_open_p, os.O_WRONLY | os.O_SYNC) == wo_args, "Verify test setup"
+    assert mock_os.close.call_args[0][0] == cred_fd, "Expect rw handle closed"
+    assert mock_cloexec.call_args[0][0] == cred_w, "Expect write cred handle cloexec"
+
+
 def test_all_files_closed(successful_exec_from_mocked_root):
     mock_os, *_, em = successful_exec_from_mocked_root
     with pytest.raises(SystemExit) as pyexc:
@@ -2247,11 +2274,11 @@ def test_all_files_closed(successful_exec_from_mocked_root):
     _, k = mock_close.call_args
     for fd in (0, 1, 2):
         assert fd in k["preserve_fds"], "Expect std streams preserved"
-    assert len(k["preserve_fds"]) == 4, "Expect audit path kept"
+    assert len(k["preserve_fds"]) == 4, "Expect audit and cred_ro fds kept"
 
-    assert mock_os.dup2.call_count == 3, "Expect to close 3 std* files"
-    closed = [std_to_close for (_fd, std_to_close), _ in mock_os.dup2.call_args_list]
-    assert closed == [0, 1, 2]
+    assert mock_os.dup2.call_count == 4, "Expect to close cred fs and std streams"
+    closed = [to_close for (_fd, to_close), _ in mock_os.dup2.call_args_list]
+    assert closed == [3, 0, 1, 2], "cred_ro, then std* fds"
 
 
 def test_respects_config_template_and_schema(mocker, successful_exec_from_mocked_root):
@@ -2344,7 +2371,7 @@ def test_ep_dir_log_path_envs_passed_to_render(
 def test_pipe_size_limit(mocker, mock_log, successful_exec_from_mocked_root, is_valid):
     *_, em = successful_exec_from_mocked_root
 
-    stdin_data_size = 224  # Empirically/designed size of `stdin_data` string
+    stdin_data_size = 235  # Empirically/designed size of `stdin_data` string
     pipe_buffer_size = 255 + stdin_data_size + is_valid  # manufacture error/success
 
     conf_str = "k: v"  # some key, some value; valid YAML string
@@ -2454,7 +2481,7 @@ def test_user_debug_emits_ephemeral_config_to_user_log(
             f.write("\ndebug: true")
 
     def duped_first_check(*a, **k):
-        assert mock_os.dup2.call_count == 3, "3 std streams; to log file, not stdout"
+        assert mock_os.dup2.call_count == 4, "cred fd; std streams to log file"
 
     mock_print = mocker.patch(f"{_MOCK_BASE}print")
     mock_print.side_effect = duped_first_check

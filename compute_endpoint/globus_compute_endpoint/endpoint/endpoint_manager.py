@@ -100,6 +100,7 @@ class UserEndpointRecord(BaseModel):
     ep_name: str
     local_user_info: t.Optional[pwd.struct_passwd]
     arguments: str
+    cred_fd: t.Optional[int] = None
 
     @property
     def uid(self) -> int:
@@ -319,6 +320,8 @@ class EndpointManager:
                     rc = -127  # invalid signal number
 
                 uep_record = self._children.pop(pid, None)
+                if uep_record and uep_record.cred_fd is not None:
+                    os.close(uep_record.cred_fd)
 
                 proc_args = f" [{uep_record.arguments}]" if uep_record else ""
                 if not rc:
@@ -1013,9 +1016,20 @@ class EndpointManager:
                     audit_r, selectors.EVENT_READ, self._audit_log_write
                 )
 
+        cred_fd = os.memfd_create("dyn", 0)
+        make_close_on_exec(cred_fd)  # redundant; but layers!
+        cred_fd_path = f"/proc/{os.getpid()}/fd/{cred_fd}"
+        cred_fd_ro = os.open(cred_fd_path, os.O_RDONLY)
+        cred_fd_wo = os.open(cred_fd_path, os.O_WRONLY | os.O_SYNC)
+        make_close_on_exec(cred_fd_wo)  # redundant; but layers!
+        os.close(cred_fd)
+        del cred_fd, cred_fd_path
+
         try:
             pid = os.fork()
         except Exception as e:
+            os.close(cred_fd_wo)
+            os.close(cred_fd_ro)
             if audit_r:
                 self._audit_log_close_reader(audit_r)
                 os.close(audit_w)
@@ -1023,13 +1037,17 @@ class EndpointManager:
             raise
 
         if pid > 0:
+            os.close(cred_fd_ro)
             if audit_r:
                 os.close(audit_w)
                 self._audit_pipes[audit_r]["pid"] = pid
 
             proc_args_s = f"({uname}, {ep_name}) {' '.join(proc_args)}"
             self._children[pid] = UserEndpointRecord(
-                ep_name=ep_name, local_user_info=user_record, arguments=proc_args_s
+                ep_name=ep_name,
+                local_user_info=user_record,
+                arguments=proc_args_s,
+                cred_fd=cred_fd_wo,
             )
             log.info(f"Creating new user endpoint (pid: {pid}) [{proc_args_s}]")
             return
@@ -1037,20 +1055,34 @@ class EndpointManager:
         # Reminder: from this point on, we are now the *child* process.
         pid = os.getpid()
 
+        # tell logging to close it's fds; necessary since we would otherwise pull
+        # the rug out from under it with close_all_fds()
+        logging.shutdown()
+
+        os.close(cred_fd_wo)  # the child process will never need to write this
+        del cred_fd_wo
+
         env = os.environ  # shorthand going forward
         if is_privileged():
             env.clear()
 
         exit_code = 70
         try:
-            # only keep the stdio streams and audit.  We perform this operation
-            # just before exec() as well, but no sense in keeping any parent fds
-            # open for longer than necessary.
-            close_all_fds(preserve_fds=[0, 1, 2, audit_w])
+            assert cred_fd_ro > 4, "Child processes get same fd numbers"
+            assert audit_w == 0 or audit_w > 4, "Child processes get same fd numbers"
+            if (cred_fd_ro := os.dup2(cred_fd_ro, 3)) != 3:
+                raise OSError("Unable to setup credential descriptor")
+            if audit_w > 0 and (audit_w := os.dup2(audit_w, 4)) != 4:
+                raise OSError("Unable to setup audit pipe")
+
+            # only keep the stdio streams, audit, and credential fds.  We perform this
+            # operation just before exec() as well, but no sense in keeping any parent
+            # fds open for longer than necessary.
+            close_all_fds(preserve_fds=[0, 1, 2, audit_w, cred_fd_ro])
 
             os.chdir("/")  # always succeeds, so start from known place
 
-            # in the child process; no need to load this in MUEP space
+            # in the child process; no need to load this in CEP space
             import shutil
             from multiprocessing.process import current_process
 
@@ -1236,6 +1268,7 @@ class EndpointManager:
                 "amqp_creds": kwargs.get("amqp_creds"),
                 "config": user_config,
                 "ep_info": ep_info,
+                "mem_fd": cred_fd_ro,
             }
             if self._config.allowed_functions is not None:
                 stdin_data_dict["allowed_functions"] = self._config.allowed_functions
@@ -1247,8 +1280,9 @@ class EndpointManager:
 
             # Reminder: this is *os*.open, not *open*.  Descriptors will not be closed
             # unless we explicitly do so, so `null_fd =` in loop will work.
+            min_null_fd = max(2, audit_w, cred_fd_ro)
             null_fd = os.open(os.devnull, os.O_WRONLY, mode=0o200)
-            while null_fd < 3:  # reminder 0/1/2 == std in/out/err, so ...
+            while null_fd < min_null_fd:  # 0/1/2 == std in/out/err, so ...
                 # ... overkill, but "just in case": don't step on them
                 null_fd = os.open(os.devnull, os.O_WRONLY, mode=0o200)
             exit_code += 1
@@ -1272,6 +1306,7 @@ class EndpointManager:
             exit_code += 1
 
             log.debug("Convey credentials; redirect stdout, stderr (to '%s')", ep_log)
+
             log_fd_flags = os.O_CREAT | os.O_WRONLY | os.O_APPEND | os.O_SYNC
             log_fd = os.open(ep_log, log_fd_flags, mode=0o600)
             with os.fdopen(log_fd, "w") as log_f:
@@ -1307,7 +1342,8 @@ class EndpointManager:
             # all parent process fds are long-since closed; for good measure,
             # ensure any interim fds are also closed.
             exit_code += 1
-            close_all_fds(preserve_fds=[0, 1, 2, audit_w])
+            preserve_fds = tuple(sorted({0, 1, 2, audit_w, cred_fd_ro}))
+            close_all_fds(preserve_fds=preserve_fds)
 
             exit_code += 1
             os.execvpe(proc_args[0], args=proc_args, env=env)
