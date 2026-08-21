@@ -259,7 +259,6 @@ class ComputeLogger(logging.Logger):
 
 
 logging.setLoggerClass(ComputeLogger)
-logger = logging.getLogger(__name__)
 
 
 def setup_logging(
