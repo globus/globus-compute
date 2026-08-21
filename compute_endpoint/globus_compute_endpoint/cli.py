@@ -565,6 +565,11 @@ def start_endpoint(*, ep_dir: pathlib.Path, die_with_parent: bool, **_kwargs):
     # `gce start --die-with-parent` instead of `gce _start-user-endpoint`.
     # deprecated; to be removed in 6 months (roughly Oct 2026)
     if die_with_parent:
+        if sys.stdin and sys.stdin.isatty():
+            raise ClickException(
+                "The --die-with-parent flag is not meant for manual use; it is for"
+                " internal use only."
+            )
         _start_user_endpoint(
             ep_dir=ep_dir,
             endpoint_uuid=state.endpoint_uuid,
@@ -942,32 +947,33 @@ def _start_user_endpoint(
             no_color=state.no_color,
         )
 
+    if sys.stdin and sys.stdin.isatty():
+        raise ClickException("User endpoints must have a parent Core endpoint")
+    if not sys.stdin or sys.stdin.closed:
+        raise Exception(f"Unable to read from stdin ({sys.stdin=!r})")
+
     _no_fn_list_canary = -15  # an arbitrary random integer; invalid as an allow_list
-    ep_info: dict
-    reg_info: dict
-    config_str: str
-    audit_fd: int | None = None
-    fn_allow_list: list[str] | None | int = _no_fn_list_canary
-    if sys.stdin and not (sys.stdin.closed or sys.stdin.isatty()):
-        try:
-            stdin_data = json.loads(sys.stdin.read())
 
-            ep_info = stdin_data["ep_info"]
-            reg_info = stdin_data["amqp_creds"]
-            config_str = stdin_data["config"]
-            audit_fd = stdin_data.get("audit_fd")
-            fn_allow_list = stdin_data.get("allowed_functions", _no_fn_list_canary)
+    try:
+        stdin_data = json.loads(sys.stdin.read())
 
-            del stdin_data  # clarity for intended scope
+        ep_info: dict = stdin_data["ep_info"]
+        reg_info: dict = stdin_data["amqp_creds"]
+        config_str: str = stdin_data["config"]
+        audit_fd: int | None = stdin_data.get("audit_fd")
+        fn_allow_list: list[str] | None | int
+        fn_allow_list = stdin_data.get("allowed_functions", _no_fn_list_canary)
 
-        except Exception as e:
-            exc_type = e.__class__.__name__
-            log.debug("Invalid info on stdin -- (%s) %s", exc_type, e)
-            raise ClickException(
-                "Missing or invalid endpoint information from stdin. (Hint: this"
-                " command is not meant to be invoked manually; it should only be run"
-                " by an endpoint manager process.)"
-            ) from e
+        del stdin_data  # clarity for intended scope
+
+    except Exception as e:
+        exc_type = type(e).__name__
+        log.debug("Invalid info on stdin -- (%s) %s", exc_type, e)
+        raise Exception(
+            "Missing or invalid endpoint information from stdin. (Hint: this"
+            " command is not meant to be invoked manually; it should only be run"
+            " by an endpoint manager process.)"
+        ) from e
 
     with contextlib.ExitStack() as stk:
         stk.enter_context(_SendMessageOnErrorExit(reg_info))

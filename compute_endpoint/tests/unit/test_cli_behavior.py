@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import contextlib
 import inspect
 import io
 import json
@@ -433,6 +434,27 @@ def test_endpoint_uuid_name_not_supported(run_line, cli_cmd):
     )
 
 
+@pytest.mark.parametrize("is_uep", (False, True))
+def test_start_ep_hookup(is_uep, make_endpoint_dir, ep_name):
+    cli_args = ["start", ep_name]
+    if is_uep:
+        cli_args.append("--die-with-parent")
+
+    make_endpoint_dir()
+
+    with contextlib.ExitStack() as stk:
+        pyt_e = stk.enter_context(pytest.raises(SystemExit))
+        m_uep = stk.enter_context(mock.patch(f"{_MOCK_BASE}_start_user_endpoint"))
+        m_cep = stk.enter_context(mock.patch(f"{_MOCK_BASE}_start_endpoint_manager"))
+        stk.enter_context(mock.patch.object(sys.stdin, "isatty", return_value=False))
+
+        cli.app.main(args=cli_args, prog_name=cli.app.name)
+
+    assert pyt_e.value.code == 0, "Basal sanity check"
+    assert m_uep.called is is_uep
+    assert m_cep.called is not is_uep
+
+
 @pytest.mark.parametrize(
     "reg_info,config_str,ep_info,audit_fd",
     [
@@ -523,6 +545,27 @@ def test_start_uep_stdin_allowed_fns_overrides_conf(
     assert k["endpoint_config"].allowed_functions == allowed_fns, (
         "allowed field not overridden!"
     )
+
+
+@pytest.mark.parametrize("has_tty", (False, True))
+def test_start_uep_from_tty_disallowed(ep_name, make_endpoint_dir, has_tty):
+    make_endpoint_dir()
+    stde = io.StringIO()
+    cli_args = ("start", "--die-with-parent", ep_name)
+
+    with contextlib.ExitStack() as stk:
+        pyt_e = stk.enter_context(pytest.raises(SystemExit))
+        mock_start = stk.enter_context(mock.patch(f"{_MOCK_BASE}_start_user_endpoint"))
+        stk.enter_context(mock.patch.object(sys.stdin, "isatty", return_value=has_tty))
+        stk.enter_context(redirect_stderr(stde))
+
+        cli.app.main(args=cli_args, prog_name=cli.app.name)
+
+    exit_exc = pyt_e.value
+
+    assert mock_start.called is not has_tty
+    assert exit_exc.code == int(has_tty)
+    assert (" internal use only" in stde.getvalue()) is has_tty
 
 
 @pytest.mark.parametrize(
