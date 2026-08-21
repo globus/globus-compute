@@ -3,6 +3,85 @@ Changelog
 
 .. scriv-insert-here
 
+.. _changelog-4.16.0:
+
+globus-compute-sdk & globus-compute-endpoint v4.16.0
+----------------------------------------------------
+
+New Functionality
+^^^^^^^^^^^^^^^^^
+
+- Environment variables can now be referenced in the User Config Jinja2
+  template via ``_GC.env``. For example, ``$HOME`` would be accessible as
+  ``_GC.env.HOME``.  See :ref:`reserved variables <reserved-template-variables>`
+  for more details
+
+- For User Endpoints, the endpoint's base directory can be configured via the
+  optional ``paths: endpoint_dir`` parameter in ``user_config_template.yaml.j2``
+
+  .. code-block:: yaml+jinja
+
+     paths:
+       endpoint_dir: {{ _GC.env.HOME }}/gc_ueps/{{ _GC.env.GLOBUS_COMPUTE_ENDPOINT_NAME }}
+
+- The User Endpoint log path can also be customized via ``paths: endpoint_log``;
+  if not specified, the default value is
+  ``$HOME/.globus_compute/uep.<UUID>.<UUID>/endpoint.log``
+
+  .. code-block:: yaml+jinja
+
+     paths:
+       endpoint_log: /var/log/{{ _GC.env.USER }}/user_endpoints.log
+
+  For more information, please see :ref:`endpoint-paths`
+
+- An email is now required for multi-user Compute endpoints (and optional for
+  single-user endpoints).  It may be specified at endpoint configuration time
+  with ``--contact-email`` or manually specified in ``config.yaml``.  This
+  value gives users an initial contact for support specific to the endpoint.
+
+  Usage examples:
+
+  .. code-block:: console
+     :caption: Specification at ``configure`` time (i.e., for new endpoints)
+
+     $ gce configure --contact-email admin@example.edu endpoint_for_example_edu
+
+  .. code-block:: yaml
+     :caption: Manual specification or editing later in ``config.yaml``
+     :emphasize-lines: 2
+
+     display_name: Compute Endpoint for example.edu
+     email: admin@example.edu
+     subscription_id: ...
+     admins:
+       ...
+
+  Existing multi-user endpoint must add the ``email`` field to the
+  ``config.yaml`` when updating ``globus-compute-endpoint`` to the latest
+  version.
+
+  N.B. ``email`` is a new field, and will fail to parse (fail to start!) on
+  versions older than 4.16.0.
+
+Bug Fixes
+^^^^^^^^^
+
+- The endpoint and worker Parsl versions no longer have to be strictly in sync.
+
+Removed
+^^^^^^^
+
+- The older log config options ``log_dir``, ``stdout``, and ``stderr``
+  have been removed.  These have been unused since v0.0.1.
+
+Changed
+^^^^^^^
+
+- Bumped ``parsl`` dependency version from `2026.4.20`_ to at least
+  `2026.7.27`_.  The big change here is the *at least*: Compute is trialing
+  reducing the strict pin to Parsl versions.
+
 .. _changelog-4.15.0:
 
 globus-compute-sdk & globus-compute-endpoint v4.15.0
