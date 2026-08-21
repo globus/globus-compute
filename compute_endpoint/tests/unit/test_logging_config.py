@@ -159,7 +159,9 @@ def test_ensure_path_ep_dir_not_dir(fs):
     ),
 )
 @pytest.mark.parametrize("ep_name", ("some_ep_name", None))
-def test_ensure_paths_expand_resolve_config_overrides_env(fs, env, paths, ep_name):
+def test_ensure_paths_expand_resolve_config_overrides_env(
+    fs, caplog, env, paths, ep_name
+):
     """
     This tests
         1) paths.* overrides env variables
@@ -175,6 +177,7 @@ def test_ensure_paths_expand_resolve_config_overrides_env(fs, env, paths, ep_nam
     exp_ep = paths.get("endpoint_dir", env.get(COMPUTE_EP_DIR_ENV, default_dir))
     exp_log = paths.get("endpoint_log", env.get(LOG_PATH_ENV, f"{exp_ep}/endpoint.log"))
 
+    caplog.set_level(logging.INFO)
     with mock.patch.dict(os.environ, env):
         exp_ep = pathlib.Path(os.path.expandvars(exp_ep)).expanduser().resolve()
         exp_log = pathlib.Path(os.path.expandvars(exp_log)).expanduser().resolve()
@@ -185,6 +188,11 @@ def test_ensure_paths_expand_resolve_config_overrides_env(fs, env, paths, ep_nam
 
         assert exp_ep.stat().st_mode & 0o777 == 0o700
         assert exp_log.parent.stat().st_mode & 0o777 == 0o700
+
+    ep_rec = next(r for r in caplog.records if "Endpoint directory" in r.message)
+    log_rec = next(r for r in caplog.records if "GLOBUS_COMPUTE_LOG_PATH" in r.message)
+    assert str(exp_ep) in ep_rec.message, "Expect log record matches set variable"
+    assert str(exp_log) in log_rec.message, "Expect log record matches set variable"
 
 
 def test_ensure_paths_default_uses_name_and_compute_dir(fs, mock_ensure_compute):
