@@ -324,15 +324,16 @@ def ensure_paths(ep_name: str | None, custom_paths: dict | None = None) -> pathl
     if ep_dir.exists() and not ep_dir.is_dir():
         raise ValueError(f"{COMPUTE_EP_DIR_ENV} must be a directory: {ep_dir}")
 
-    uep_desc = f" for UEP {ep_name}" if ep_name else ""
-    logger.info(f"Endpoint directory{uep_desc} set to {ep_dir}")
-
     # Now update the ep_dir ENV with the final value
     # Parent directory (default -> ~/.globus_compute but could be anywhere)
     # might have already been created but confirm anyway
     ep_dir = ep_dir.resolve()
     ep_dir.mkdir(mode=0o700, parents=True, exist_ok=True)
-    os.environ[COMPUTE_EP_DIR_ENV] = str(ep_dir)
+    ep_dir_str = str(ep_dir)
+    os.environ[COMPUTE_EP_DIR_ENV] = ep_dir_str
+
+    uep_desc = f" for UEP {ep_name}" if ep_name else ""
+    log.info(f"Endpoint directory{uep_desc} set to {ep_dir_str!r}")
 
     if log_path_str:
         log_path = pathlib.Path(os.path.expandvars(log_path_str)).expanduser()
@@ -345,8 +346,9 @@ def ensure_paths(ep_name: str | None, custom_paths: dict | None = None) -> pathl
     # Testing of the path's write access is left to the caller in endpoint_manager.py
     log_path = log_path.resolve()
     log_path.parent.mkdir(mode=0o700, parents=True, exist_ok=True)
+    log_path_str = str(log_path)
 
-    os.environ[LOG_PATH_ENV] = str(log_path)
-    log.info(f"{LOG_PATH_ENV} has been set to {log_path_str}")
+    os.environ[LOG_PATH_ENV] = log_path_str
+    log.info(f"{LOG_PATH_ENV} has been set to {log_path_str!r}")
 
     return log_path
