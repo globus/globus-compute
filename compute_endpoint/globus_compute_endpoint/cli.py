@@ -375,11 +375,6 @@ def version_command():
         "Specify a custom identity mapping configuration (identity_mapping_config.json)"
     ),
 )
-@optgroup.option(
-    "--endpoint-config",
-    default=None,
-    help="DEPRECATED: use --manager-config or --template-config",
-)
 @optgroup.group(
     "Authentication Policy Creation",
     help=(
@@ -435,7 +430,6 @@ def version_command():
 def configure_endpoint(
     *,
     name: str,
-    endpoint_config: str | None,
     manager_config: pathlib.Path | None,
     template_config: pathlib.Path | None,
     id_mapping_config: pathlib.Path | None,
@@ -465,24 +459,6 @@ def configure_endpoint(
             "Unable to configure new endpoints; Manager Endpoint Processes are not"
             " supported on this system"
         )
-
-    if endpoint_config is not None:
-        warnings.warn(
-            "--endpoint-config is deprecated; use --manager-config instead."
-            " If you want to configure user endpoint processes, use --template-config.",
-            DeprecationWarning,
-            stacklevel=2,
-        )
-
-        if manager_config is None:
-            manager_config = pathlib.Path(endpoint_config)
-        else:
-            warnings.warn(
-                "Both --endpoint-config and --manager-config were provided;"
-                " --endpoint-config will be ignored.",
-                UserWarning,
-                stacklevel=2,
-            )
 
     try:
         Endpoint.validate_endpoint_name(name)
