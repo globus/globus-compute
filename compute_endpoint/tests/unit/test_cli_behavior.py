@@ -989,42 +989,6 @@ def test_configure_ep_public_visible_by_default(
     assert exp_public is (conf_dict.get("public") is True)
 
 
-def test_configure_ep_endpoint_config_deprecated(run_line, randomstring, mock_ep):
-    ep_config_arg = randomstring()
-
-    with pytest.warns(DeprecationWarning, match="--endpoint-config is deprecated"):
-        run_line(
-            f"configure {randomstring()} --endpoint-config {ep_config_arg}",
-            assert_exit_code=0,
-        )
-
-    assert (
-        mock_ep.configure_endpoint.call_args.kwargs["endpoint_config"].name
-        == ep_config_arg
-    )
-
-
-def test_configure_ep_manager_config_precedence(
-    run_line, randomstring, mock_ep, gc_dir
-):
-    ep_config_arg = randomstring(5)
-    gc_dir.mkdir(parents=True, exist_ok=True)
-    manager_config_arg = gc_dir / randomstring(4)
-    manager_config_arg.touch()
-
-    with pytest.warns(UserWarning, match="--endpoint-config will be ignored"):
-        run_line(
-            f"configure {randomstring()} --manager-config {manager_config_arg}"
-            f" --endpoint-config {ep_config_arg}",
-            assert_exit_code=0,
-        )
-
-    assert (
-        mock_ep.configure_endpoint.call_args.kwargs["endpoint_config"]
-        == manager_config_arg
-    )
-
-
 @pytest.mark.parametrize("manager_config", ("some-config.yaml", None))
 @pytest.mark.parametrize("template_config", ("some-template.yaml.j2", None))
 @pytest.mark.parametrize("schema_config", ("some-schema.json", None))
