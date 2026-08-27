@@ -584,8 +584,9 @@ Even a single number difference in Python minor versions (e.g., from 3.12 |rarr|
 can generate issues.  Micro version differences (e.g., from 3.11.8 |rarr| 3.11.9)
 are usually safe, though not universally.
 
-Errors may surface as serialization/deserialization ``Exception``s, Globus
-Compute task workers lost due to ``SEGFAULT``, or even incorrect results.
+Errors may surface as serialization/deserialization ``Exception``\s,
+Globus Compute task workers lost due to ``SEGFAULT``,
+or even incorrect results.
 
 Note that the |Client| class's :func:`~globus_compute_sdk.Client.register_function`
 method can be used to pre-serialize a function using the registering SDK's environment
