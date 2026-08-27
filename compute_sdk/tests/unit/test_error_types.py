@@ -22,6 +22,6 @@ def test_task_execution_failed_serialization_help_msg():
     tef = TaskExecutionFailed(tb)
     assert "This appears to be an error with serialization." in str(tef)
     assert (
-        "https://globus-compute.readthedocs.io/en/latest/sdk.html"
-        "#specifying-a-serialization-strategy" in str(tef)
+        "https://globus-compute.readthedocs.io/en/latest/sdk/executor_user_guide.html"
+        "#specifying-serde-strategy" in str(tef)
     )
