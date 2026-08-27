@@ -90,7 +90,7 @@ example, to use globus_compute_sdk.serialize.AllCodeStrategies:
     gcx.serializer = ComputeSerializer(strategy_code=AllCodeStrategies())
 
 For more information, see:
-    https://globus-compute.readthedocs.io/en/latest/sdk.html#specifying-a-serialization-strategy
+    https://globus-compute.readthedocs.io/en/latest/sdk/executor_user_guide.html#specifying-serde-strategy
 """
 
 
