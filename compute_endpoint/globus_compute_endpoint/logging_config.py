@@ -251,16 +251,6 @@ def _get_stream_dict_config(debug: bool, no_color: bool) -> dict:
     }
 
 
-class ComputeLogger(logging.Logger):
-    TRACE = logging.DEBUG - 5
-
-    def trace(self, msg, *args, **kwargs):
-        self.log(ComputeLogger.TRACE, msg, args, **kwargs)
-
-
-logging.setLoggerClass(ComputeLogger)
-
-
 def setup_logging(
     *,
     logfile: pathlib.Path | str | None = None,
