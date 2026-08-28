@@ -1,55 +1,53 @@
-# This is the default user-endpoint-process (UEP) template provided with
-# newly-configured endpoints.  Endpoints generate a UEP-specific configuration
-# by processing this YAML file as a Jinja template against SDK-provided (user)
-# variables -- please modify this template to suit your site's requirements.
-#
-# As an optional security and user-debugging aid, consider also specifying a
-# JSON schema for the user-provided variables.  If `user_config_schema.json`
-# exists within the same directory, then before starting the UEP, the MEP will
-# validate the variables against the schema before rendering.  This provides
-# an administrative peace of mind that users cannot specify invalid arguments.
-# From a usability standpoint, however, it also can make invalid values
-# prominently visible to users.
-#
-# For more information, please see the `user_endpoint_config` in Globus Compute
-# SDK's Executor.
-#
-# Some common options site-administrators may want to set:
-#  - address
-#  - provider (e.g., SlurmProvider, TorqueProvider, CobaltProvider, etc.)
-#  - account
-#  - scheduler_options
-#  - walltime
-#  - worker_init
-#
-# There are a number of example configurations available in the documentation:
-#    https://globus-compute.readthedocs.io/en/stable/endpoints.html#example-configurations
+{#-
+  This is the default user-endpoint-process (UEP) template provided with
+  newly-configured endpoints.  Endpoints generate a UEP-specific configuration
+  by processing this YAML file as a Jinja template against SDK-provided (user)
+  variables -- please modify this template to suit your site's requirements.
 
-{# to skip user-defined requirements/worker_init, comment this out or set to false.
-   if so, suggest also removing requirements/worker_init from user_config_schema.json. #}
+  As an optional security and user-debugging aid, consider also specifying a
+  JSON schema for the user-provided variables.  If `user_config_schema.json`
+  exists within the same directory, then before starting the UEP, the MEP will
+  validate the variables against the schema before rendering.  This provides
+  an administrative peace of mind that users cannot specify invalid arguments.
+  From a usability standpoint, however, it also makes invalid values
+  prominently visible to users.
+
+  There are a number of example configurations available in the documentation:
+     https://globus-compute.readthedocs.io/en/stable/endpoints.html#example-configurations
+-#}
+
+{#- --- BEGIN DYNAMIC UV LOGIC
+
+  During the Jinja template rendering, this block checks what is known about the given
+  and requested environments (e.g., Python version, SDK version, requested packages),
+  and then defines the template variable `default_worker_init`.  This block does not
+  directly render anything, but `default_worker_init` is utilized in the endpoint
+  configuration block at the bottom of this file.  Effectively, the output of this
+  block is a set of commands that will be run as part of the worker initialization.
+
+  If you do not want to allow task-submit-time environment specification (i.e., for the
+  user to submit a list of package `requirements`), then you may set
+  `_arbitrary_user_interaction` to `false`.  If so, consider also removing the unused
+  template variables from `user_config_schema.json`.
+
+  For a longer form discussion on this file, see:
+    https://globus-compute.readthedocs.io/en/stable/endpoints/templates.html#task-time-python-environments
+-#}
 {%- set _arbitrary_user_interaction = true %}
 
 {%- set _rt = _GC.user_runtime %}
-{%- set py_ver =
-  (_rt.python.version_tuple | join("."))
-  if _rt.python is defined and _rt.python.version_tuple is defined
-  else none
-%}
-{%- set sdk_ver =
-  (_rt.globus_compute_sdk_version[1:-1])
-  if _rt.globus_compute_sdk_version is defined
-  else none
-%}
+{%- set py_ver = (_rt.python.version_tuple | join(".")) if _rt.python is defined and _rt.python.version_tuple is defined else none %}
+{%- set sdk_ver = (_rt.globus_compute_sdk_version[1:-1]) if _rt.globus_compute_sdk_version is defined else none %}
 {%- set requirements = requirements | default(none) %}
 {%- set env_name = [
     ("py" ~ py_ver) if py_ver else none,
     ("sdk" ~ sdk_ver) if sdk_ver else none,
-    ("reqs$(echo -e " ~ requirements ~ " | md5sum | awk '{print $1}')") if requirements else none,
+    ("reqs$(echo -en " ~ requirements ~ " | md5sum | awk '{print $1}')") if requirements else none,
   ] | select | join("-") or none
 %}
 
 {%- set default_worker_init %}
-  {%- if env_name is not none %}
+  {%- if env_name is not none -%}
 # The environment initialization script creates (or reuses) a per-task Python
 # virtual environment with `uv`, matched to the submitting user's Python and
 # Globus Compute SDK versions.  If the user supplies a `requirements` option --
@@ -95,12 +93,21 @@ eval '$(echo -e {{ worker_init }} )'
   {%- endif %} {# _arbitrary_user_interaction and worker_init is defined #}
 {%- endset %} {# default_worker_init #}
 
+{#- --- END DYNAMIC UV LOGIC -#}
+
+{#- --- Endpoint settings start here: -#}
+
+{#- Idle heartbeats; see: https://globus-compute.readthedocs.io/en/stable/endpoints/config_reference.html#idle-timeout #}
+idle_heartbeats_soft: 10
+idle_heartbeats_hard: 5760
+
 endpoint_setup: {{ endpoint_setup|default() }}
 
 engine:
   type: GlobusComputeEngine
   max_workers_per_node: 1
 
+  # Configuration for site-topology (i.e., the compute backend)
   provider:
     type: LocalProvider
 
@@ -110,14 +117,3 @@ engine:
 
     worker_init: |
       {{ default_worker_init | default("") | indent(6) }}
-
-# Endpoints will be restarted when a user submits new tasks to the
-# web-services, so eagerly shut down if endpoint is idle.  At 30s/hb (default
-# value), 10 heartbeats is 300s.
-idle_heartbeats_soft: 10
-
-# If endpoint is *apparently* idle (e.g., outstanding tasks, but no movement)
-# for this many heartbeats, then shutdown anyway.  At 30s/hb (default value),
-# 5,760 heartbeats == "48 hours".  (Note that this value will be ignored if
-# idle_heartbeats_soft is 0 or not set.)
-idle_heartbeats_hard: 5760
