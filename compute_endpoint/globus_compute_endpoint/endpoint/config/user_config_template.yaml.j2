@@ -16,19 +16,20 @@
      https://globus-compute.readthedocs.io/en/stable/endpoints.html#example-configurations
 -#}
 
-{#- --- BEGIN DYNAMIC UV LOGIC
+{#- --- BEGIN DYNAMIC UV LOGIC ---
 
-  During the Jinja template rendering, this block checks what is known about the given
-  and requested environments (e.g., Python version, SDK version, requested packages),
-  and then defines the template variable `default_worker_init`.  This block does not
-  directly render anything, but `default_worker_init` is utilized in the endpoint
-  configuration block at the bottom of this file.  Effectively, the output of this
-  block is a set of commands that will be run as part of the worker initialization.
+  During the Jinja template rendering, this block checks what is known about
+  the given and requested environments (e.g., Python version, SDK version,
+  requested packages), and then defines the template variable
+  `default_worker_init`.  This block does not directly render anything, but
+  `default_worker_init` is utilized in the endpoint configuration block at the
+  bottom of this file.  Effectively, the output of this block is a set of
+  commands that will be run as part of the worker initialization.
 
-  If you do not want to allow task-submit-time environment specification (i.e., for the
-  user to submit a list of package `requirements`), then you may set
-  `_arbitrary_user_interaction` to `false`.  If so, consider also removing the unused
-  template variables from `user_config_schema.json`.
+  If you do not want to allow task-submit-time environment specification (i.e.,
+  for the user to submit a list of package `requirements`), then you may set
+  `_arbitrary_user_interaction` to `false`.  If so, consider also removing the
+  unused template variables from `user_config_schema.json`.
 
   For a longer form discussion on this file, see:
     https://globus-compute.readthedocs.io/en/stable/endpoints/templates.html#task-time-python-environments
@@ -51,8 +52,8 @@
 # The environment initialization script creates (or reuses) a per-task Python
 # virtual environment with `uv`, matched to the submitting user's Python and
 # Globus Compute SDK versions.  If the user supplies a `requirements` option --
-# a requirements.txt file as a multi-line string -- those packages are installed
-# into the environment as well.
+# a requirements.txt file as a multi-line string -- those packages are
+# installed into the environment as well.
 
 export PATH="$HOME/.local/bin:$PATH"
 if ! command -v uv &> /dev/null; then
@@ -93,9 +94,9 @@ eval '$(echo -e {{ worker_init }} )'
   {%- endif %} {# _arbitrary_user_interaction and worker_init is defined #}
 {%- endset %} {# default_worker_init #}
 
-{#- --- END DYNAMIC UV LOGIC -#}
+{#- --- END DYNAMIC UV LOGIC --- -#}
 
-{#- --- Endpoint settings start here: -#}
+{#- --- Endpoint settings start here --- -#}
 
 {#- Idle heartbeats; see: https://globus-compute.readthedocs.io/en/stable/endpoints/config_reference.html#idle-timeout #}
 idle_heartbeats_soft: 10
@@ -107,7 +108,7 @@ engine:
   type: GlobusComputeEngine
   max_workers_per_node: 1
 
-  # Configuration for site-topology (i.e., the compute backend)
+  # Configuration for the compute backend (e.g., HPC cluster, personal laptop)
   provider:
     type: LocalProvider
 
