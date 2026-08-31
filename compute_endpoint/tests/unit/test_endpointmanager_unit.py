@@ -122,7 +122,7 @@ def identity_map_path(conf_dir):
 
 
 @pytest.fixture
-def mock_conf(identity_map_path):
+def mock_conf():
     yield ManagerEndpointConfig()
 
 
