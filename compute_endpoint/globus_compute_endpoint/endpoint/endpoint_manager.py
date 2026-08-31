@@ -52,6 +52,7 @@ from globus_compute_endpoint.endpoint.utils import (
     _redact_url_creds,
     close_all_fds,
     is_privileged,
+    make_close_on_exec,
     send_endpoint_startup_failure_to_amqp,
     update_url_port,
 )
@@ -1003,6 +1004,7 @@ class EndpointManager:
         if not self._audit_log_handler_stop:
             with self._audit_log_lock:
                 audit_r, audit_w = os.pipe2(os.O_DIRECT)
+                make_close_on_exec(audit_r)  # redundant; but layers!
                 self._audit_pipes[audit_r] = {
                     "uid": uid,
                     "endpoint_id": uep_amqp_creds["endpoint_id"],
@@ -1021,13 +1023,14 @@ class EndpointManager:
             raise
 
         if pid > 0:
+            if audit_r:
+                os.close(audit_w)
+                self._audit_pipes[audit_r]["pid"] = pid
+
             proc_args_s = f"({uname}, {ep_name}) {' '.join(proc_args)}"
             self._children[pid] = UserEndpointRecord(
                 ep_name=ep_name, local_user_info=user_record, arguments=proc_args_s
             )
-            if audit_r:
-                os.close(audit_w)
-                self._audit_pipes[audit_r]["pid"] = pid
             log.info(f"Creating new user endpoint (pid: {pid}) [{proc_args_s}]")
             return
 

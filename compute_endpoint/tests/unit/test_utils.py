@@ -1,3 +1,4 @@
+import fcntl
 import resource
 import sys
 import uuid
@@ -10,6 +11,7 @@ from globus_compute_endpoint.endpoint.utils import (
     _redact_url_creds,
     close_all_fds,
     is_privileged,
+    make_close_on_exec,
     send_endpoint_startup_failure_to_amqp,
     update_url_port,
 )
@@ -154,6 +156,19 @@ def test_cmd_send_failure_publishes_message(mock_mq_chan, randomstring, err_msg)
 
     assert uep_uuid.encode() in k["body"]
     assert err_msg.encode() in k["body"]
+
+
+def test_make_close_on_exec(tmp_path):
+    f_path = tmp_path / "abc"
+    with open(f_path, "w") as f:
+        fcntl.fcntl(f.fileno(), fcntl.F_SETFD, 0)
+        flags = fcntl.fcntl(f.fileno(), fcntl.F_GETFD)
+        assert flags & fcntl.FD_CLOEXEC == 0, "Verify test setup"
+
+        make_close_on_exec(f.fileno())
+        flags = fcntl.fcntl(f.fileno(), fcntl.F_GETFD)
+
+    assert flags & fcntl.FD_CLOEXEC == fcntl.FD_CLOEXEC
 
 
 @pytest.mark.parametrize("preserve", ((15, 16), (3, 5, 6, 11), ()))

@@ -2221,6 +2221,20 @@ def test_ep_info_not_root_gets_no_matched_identity(
     assert ep_info["posix_ppid"] == mock_os.getppid()
 
 
+def test_audit_pipe_cloexec(successful_exec_from_mocked_root):
+    mock_os, *_, em = successful_exec_from_mocked_root
+    em._audit_log_handler_stop = False
+    audit_r, audit_w = (random.randint(15, 50), random.randint(51, 100))
+    mock_os.pipe2.return_value = audit_r, audit_w
+    with mock.patch(f"{_MOCK_BASE}make_close_on_exec") as mock_cloexec:
+        mock_cloexec.side_effect = SystemExit
+        with pytest.raises(SystemExit):
+            em._event_loop()
+
+    a, _ = mock_cloexec.call_args
+    assert a == (audit_r,), "Expect parent process audit fd cloexec"
+
+
 def test_all_files_closed(successful_exec_from_mocked_root):
     mock_os, *_, em = successful_exec_from_mocked_root
     with pytest.raises(SystemExit) as pyexc:

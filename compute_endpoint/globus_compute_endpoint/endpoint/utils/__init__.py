@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import fcntl as _fcntl
 import os as _os
 import pwd as _pwd
 import re as _re
@@ -104,6 +105,11 @@ def _redact_url_creds(raw: _T, redact_user=True, repl="***", count=0) -> _T:
     if isinstance(raw, str):
         return _url_user_pass_re.sub(repl=repl, string=raw, count=count)
     return _urlb_user_pass_re.sub(repl=repl.encode(), string=raw, count=count)
+
+
+def make_close_on_exec(fd: int) -> None:
+    flags = _fcntl.fcntl(fd, _fcntl.F_GETFD)
+    _fcntl.fcntl(fd, _fcntl.F_SETFD, flags | _fcntl.FD_CLOEXEC)
 
 
 def close_all_fds(preserve_fds: t.Iterable[int] = ()) -> None:
