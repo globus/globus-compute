@@ -59,7 +59,6 @@ from globus_compute_endpoint.exceptions import MessageSystemExit
 from globus_compute_endpoint.logging_config import ensure_paths
 from globus_compute_sdk import Client
 from globus_compute_sdk.sdk.auth.auth_client import ComputeAuthClient
-from globus_compute_sdk.sdk.compute_dir import ensure_compute_dir
 from packaging.version import Version
 from pydantic import BaseModel, ConfigDict
 
@@ -1058,7 +1057,6 @@ class EndpointManager:
             current_process().name = preexec_name
 
             from globus_compute_endpoint.logging_config import (
-                LOG_PATH_ENV,
                 LOG_TS_FMT,
                 setup_logging,
             )

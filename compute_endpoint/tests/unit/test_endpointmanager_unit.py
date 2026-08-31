@@ -35,8 +35,6 @@ from globus_compute_endpoint.endpoint.rabbit_mq import (
 )
 from globus_compute_endpoint.endpoint.utils import _redact_url_creds
 from globus_compute_endpoint.exceptions import MessageSystemExit
-from globus_compute_endpoint.logging_config import LOG_PATH_ENV
-from globus_compute_sdk.sdk.compute_dir import COMPUTE_EP_DIR_ENV
 from globus_sdk import UserApp
 from pytest_mock import MockFixture
 
@@ -90,13 +88,10 @@ def mock_ensure_compute_dir():
     return pathlib.Path(_mock_localuser_rec.pw_dir) / ".globus_compute"
 
 
-def mock_ensure_paths():
-    return mock_ensure_compute_dir() / "some_ep_name" / "endpoint.log"
-
-
 @pytest.fixture
-def mock_ensure_path_patch():
-    with mock.patch(f"{_MOCK_BASE}ensure_paths", return_value=mock_ensure_paths()) as m:
+def mock_ensure_paths(ep_name):
+    log_path = mock_ensure_compute_dir() / ep_name / "endpoint.log"
+    with mock.patch(f"{_MOCK_BASE}ensure_paths", return_value=log_path) as m:
         yield m
 
 
@@ -276,8 +271,6 @@ def epmanager_as_user(
 
     mock_os.waitpid.return_value = (0, 0)
 
-    mocker.patch(f"{_MOCK_BASE}ensure_paths", side_effect=mock_ensure_paths)
-
     mock_pwd = mocker.patch(f"{_MOCK_BASE}pwd")
     mock_pwd.getpwnam.side_effect = AssertionError(
         "getpwnam: unprivileged should not care"
@@ -349,7 +342,6 @@ def epmanager_as_root(
     )
 
     mocker.patch(f"{_MOCK_BASE}is_privileged", return_value=True)
-    mocker.patch(f"{_MOCK_BASE}ensure_compute_dir", side_effect=mock_ensure_compute_dir)
 
     ep_uuid, _ = mock_client
 
@@ -375,14 +367,19 @@ def ident():
 
 
 @pytest.fixture
-def command_payload(ident):
+def ep_name(randomstring):
+    return f"some_ep_{randomstring()}"
+
+
+@pytest.fixture
+def command_payload(ident, ep_name):
     return {
         "globus_username": "a@example.com",
         "globus_effective_identity": 1,
         "globus_identity_set": [{"sub": ident}],
         "command": "cmd_start_endpoint",
         "kwargs": {
-            "name": "some_ep_name",
+            "name": ep_name,
             "user_opts": {"heartbeat": 10},
             "amqp_creds": {},
             "user_runtime": {
@@ -403,7 +400,7 @@ def successful_exec_from_mocked_root(
     mock_props,
     ident,
     command_payload,
-    mock_ensure_path_patch,
+    mock_ensure_paths,
 ):
     conf_dir, mock_conf, mock_client, mock_os, mock_pwd, em = epmanager_as_root
 
@@ -430,7 +427,7 @@ def successful_exec_from_mocked_user(
     mock_props,
     ident,
     command_payload,
-    mock_ensure_path_patch,
+    mock_ensure_paths,
 ):
     conf_dir, mock_conf, mock_client, mock_os, mock_pwd, em = epmanager_as_user
 
@@ -661,23 +658,23 @@ def test_handles_invalid_reg_info(
         EndpointManager(conf_dir, ep_uuid, mock_conf, received_data[1])
 
 
-def test_records_user_ep_as_running(successful_exec_from_mocked_root):
+def test_records_user_ep_as_running(successful_exec_from_mocked_root, ep_name):
     mock_os, *_, em = successful_exec_from_mocked_root
     mock_os.fork.return_value = 1
 
     em._event_loop()
 
     uep_rec = em._children.pop(1)
-    assert uep_rec.ep_name == "some_ep_name"
+    assert uep_rec.ep_name == ep_name
 
 
 def test_caches_start_cmd_args_if_ep_already_running(
-    mocker, successful_exec_from_mocked_root, command_payload
+    mocker, successful_exec_from_mocked_root, command_payload, ep_name
 ):
     *_, em = successful_exec_from_mocked_root
     child_pid = random.randrange(1, 32768 + 1)
     mock_uep = mocker.MagicMock()
-    mock_uep.ep_name = "some_ep_name"
+    mock_uep.ep_name = ep_name
     em._children[child_pid] = mock_uep
 
     em._event_loop()
@@ -2405,7 +2402,7 @@ def test_set_uep_allowed_functions(
 
 
 def test_redirect_stdstreams_to_user_log(
-    successful_exec_from_mocked_root, conf_dir, command_payload
+    successful_exec_from_mocked_root, conf_dir, mock_ensure_paths
 ):
     mock_os, *_, em = successful_exec_from_mocked_root
 
@@ -2415,8 +2412,6 @@ def test_redirect_stdstreams_to_user_log(
     mock_os.O_CREAT = 0x8
     exp_flags = mock_os.O_CREAT | mock_os.O_WRONLY | mock_os.O_APPEND | mock_os.O_SYNC
 
-    uep_name = command_payload["kwargs"]["name"]
-    uep_dir = mock_ensure_compute_dir() / uep_name
     ep_log = mock_ensure_paths()
 
     with pytest.raises(SystemExit) as pyexc:
