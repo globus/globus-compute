@@ -1255,10 +1255,8 @@ class EndpointManager:
             log.debug("Setting up process stdin")
             read_handle, write_handle = os.pipe()
 
-            # fcntl.F_GETPIPE_SZ is not available in Python versions less than 3.10
-            F_GETPIPE_SZ = 1032
             # 256 - Allow some headroom for multiple kernel-specific factors
-            max_buf_size = fcntl.fcntl(write_handle, F_GETPIPE_SZ) - 256
+            max_buf_size = fcntl.fcntl(write_handle, fcntl.F_GETPIPE_SZ) - 256
             stdin_data_size = len(stdin_data)
             if stdin_data_size > max_buf_size:
                 raise ValueError(
