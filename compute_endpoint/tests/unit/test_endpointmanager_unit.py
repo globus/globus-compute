@@ -249,27 +249,39 @@ def mock_config_paths():
 
 
 @pytest.fixture
+def mock_os():
+    with mock.patch(f"{_MOCK_BASE}os") as m:
+        m.fork.return_value = 0
+        m.getppid.return_value = 1111
+        m.getpid.return_value = 22222222
+        m.memfd_create.return_value = 37
+
+        m.dup2.side_effect = (0, 1, 2, AssertionError("dup2: unexpected?"))
+        m.open.side_effect = (4, 5, AssertionError("open: unexpected?"))
+        m.pipe.return_value = 40, 41
+        m.waitpid.return_value = (0, 0)
+        m.O_RDONLY = os.O_RDONLY
+        m.O_WRONLY = os.O_WRONLY
+        m.O_SYNC = os.O_SYNC
+
+        m.setuid.side_effect = PermissionError("[unit test] Operation not permitted")
+
+        yield m
+
+
+@pytest.fixture
 def epmanager_as_user(
     mocker,
     conf_dir,
+    mock_os,
     mock_close_fds,
     mock_client,
     mock_auth_client,
     mock_conf,
     mock_reg_info,
 ):
-    mock_os = mocker.patch(f"{_MOCK_BASE}os")
     mock_os.getuid.return_value = _mock_localuser_rec.pw_uid
     mock_os.getgid.return_value = _mock_localuser_rec.pw_gid
-
-    mock_os.getppid.return_value = 3333
-    mock_os.getpid.return_value = 44444444
-    mock_os.fork.return_value = 0
-    mock_os.pipe.return_value = 40, 41
-    mock_os.dup2.side_effect = (0, 1, 2, AssertionError("dup2: unexpected?"))
-    mock_os.open.side_effect = (4, 5, AssertionError("open: unexpected?"))
-
-    mock_os.waitpid.return_value = (0, 0)
 
     mock_pwd = mocker.patch(f"{_MOCK_BASE}pwd")
     mock_pwd.getpwnam.side_effect = AssertionError(
@@ -307,6 +319,7 @@ def epmanager_as_user(
 def epmanager_as_root(
     mocker,
     conf_dir,
+    mock_os,
     mock_close_fds,
     mock_conf_root,
     mock_client,
@@ -314,20 +327,10 @@ def epmanager_as_root(
     mock_pim,
     mock_reg_info,
 ):
-    mock_os = mocker.patch(f"{_MOCK_BASE}os")
-    mock_os.getppid.return_value = 1111
-    mock_os.getpid.return_value = 22222222
     mock_os.getuid.return_value = 0
     mock_os.getgid.return_value = 0
-    mock_os.setuid.side_effect = PermissionError("[unit test] Operation not permitted")
 
-    mock_os.fork.return_value = 0
-    mock_os.pipe.return_value = 40, 41
-    mock_os.dup2.side_effect = (0, 1, 2, AssertionError("dup2: unexpected?"))
-    mock_os.open.side_effect = (4, 5, AssertionError("open: unexpected?"))
     mock_os.environ = {"Some": "test", "environ": "with", "debug": "1"}
-
-    mock_os.waitpid.return_value = (0, 0)
 
     mock_pwd = mocker.patch(f"{_MOCK_BASE}pwd")
     mock_pwd.getpwnam.side_effect = (
