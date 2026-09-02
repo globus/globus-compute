@@ -28,6 +28,7 @@ from datetime import datetime
 import setproctitle
 import yaml
 from cachetools import TTLCache
+from cryptography.fernet import Fernet
 from globus_compute_common.messagepack import pack
 from globus_compute_common.messagepack.message_types import EPStatusReport
 from globus_compute_endpoint import __version__
@@ -101,6 +102,7 @@ class UserEndpointRecord(BaseModel):
     local_user_info: t.Optional[pwd.struct_passwd]
     arguments: str
     cred_fd: t.Optional[int] = None
+    enckey: t.Optional[bytes] = None
 
     @property
     def uid(self) -> int:
@@ -950,6 +952,24 @@ class EndpointManager:
             # Regardless, be opaque with user.
             raise PermissionError("see your system administrator") from None
 
+    @staticmethod
+    def _update_uep_credentials(uep: UserEndpointRecord, amqp_creds: dict):
+        if not (uep.cred_fd and uep.enckey):
+            log.info(
+                f"Unable to update cached credentials for {uep.ep_name} (user:"
+                f" {uep.uname}): missing encryption key or credential file"
+            )
+            return
+        payload = {"amqp_creds": amqp_creds}
+        enc = Fernet(uep.enckey)
+        cred_data = json.dumps(payload, separators=(",", ":"))
+        cred_data_enc = enc.encrypt(cred_data.encode())
+
+        os.ftruncate(uep.cred_fd, 0)
+        os.lseek(uep.cred_fd, 0, os.SEEK_SET)
+        os.write(uep.cred_fd, cred_data_enc)
+        os.fsync(uep.cred_fd)
+
     def cmd_start_endpoint(
         self,
         ident: MappedPosixIdentity,
@@ -971,9 +991,11 @@ class EndpointManager:
             if r.ep_name == ep_name:
                 log.info(
                     f"User endpoint {ep_name} is already running (pid: {p}); "
-                    "caching arguments in case it's about to shut down"
+                    "updating credentials then caching arguments in case it's "
+                    "about to shut down"
                 )
                 self._cached_cmd_start_args[p] = (ident, args, kwargs)
+                self._update_uep_credentials(r, uep_amqp_creds)
                 return
 
         user_record = ident.local_user_record
@@ -1025,6 +1047,8 @@ class EndpointManager:
         os.close(cred_fd)
         del cred_fd, cred_fd_path
 
+        cred_key = Fernet.generate_key()
+
         try:
             pid = os.fork()
         except Exception as e:
@@ -1043,12 +1067,15 @@ class EndpointManager:
                 self._audit_pipes[audit_r]["pid"] = pid
 
             proc_args_s = f"({uname}, {ep_name}) {' '.join(proc_args)}"
-            self._children[pid] = UserEndpointRecord(
+            uep_record = UserEndpointRecord(
                 ep_name=ep_name,
                 local_user_info=user_record,
                 arguments=proc_args_s,
                 cred_fd=cred_fd_wo,
+                enckey=cred_key,
             )
+            self._children[pid] = uep_record
+            self._update_uep_credentials(uep_record, uep_amqp_creds)
             log.info(f"Creating new user endpoint (pid: {pid}) [{proc_args_s}]")
             return
 
