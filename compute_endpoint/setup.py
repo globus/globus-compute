@@ -34,6 +34,7 @@ REQUIRES = [
     "jsonschema>=4.21,<5",
     "cachetools>=5.3.1",
     "types-cachetools>=5.3.0.6",
+    "cryptography>=48,",
 ]
 
 TEST_REQUIRES = [
