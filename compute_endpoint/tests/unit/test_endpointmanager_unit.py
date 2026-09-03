@@ -118,17 +118,17 @@ def conf_dir(fs, request):
 def identity_map_path(conf_dir):
     im_path = conf_dir / "some_identity_mapping_configuration.json"
     im_path.write_text("[]")
-    yield im_path
+    return im_path
 
 
 @pytest.fixture
 def mock_conf():
-    yield ManagerEndpointConfig()
+    return ManagerEndpointConfig()
 
 
 @pytest.fixture
 def mock_conf_root(identity_map_path):
-    yield ManagerEndpointConfig(identity_mapping_config_path=identity_map_path)
+    return ManagerEndpointConfig(identity_mapping_config_path=identity_map_path)
 
 
 @pytest.fixture(autouse=True)
@@ -148,16 +148,16 @@ engine:
 
 
 @pytest.fixture(autouse=True)
-def mock_setproctitle(mocker, randomstring):
+def mock_setproctitle(randomstring):
     orig_proc_title = randomstring()
-    mock_spt = mocker.patch(f"{_MOCK_BASE}setproctitle")
-    mock_spt.getproctitle.return_value = orig_proc_title
-    yield mock_spt, orig_proc_title
+    with mock.patch(f"{_MOCK_BASE}setproctitle") as m:
+        m.getproctitle.return_value = orig_proc_title
+        yield m, orig_proc_title
 
 
 @pytest.fixture
-def mock_reg_info(ep_uuid) -> str:
-    yield {
+def mock_reg_info(ep_uuid) -> dict:
+    return {
         "endpoint_id": ep_uuid,
         "command_queue_info": {"connection_url": "", "queue": ""},
         "result_queue_info": {
@@ -180,10 +180,10 @@ def log_shutdown():
 
 
 @pytest.fixture(autouse=True)
-def mock_app(mocker: MockFixture) -> UserApp:
-    _app = mock.Mock(spec=UserApp)
-    mocker.patch(f"{_MOCK_BASE}get_globus_app_with_scopes", return_value=_app)
-    return _app
+def mock_app() -> UserApp:
+    m = mock.Mock(spec=UserApp)
+    with mock.patch(f"{_MOCK_BASE}get_globus_app_with_scopes", return_value=m):
+        yield m
 
 
 @pytest.fixture
@@ -193,18 +193,18 @@ def mock_close_fds():
 
 
 @pytest.fixture
-def mock_client(mocker, ep_uuid, mock_reg_info):
+def mock_client(ep_uuid, mock_reg_info):
     mock_gcc = mock.Mock()
     mock_gcc.register_endpoint.return_value = mock_reg_info
-    mocker.patch(f"{_MOCK_BASE}Client", return_value=mock_gcc)
-    yield ep_uuid, mock_gcc
+    with mock.patch(f"{_MOCK_BASE}Client", return_value=mock_gcc):
+        yield ep_uuid, mock_gcc
 
 
 @pytest.fixture
-def mock_auth_client(mocker):
+def mock_auth_client():
     mock_ac = mock.Mock()
-    mocker.patch(f"{_MOCK_BASE}ComputeAuthClient", return_value=mock_ac)
-    yield mock_ac
+    with mock.patch(f"{_MOCK_BASE}ComputeAuthClient", return_value=mock_ac):
+        yield mock_ac
 
 
 @pytest.fixture(autouse=True)
