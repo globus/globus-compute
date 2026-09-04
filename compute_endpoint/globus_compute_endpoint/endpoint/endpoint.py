@@ -526,8 +526,8 @@ class Endpoint:
                 reg_info["result_queue_info"],
                 reg_info["heartbeat_queue_info"],
             )
-        except KeyError:
-            log.error("Invalid credential structure")
+        except KeyError as e:
+            log.error(f"Invalid credential structure: {e}")
             exit(os.EX_DATAERR)
 
         if endpoint_uuid and ret_ep_uuid != endpoint_uuid:

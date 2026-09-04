@@ -51,7 +51,7 @@ def test_message_integrity_across_sizes(
     start_result_q_subscriber(result_q=results_q)
 
     result_message = results_q.get(timeout=2)
-    assert result_message == (result_pub.queue_info["test_routing_key"], b_message)
+    assert result_message == (result_pub._queue_info["test_routing_key"], b_message)
 
 
 def test_publish_multiple_then_subscribe(
