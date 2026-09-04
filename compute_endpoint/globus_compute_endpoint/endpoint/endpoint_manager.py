@@ -965,6 +965,8 @@ class EndpointManager:
         if not ep_name:
             raise InvalidCommandError("Missing endpoint name")
 
+        uep_amqp_creds: dict = kwargs["amqp_creds"]
+
         for p, r in self._children.items():
             if r.ep_name == ep_name:
                 log.info(
@@ -1000,8 +1002,6 @@ class EndpointManager:
             ep_name,
             *args,
         ]
-
-        uep_amqp_creds: dict = kwargs["amqp_creds"]
 
         audit_r, audit_w = 0, 0
         if not self._audit_log_handler_stop:
@@ -1265,7 +1265,7 @@ class EndpointManager:
                 )
 
             stdin_data_dict = {
-                "amqp_creds": kwargs.get("amqp_creds"),
+                "amqp_creds": uep_amqp_creds,
                 "config": user_config,
                 "ep_info": ep_info,
                 "mem_fd": cred_fd_ro,

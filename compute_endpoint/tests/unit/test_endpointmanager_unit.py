@@ -2130,7 +2130,7 @@ def test_run_as_same_user_fails_if_admin(successful_exec_from_mocked_root):
 
     em._allow_same_user = False  # just to be explicit
     mpi = MappedPosixIdentity(em._mu_user, [], str(uuid.uuid4()))
-    kwargs = {"name": "some_endpoint_name"}
+    kwargs = {"name": "some_endpoint_name", "amqp_creds": {}}
     with pytest.raises(InvalidUserError) as pyexc:
         em.cmd_start_endpoint(mpi, None, kwargs)
 
