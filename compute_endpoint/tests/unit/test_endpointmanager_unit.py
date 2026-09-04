@@ -20,6 +20,7 @@ from unittest import mock
 import pika
 import pytest as pytest
 import yaml
+from cryptography.fernet import Fernet
 from globus_compute_common.messagepack import unpack
 from globus_compute_common.messagepack.message_types import EPStatusReport
 from globus_compute_endpoint.endpoint.config import (
@@ -36,6 +37,7 @@ from globus_compute_endpoint.endpoint.rabbit_mq import (
 from globus_compute_endpoint.endpoint.utils import _redact_url_creds
 from globus_compute_endpoint.exceptions import MessageSystemExit
 from globus_sdk import UserApp
+from pyfakefs.fake_os import use_original_os
 from pytest_mock import MockFixture
 
 try:
@@ -48,6 +50,7 @@ else:
         EndpointManager,
         InvalidUserError,
         MappedPosixIdentity,
+        UserEndpointRecord,
     )
 
 
@@ -678,12 +681,11 @@ def test_records_user_ep_as_running(successful_exec_from_mocked_root, ep_name):
 
 
 def test_caches_start_cmd_args_if_ep_already_running(
-    mocker, successful_exec_from_mocked_root, command_payload, ep_name
+    successful_exec_from_mocked_root, command_payload, ep_name
 ):
     *_, em = successful_exec_from_mocked_root
     child_pid = random.randrange(1, 32768 + 1)
-    mock_uep = mocker.MagicMock()
-    mock_uep.ep_name = ep_name
+    mock_uep = UserEndpointRecord(ep_name=ep_name, local_user_info=None, arguments="")
     em._children[child_pid] = mock_uep
 
     em._event_loop()
@@ -2279,6 +2281,87 @@ def test_all_files_closed(successful_exec_from_mocked_root):
     assert mock_os.dup2.call_count == 4, "Expect to close cred fs and std streams"
     closed = [to_close for (_fd, to_close), _ in mock_os.dup2.call_args_list]
     assert closed == [3, 0, 1, 2], "cred_ro, then std* fds"
+
+
+def test_update_uep_credentials(
+    randomstring, conf_dir, mock_conf, mock_client, mock_reg_info
+):
+    ep_uuid, mock_gcc = mock_client
+    em = EndpointManager(conf_dir, ep_uuid, mock_conf, mock_reg_info)
+
+    # The `fs` fixture is pulled in by conf_dir, but doesn't handle memfd_create.
+    # This test only needs the EndpointManager() instance, so can turn fs off now.
+    with use_original_os():
+        exp_data = {"some": f"amqp creds {randomstring()}"}
+
+        mfd = os.memfd_create("real_memfd")
+        key = b"A" * 43 + b"="  # test key == base64 of 32 null bytes
+        enc = Fernet(key)
+        uer = UserEndpointRecord(ep_name="abc", local_user_info=None, arguments="")
+        uer.cred_fd = mfd
+        uer.enckey = key
+
+        try:
+            em._update_uep_credentials(uer, exp_data)
+            os.lseek(mfd, 0, os.SEEK_SET)
+            encrypted_data = os.read(mfd, 4096)
+        finally:
+            os.close(mfd)
+
+    found_data_decrypted = enc.decrypt(encrypted_data)
+    found_data = json.loads(found_data_decrypted)
+    assert found_data["amqp_creds"] == exp_data
+
+
+def test_uep_credential_file_written(
+    randomstring, ep_name, successful_exec_from_mocked_root
+):
+    mock_os, *_, em = successful_exec_from_mocked_root
+
+    ident = MappedPosixIdentity(
+        local_user_record=_mock_localuser_rec,
+        globus_identity_candidates=[],  # no mappings, initially
+        matched_identity=None,
+    )
+    exp_data = {"test": f"datastructure {randomstring()}"}
+    kw = {"name": ep_name, "amqp_creds": exp_data}
+
+    mock_os.fork.return_value = 1234  # parent-path, please
+    em.cmd_start_endpoint(ident, None, kwargs=kw)
+
+    uer: UserEndpointRecord = em._children[1234]
+
+    (written_fd, encrypted_data), k = mock_os.write.call_args
+    assert uer.cred_fd == written_fd
+    assert bool(encrypted_data), "Verify test setup: anything written at all?"
+
+    enc = Fernet(uer.enckey)
+    found_data_decrypted = enc.decrypt(encrypted_data)
+    found_data = json.loads(found_data_decrypted)
+    assert found_data["amqp_creds"] == exp_data
+
+
+def test_running_uep_credentials_refreshed(
+    randomstring, successful_exec_from_mocked_root, ep_name
+):
+    *_, em = successful_exec_from_mocked_root
+
+    mfd = os.memfd_create("real_memfd")
+    key = b"A" * 43 + b"="  # test key == base64 of 32 null bytes
+    enc = Fernet(key)
+    uer = UserEndpointRecord(ep_name=ep_name, local_user_info=None, arguments="")
+
+    em._children[1234] = uer
+    exp_data = {"test": f"datastructure {randomstring()}"}
+    kw = {"name": ep_name, "amqp_creds": exp_data}
+
+    with mock.patch.object(em, "_update_uep_credentials") as mock_update:
+        em.cmd_start_endpoint(None, None, kwargs=kw)
+
+    assert mock_update.called, "Test namesake"
+
+    a, k = mock_update.call_args
+    assert (uer, exp_data) == a
 
 
 def test_respects_config_template_and_schema(mocker, successful_exec_from_mocked_root):
