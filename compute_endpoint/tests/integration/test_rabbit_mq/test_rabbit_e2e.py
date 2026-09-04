@@ -26,5 +26,5 @@ def test_simple_roundtrip(
     result_pub.publish(task_message)
     _, result_message = result_q.get(timeout=2)
 
-    _, expected = (result_pub.queue_info["test_routing_key"], message)
+    _, expected = (result_pub._queue_info["test_routing_key"], message)
     assert result_message == expected

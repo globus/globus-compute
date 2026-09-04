@@ -53,8 +53,6 @@ class ResultPublisher(threading.Thread):
         :param channel_close_window_limit: Limit of channel close events (within
             ``channel_close_window_s``) before shutting down the thread.
         """
-        self.queue_info = queue_info
-
         # how often to check for work; every `poll_period_s`, the `_event_watcher`
         # method will handle any outstanding work.
         self.poll_period_s = max(0.01, poll_period_s)
@@ -89,10 +87,8 @@ class ResultPublisher(threading.Thread):
         # start closed ("connected" after connect)
         self.status = RabbitPublisherStatus.closed
 
-        publish_kw = dict(**self.queue_info["queue_publish_kwargs"])
-        if "properties" in publish_kw:
-            publish_kw["properties"] = BasicProperties(**publish_kw["properties"])
-        self._publish_kwargs = publish_kw
+        self._publish_kwargs: dict[str, t.Any] = {}
+        self._queue_info = queue_info
 
         super().__init__()
 
@@ -181,7 +177,12 @@ class ResultPublisher(threading.Thread):
             self.join(timeout=timeout)
 
     def _connect(self) -> pika.SelectConnection:
-        pika_params = pika.URLParameters(self.queue_info["connection_url"])
+        publish_kw = dict(**self._queue_info["queue_publish_kwargs"])
+        if "properties" in publish_kw:
+            publish_kw["properties"] = BasicProperties(**publish_kw["properties"])
+        self._publish_kwargs = publish_kw
+
+        pika_params = pika.URLParameters(self._queue_info["connection_url"])
         return pika.SelectConnection(
             pika_params,
             on_open_callback=self._on_connection_open,
@@ -242,7 +243,7 @@ class ResultPublisher(threading.Thread):
         )
         mq_chan.exchange_declare(
             passive=True,
-            exchange=self.queue_info["exchange"],
+            exchange=self._queue_info["exchange"],
             callback=self._on_exchange_verified,
         )
 
@@ -277,7 +278,7 @@ class ResultPublisher(threading.Thread):
         assert self._mq_chan is not None
         self._mq_chan.queue_declare(
             passive=True,
-            queue=self.queue_info["queue"],
+            queue=self._queue_info["queue"],
             callback=self._on_queue_verified,
         )
 
@@ -286,7 +287,7 @@ class ResultPublisher(threading.Thread):
         self._mq_chan.confirm_delivery(self._on_delivery)
         self.status = RabbitPublisherStatus.connected
         self._connected_at = time.time()
-        exch = self.queue_info["exchange"]
+        exch = self._queue_info["exchange"]
         log.info(f"{self!r} Ready to send results to exchange: {exch}")
 
     def _on_delivery(self, frame: Method):

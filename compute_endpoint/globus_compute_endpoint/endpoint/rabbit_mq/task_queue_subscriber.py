@@ -70,7 +70,7 @@ class TaskQueueSubscriber(threading.Thread):
 
         super().__init__()
 
-        self.queue_info = queue_info
+        self._queue_info = queue_info
         self.pending_task_queue = pending_task_queue
         self._to_ack: queue.SimpleQueue[int] = queue.SimpleQueue()
         self._stop_event = threading.Event()
@@ -176,7 +176,7 @@ class TaskQueueSubscriber(threading.Thread):
         self._stop_event.set()
 
     def _connect(self) -> pika.SelectConnection:
-        pika_params = pika.URLParameters(self.queue_info["connection_url"])
+        pika_params = pika.URLParameters(self._queue_info["connection_url"])
         return pika.SelectConnection(
             pika_params,
             on_close_callback=self._on_connection_closed,
@@ -265,7 +265,7 @@ class TaskQueueSubscriber(threading.Thread):
     def _start_consuming(self):
         try:
             self._consumer_tag = self._channel.basic_consume(
-                queue=self.queue_info["queue"],
+                queue=self._queue_info["queue"],
                 on_message_callback=self._on_message,
                 exclusive=True,
             )
@@ -277,7 +277,7 @@ class TaskQueueSubscriber(threading.Thread):
             )
             self._stop_ioloop()
         else:
-            qname = self.queue_info["queue"]
+            qname = self._queue_info["queue"]
             logger.info(f"{self!r} Awaiting messages from queue: {qname}")
 
     def _on_cancelok(self, _frame: Method[Basic.CancelOk]):
@@ -293,13 +293,13 @@ class TaskQueueSubscriber(threading.Thread):
         """
         logger.info(
             "Exchange declared successfully.  Ensuring queue exists:"
-            f" {self.queue_info['queue']}"
+            f" {self._queue_info['queue']}"
         )
         assert self._channel is not None
         self._channel.queue_declare(
             passive=True,  # *we* don't create the queue, just consume it
             callback=self._on_queue_declareok,
-            queue=self.queue_info["queue"],
+            queue=self._queue_info["queue"],
         )
 
     def _on_queue_declareok(self, _frame: Method):
