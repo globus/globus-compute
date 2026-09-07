@@ -1,11 +1,14 @@
 from __future__ import annotations
 
 import fcntl as _fcntl
+import json
+import os
 import os as _os
 import pwd as _pwd
 import re as _re
 import resource as _resource
 import sys
+import time
 import typing as t
 import urllib.parse
 
@@ -211,7 +214,7 @@ def user_input_select(prompt: str, options: list[str]) -> str | None:
 
 
 def make_credential_provider(
-    reg_info: dict | None = None,
+    cred_fd: int | None, key: str | bytes | None, reg_info: dict | None = None
 ) -> t.Callable[[], dict[str, dict]]:
     """
     Dynamically query a credential source.
@@ -220,12 +223,50 @@ def make_credential_provider(
     encapsulated in the SDK by `Client.register_endpoint()`.  It currently contains
     connection information for the task, result, and heartbeat queues.
     """
-    if reg_info is None:
-        raise KeyError("No credential info provided")
+    # The non-"else" branches are only required so long as we support pre-"credential
+    # refreshing" CEPs.  The clock starts ticking from Sep, 2026.
+    if cred_fd is None:
+        if reg_info is None:
+            raise KeyError("No credential info provided")
 
-    amqp_creds: dict = {"amqp_creds": reg_info}
+        amqp_creds: dict = {"amqp_creds": reg_info}
+        del cred_fd, key
 
-    def _credential_provider() -> dict:
-        return amqp_creds
+        def _credential_provider() -> dict:
+            return amqp_creds
+
+    elif not key:
+        raise ValueError("Missing required encryption key")
+
+    else:
+        from cryptography.fernet import Fernet
+
+        _cred_fd = int(cred_fd)  # damnit mypy, we just proved it!
+        del reg_info, cred_fd
+
+        def _credential_provider() -> dict:
+            try_count = 1
+            while True:
+                try:
+                    os.lseek(_cred_fd, 0, os.SEEK_SET)
+                    dyn_data_b = b""
+                    while chunk := os.read(_cred_fd, 2**15):
+                        dyn_data_b += chunk
+
+                    enc = Fernet(key)
+                    creds = json.loads(enc.decrypt(dyn_data_b))
+                    if not creds:
+                        raise ValueError("Credentials empty or not written")
+                    return creds
+                except Exception as exc:
+                    if try_count < 1:
+                        raise
+                    # Maybe we got super unlucky in catching the file mid-truncate
+                    # or write; try one more time after small delay
+                    try_count -= 1
+                    exc_type = type(exc).__name__
+                    msg = f"Failed to collect credentials: ({exc_type}) {exc}"
+                    print(msg, file=sys.stderr, flush=True)
+                    time.sleep(1)
 
     return _credential_provider

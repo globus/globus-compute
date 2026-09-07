@@ -1,4 +1,6 @@
 import fcntl
+import json
+import os
 import resource
 import sys
 import uuid
@@ -7,11 +9,13 @@ from unittest import mock
 
 import pika
 import pytest
+from cryptography.fernet import Fernet
 from globus_compute_endpoint.endpoint.utils import (
     _redact_url_creds,
     close_all_fds,
     is_privileged,
     make_close_on_exec,
+    make_credential_provider,
     send_endpoint_startup_failure_to_amqp,
     update_url_port,
 )
@@ -194,3 +198,99 @@ def test_all_files_closed(preserve):
 
     assert any(0 in r for r in closed_ranges), "Expect all but preserved closed"
     assert any(hard_no in r for r in closed_ranges), "Expect all but preserved closed"
+
+
+@pytest.mark.parametrize(
+    "has_fd,has_key,has_info,exp_exc",
+    (
+        (False, False, False, KeyError),
+        (False, True, False, KeyError),
+        (True, False, False, ValueError),
+        (True, False, True, ValueError),
+    ),
+)
+def test_credential_provider_handles_bad_input(has_fd, has_key, has_info, exp_exc):
+    fd = has_fd and 123 or None
+    key = has_key and "some_key" or None
+    reg_info = has_info and {"some": "creds"} or None
+    with pytest.raises(exp_exc):
+        make_credential_provider(fd, key, reg_info)
+
+
+@pytest.mark.parametrize(
+    "has_fd,has_key,has_info",
+    (
+        (False, False, True),
+        (False, True, True),
+        (True, True, False),
+        (True, True, True),
+    ),
+)
+def test_credential_provider_backwards_compatible(
+    randomstring, has_fd, has_key, has_info
+):
+    exp_creds = {"amqp_creds": {"testval": randomstring()}}
+    fd = has_fd and os.memfd_create("test_utils_cred_provider") or None
+    key = has_key and Fernet.generate_key() or None
+    reg_info = has_info and exp_creds["amqp_creds"] or None
+
+    cred_fn = make_credential_provider(fd, key, reg_info)
+
+    if has_fd:
+        enc = Fernet(key)
+        encrypted = enc.encrypt(json.dumps(exp_creds).encode())
+        os.write(fd, encrypted)
+        os.fsync(fd)
+
+    found_creds = cred_fn()
+    assert found_creds == exp_creds
+
+    if has_fd:
+        os.close(fd)
+
+
+def test_credential_provider_raises_on_empty():
+    fd = os.memfd_create("test_utils_cred_provider")
+    key = Fernet.generate_key()
+    enc = Fernet(key)
+
+    cred_fn = make_credential_provider(fd, key)
+
+    os.write(fd, enc.encrypt(b"null"))  # null == "valid json"
+    with mock.patch(f"{_MOCK_BASE}time.sleep"):  # don't wait in test
+        with pytest.raises(ValueError) as pyt_e:
+            cred_fn()
+    os.close(fd)
+    assert "Credentials empty" in str(pyt_e.value)
+
+
+def test_credential_provider_rereads():
+    fd = os.memfd_create("test_utils_cred_provider")
+    key = Fernet.generate_key()
+
+    cred_fn = make_credential_provider(fd, key)
+
+    def write_creds_now(*a, **k):
+        enc = Fernet(key)
+        os.write(fd, enc.encrypt(b'"test value"'))
+
+    with mock.patch(f"{_MOCK_BASE}time.sleep") as m:
+        m.side_effect = write_creds_now
+        assert "test value" == cred_fn()
+    os.close(fd)
+
+
+def test_credential_provider_reads_large_file():
+    fd = os.memfd_create("test_utils_cred_provider")
+    key = Fernet.generate_key()
+
+    cred_fn = make_credential_provider(fd, key)
+
+    exp_data = "A" * 2**18
+    data = json.dumps(exp_data).encode()
+    enc = Fernet(key)
+    os.write(fd, enc.encrypt(data))
+
+    with mock.patch(f"{_MOCK_BASE}time.sleep"):
+        assert exp_data == cred_fn()
+    os.close(fd)
