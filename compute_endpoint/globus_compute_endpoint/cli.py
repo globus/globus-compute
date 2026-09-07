@@ -959,11 +959,14 @@ def _start_user_endpoint(
         stdin_data = json.loads(sys.stdin.read())
 
         ep_info: dict = stdin_data["ep_info"]
-        reg_info: dict = stdin_data["amqp_creds"]
         config_str: str = stdin_data["config"]
         audit_fd: int | None = stdin_data.get("audit_fd")
         fn_allow_list: list[str] | None | int
         fn_allow_list = stdin_data.get("allowed_functions", _no_fn_list_canary)
+
+        cred_fd: int = stdin_data.get("mem_fd")
+        enckey: str = stdin_data.get("enckey")
+        reg_info: dict | None = stdin_data.get("amqp_creds")
 
         del stdin_data  # clarity for intended scope
 
@@ -1017,7 +1020,7 @@ def _start_user_endpoint(
         pid_path = Endpoint.pid_path(ep_dir)
         stk.enter_context(_pidfile(pid_path, ep_config.heartbeat_period * 3))
 
-        cred_fn = make_credential_provider(reg_info)
+        cred_fn = make_credential_provider(cred_fd, enckey, reg_info)
         get_cli_endpoint(ep_config).start_endpoint(
             endpoint_dir=ep_dir,
             endpoint_uuid=endpoint_uuid,

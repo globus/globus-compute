@@ -1,0 +1,5 @@
+Bug Fixes
+^^^^^^^^^
+
+- Long-running UEPs are now able to reconnect to the AMQP service.  They no
+  longer shutdown after a spurious disconnect.

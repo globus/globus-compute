@@ -1296,6 +1296,7 @@ class EndpointManager:
                 "config": user_config,
                 "ep_info": ep_info,
                 "mem_fd": cred_fd_ro,
+                "enckey": cred_key.decode(),
             }
             if self._config.allowed_functions is not None:
                 stdin_data_dict["allowed_functions"] = self._config.allowed_functions
