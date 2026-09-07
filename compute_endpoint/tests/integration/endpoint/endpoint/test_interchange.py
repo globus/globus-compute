@@ -94,7 +94,7 @@ def ep_ix_factory(endpoint_uuid, mock_conf, mock_quiesce):
         kw = {
             "endpoint_id": endpoint_uuid,
             "config": mock_conf,
-            "reg_info": reg_info,
+            "cred_fn": lambda: {"amqp_creds": reg_info},
             "ep_info": {},
         }
         kw.update(k)
@@ -124,10 +124,12 @@ def test_endpoint_id_conveyed_to_engine(gc_dir, mock_conf, ep_uuid):
     mock_conf.engine = engines.ThreadPoolEngine()
     ic = EndpointInterchange(
         mock_conf,
-        reg_info={
-            "task_queue_info": {},
-            "result_queue_info": {},
-            "heartbeat_queue_info": {},
+        cred_fn=lambda: {
+            "amqp_creds": {
+                "task_queue_info": {},
+                "result_queue_info": {},
+                "heartbeat_queue_info": {},
+            }
         },
         ep_info={},
         endpoint_id=ep_uuid,
@@ -140,7 +142,10 @@ def test_endpoint_id_conveyed_to_engine(gc_dir, mock_conf, ep_uuid):
 def test_start_requires_pre_registered(mock_conf, gc_dir):
     with pytest.raises(TypeError):
         EndpointInterchange(
-            config=mock_conf, reg_info=None, ep_info={}, endpoint_id="mock_endpoint_id"
+            config=mock_conf,
+            cred_fn=None,
+            ep_info={},
+            endpoint_id="mock_endpoint_id",
         )
 
 

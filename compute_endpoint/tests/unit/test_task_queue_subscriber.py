@@ -26,7 +26,7 @@ def mock_pika():
 def test_tqs_as_contextmanager(randomstring, mock_pika):
     queue_info = {"queue": randomstring(), **q_info, "connection_url": "amqp:///"}
     with TaskQueueSubscriber(
-        queue_info=queue_info,
+        cred_fn=lambda: queue_info,
         pending_task_queue=queue.SimpleQueue(),
     ) as tqs:
         try_assert(tqs.is_alive, "Context manager starts thread")
@@ -37,7 +37,7 @@ def test_tqs_as_contextmanager(randomstring, mock_pika):
 def test_tqs_callbacks_hooked_up(randomstring, mock_pika):
     queue_info = {"queue": randomstring(), **q_info, "connection_url": "amqp:///"}
     tqs = TaskQueueSubscriber(
-        queue_info=queue_info,
+        cred_fn=lambda: queue_info,
         pending_task_queue=queue.SimpleQueue(),
     )
     tqs._connect()

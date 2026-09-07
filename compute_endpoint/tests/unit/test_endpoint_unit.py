@@ -151,11 +151,13 @@ def pword(randomstring):
 @pytest.fixture
 def mock_reg_info(ep_uuid, uname, pword):
     c_url = f"amqp://{uname}:{pword}@some.domain"
-    yield {
-        "endpoint_id": ep_uuid,
-        "task_queue_info": {"connection_url": f"{c_url}:1234"},
-        "result_queue_info": {"connection_url": c_url},
-        "heartbeat_queue_info": {"connection_url": c_url},
+    return {
+        "amqp_creds": {
+            "endpoint_id": ep_uuid,
+            "task_queue_info": {"connection_url": f"{c_url}:1234"},
+            "result_queue_info": {"connection_url": c_url},
+            "heartbeat_queue_info": {"connection_url": c_url},
+        }
     }
 
 
@@ -317,7 +319,7 @@ def test_start_without_engine(caplog, conf_dir, conf):
             endpoint_uuid=None,
             endpoint_config=conf,
             log_to_console=False,
-            reg_info={},
+            cred_fn=lambda: {},
             ep_info={},
         )
     r = caplog.records[-1]
@@ -341,7 +343,7 @@ def test_start_ha_non_compliant(caplog, randomstring, mock_print, conf_dir, conf
             endpoint_uuid=None,
             endpoint_config=conf,
             log_to_console=False,
-            reg_info={},
+            cred_fn=lambda: {},
             ep_info={},
         )
     r = caplog.records[-1]
@@ -357,7 +359,7 @@ def test_endpoint_needs_no_client_if_reg_info(
     ep, ep_dir, log_to_console, ep_conf = mock_ep_data
     ep_args = (ep_dir, ep_uuid, ep_conf, log_to_console)
 
-    ep.start_endpoint(*ep_args, reg_info=mock_reg_info, ep_info={})
+    ep.start_endpoint(*ep_args, cred_fn=lambda: mock_reg_info, ep_info={})
     assert not mock_get_client.called, "No need for Client!"
     assert mock_launch.called, "Registration given; should start"
 
@@ -374,7 +376,7 @@ def test_start_endpoint_redacts_url_creds_from_logs(
 ):
     ep, ep_dir, log_to_console, ep_conf = mock_ep_data
     ep_args = (ep_dir, ep_uuid, ep_conf, log_to_console)
-    ep.start_endpoint(*ep_args, reg_info=mock_reg_info, ep_info={})
+    ep.start_endpoint(*ep_args, cred_fn=lambda: mock_reg_info, ep_info={})
     assert mock_launch.called, "Should launch successfully"
 
     debug_args = "\n".join(str((a, k)) for a, k in mock_log.debug.call_args_list)
@@ -391,7 +393,7 @@ def test_start_endpoint_populates_ep_static_info(
     canary_value = randomstring()
     ep_info = {"canary": canary_value}
     with mock.patch(f"{_mock_base}Endpoint.start_interchange") as mock_launch:
-        ep.start_endpoint(*ep_args, reg_info=mock_reg_info, ep_info=ep_info)
+        ep.start_endpoint(*ep_args, cred_fn=lambda: mock_reg_info, ep_info=ep_info)
     assert mock_launch.called, "Should launch successfully"
 
     (*_, found, _audit_fd), _k = mock_launch.call_args
@@ -522,7 +524,7 @@ def test_endpoint_sets_process_title(
         mock_spt.getproctitle.return_value = orig_proc_title
         mock_spt.setproctitle.side_effect = StopIteration("Sentinel")
         with pytest.raises(StopIteration, match="Sentinel"):
-            ep.start_endpoint(*ep_args, reg_info=mock_reg_info, ep_info={})
+            ep.start_endpoint(*ep_args, cred_fn=lambda: mock_reg_info, ep_info={})
 
     a, _k = mock_spt.setproctitle.call_args
     assert a[0].startswith("Globus Compute Endpoint"), (
@@ -541,15 +543,18 @@ def test_endpoint_respects_port(mock_ep_data, port, mock_reg_info, ep_uuid):
     ep, ep_dir, log_to_console, ep_conf = mock_ep_data
     ep_conf.amqp_port = port
 
-    tq_url = mock_reg_info["task_queue_info"]["connection_url"]
-    rq_url = mock_reg_info["result_queue_info"]["connection_url"]
-    hbq_url = mock_reg_info["heartbeat_queue_info"]["connection_url"]
+    q_infos = mock_reg_info["amqp_creds"]
+    tq_url = q_infos["task_queue_info"]["connection_url"]
+    rq_url = q_infos["result_queue_info"]["connection_url"]
+    hbq_url = q_infos["heartbeat_queue_info"]["connection_url"]
 
     ep_args = (ep_dir, ep_uuid, ep_conf, log_to_console)
-    with mock.patch(f"{_mock_base}update_url_port", spec=True) as mock_upd:
+    with (
+        mock.patch(f"{_mock_base}update_url_port", spec=True) as mock_upd,
+        pytest.raises(StopIteration, match="Sentinel"),
+    ):
         mock_upd.side_effect = (None, None, StopIteration("Sentinel"))
-        with pytest.raises(StopIteration, match="Sentinel"):
-            ep.start_endpoint(*ep_args, reg_info=mock_reg_info, ep_info={})
+        ep.start_endpoint(*ep_args, cred_fn=lambda: mock_reg_info, ep_info={})
 
     for (a, _), exp_url in zip(mock_upd.call_args_list, (tq_url, rq_url, hbq_url)):
         assert a == (exp_url, port)
@@ -571,26 +576,23 @@ def test_endpoint_sets_owner_only_access(tmp_path, umask, mask, idmap):
 
 
 def test_always_prints_endpoint_id_to_terminal(
-    mock_launch, mocker, mock_ep_data, mock_reg_info
+    mock_launch, mocker, ep_uuid, mock_ep_data, mock_reg_info
 ):
     ep, ep_dir, log_to_console, ep_conf = mock_ep_data
-    ep_id = str(uuid.uuid4())
 
     mock_dup2 = mocker.patch(f"{_mock_base}os.dup2")
     mock_dup2.return_value = 0
     mock_sys = mocker.patch(f"{_mock_base}sys")
 
-    expected_text = f"Starting endpoint; registered ID: {ep_id}"
-
-    reg_info = {**mock_reg_info, "endpoint_id": ep_id}
+    expected_text = f"Starting endpoint; registered ID: {ep_uuid}"
 
     mock_sys.stdout.isatty.return_value = True
     ep.start_endpoint(
         ep_dir,
-        ep_id,
+        ep_uuid,
         ep_conf,
         log_to_console,
-        reg_info,
+        lambda: mock_reg_info,
         ep_info={},
     )
 
@@ -603,10 +605,10 @@ def test_always_prints_endpoint_id_to_terminal(
     mock_sys.stderr.isatty.return_value = True
     ep.start_endpoint(
         ep_dir,
-        ep_id,
+        ep_uuid,
         ep_conf,
         log_to_console,
-        reg_info,
+        lambda: mock_reg_info,
         ep_info={},
     )
 
@@ -617,10 +619,10 @@ def test_always_prints_endpoint_id_to_terminal(
     mock_sys.stderr.isatty.return_value = False
     ep.start_endpoint(
         ep_dir,
-        ep_id,
+        ep_uuid,
         ep_conf,
         log_to_console,
-        reg_info,
+        lambda: mock_reg_info,
         ep_info={},
     )
 
@@ -714,7 +716,7 @@ def test_handles_provided_endpoint_id_no_json(
     ep, ep_dir, log_to_console, ep_conf = mock_ep_data
     ep_args = (ep_dir, ep_uuid, ep_conf, log_to_console)
 
-    ep.start_endpoint(*ep_args, reg_info=mock_reg_info, ep_info={})
+    ep.start_endpoint(*ep_args, cred_fn=lambda: mock_reg_info, ep_info={})
 
     a, _k = mock_launch.call_args
     assert a[0] == ep_uuid
@@ -732,7 +734,7 @@ def test_handles_provided_endpoint_id_with_json(
 
     ep_json = ep_dir / "endpoint.json"
     ep_json.write_text(json.dumps({"endpoint_id": str(uuid.uuid4())}))
-    ep.start_endpoint(*ep_args, reg_info=mock_reg_info, ep_info={})
+    ep.start_endpoint(*ep_args, cred_fn=lambda: mock_reg_info, ep_info={})
 
     a, _k = mock_launch.call_args
     assert a[0] == ep_uuid

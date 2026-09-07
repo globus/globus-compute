@@ -500,7 +500,7 @@ def test_start_user_ep_reads_stdin(
     config_str_found = mock_load_conf.call_args[0][0]
 
     assert config_str == config_str_found
-    assert reg_info == s_ep_k["reg_info"]
+    assert reg_info == s_ep_k["cred_fn"]()["amqp_creds"]
     assert ep_info == s_ep_k["ep_info"]
     assert audit_fd == s_ep_k["audit_fd"]
 

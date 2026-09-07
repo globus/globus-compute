@@ -32,7 +32,7 @@ def mock_pika():
 
 def test_rp_as_contextmanager(randomstring, mock_pika):
     queue_info = {"queue": randomstring(), **q_info, "connection_url": "amqp:///"}
-    with ResultPublisher(queue_info=queue_info) as rp:
+    with ResultPublisher(cred_fn=lambda: queue_info) as rp:
         try_assert(rp.is_alive, "Context manager starts thread")
 
     try_assert(lambda: not rp.is_alive(), "Context manager stops thread")
@@ -40,7 +40,7 @@ def test_rp_as_contextmanager(randomstring, mock_pika):
 
 def test_rp_callbacks_hooked_up(randomstring, mock_pika):
     queue_info = {"queue": randomstring(), **q_info, "connection_url": "amqp:///"}
-    rp = ResultPublisher(queue_info=queue_info)
+    rp = ResultPublisher(cred_fn=lambda: queue_info)
     rp._connect()
 
     assert mock_pika.SelectConnection.called
@@ -55,7 +55,8 @@ def test_rp_verifies_exchange(randomstring):
     mock_channel = mock.Mock()
     queue_info = {"exchange": randomstring(), **q_info}
 
-    rp = ResultPublisher(queue_info=queue_info)
+    rp = ResultPublisher(cred_fn=lambda: queue_info)
+    rp._queue_info = rp.cred_fn()
     rp._on_channel_open(mock_channel)
 
     assert mock_channel.exchange_declare.called
@@ -68,7 +69,8 @@ def test_rp_verifies_queue(randomstring):
     mock_channel = mock.Mock()
     queue_info = {"queue": randomstring(), **q_info}
 
-    rp = ResultPublisher(queue_info=queue_info)
+    rp = ResultPublisher(cred_fn=lambda: queue_info)
+    rp._queue_info = rp.cred_fn()
     rp._mq_chan = mock_channel
     rp._on_exchange_verified(None)
 
@@ -87,7 +89,10 @@ def test_rp_stops_if_unable_to_connect(mocker, randomstring, attempt_limit):
     mock_stop.wait.return_value = None
     queue_info = {"queue": randomstring(), **q_info}
 
-    rp = ResultPublisher(queue_info=queue_info, connect_attempt_limit=attempt_limit)
+    rp = ResultPublisher(
+        cred_fn=lambda: queue_info, connect_attempt_limit=attempt_limit
+    )
+    rp._queue_info = rp.cred_fn()
     rp._connect = mock.Mock(spec=ResultPublisher._connect)
     rp._stop_event = mock_stop
     rp.run()
@@ -98,7 +103,7 @@ def test_rp_stops_if_unable_to_connect(mocker, randomstring, attempt_limit):
 
 def test_rp_connect_limit_very_high_sc30467(randomstring):
     queue_info = {"queue": randomstring(), **q_info}
-    rp = ResultPublisher(queue_info=queue_info)
+    rp = ResultPublisher(cred_fn=lambda: queue_info)
     assert rp.connect_attempt_limit >= 5000, (
         "Some very high limit as RMQ can be down for awhile; SC-30467"
     )
@@ -107,7 +112,8 @@ def test_rp_connect_limit_very_high_sc30467(randomstring):
 def test_rp_new_channel_resets_delivery_index():
     mock_channel = mock.Mock()
     queue_info = {"exchange": "some_exchange", **q_info}
-    rp = ResultPublisher(queue_info=queue_info)
+    rp = ResultPublisher(cred_fn=lambda: queue_info)
+    rp._queue_info = rp.cred_fn()
     rp._delivery_tag_index = random.randint(-1000, 1000)
     rp._on_channel_open(mock_channel)
 
@@ -117,7 +123,8 @@ def test_rp_new_channel_resets_delivery_index():
 def test_rp_delivery_confirmation_enabled():
     mock_channel = mock.Mock()
     queue_info = {**q_info}
-    rp = ResultPublisher(queue_info=queue_info)
+    rp = ResultPublisher(cred_fn=lambda: queue_info)
+    rp._queue_info = rp.cred_fn()
     rp._mq_chan = mock_channel
 
     rp._on_queue_verified(None)
@@ -130,7 +137,8 @@ def test_rp_delivery_confirmation_enabled():
 def test_rp_channel_closed_retries_then_shuts_down(mock_log, randomstring):
     exc = Exception(f"some reason: {randomstring()}")
     queue_info = {**q_info}
-    rp = ResultPublisher(queue_info=queue_info)
+    rp = ResultPublisher(cred_fn=lambda: queue_info)
+    rp._queue_info = rp.cred_fn()
     rp._mq_chan = mock.Mock()
     rp._mq_conn = mock.Mock()
 
@@ -163,7 +171,8 @@ def test_rp_stable_connection_resets_fail_counter(mocker):
     mock_time = mocker.patch(f"{_MOCK_BASE}time")
     mock_time.time.side_effect = [1000, 1061]  # 60 seconds passed
     queue_info = {**q_info}
-    rp = ResultPublisher(queue_info=queue_info)
+    rp = ResultPublisher(cred_fn=lambda: queue_info)
+    rp._queue_info = rp.cred_fn()
     rp._mq_chan = mock.Mock()
     rp._mq_conn = mock.Mock()
 
@@ -181,7 +190,9 @@ def test_rp_stops_trying_on_unrecoverable(randomstring, mock_log):
     queue_info = {"queue": randomstring(), **q_info}
 
     attempt_limit = random.randint(1_000_000, 2_000_000)  # something large
-    rp = ResultPublisher(queue_info=queue_info, connect_attempt_limit=attempt_limit)
+    rp = ResultPublisher(
+        cred_fn=lambda: queue_info, connect_attempt_limit=attempt_limit
+    )
     rp._on_open_failed(mock_conn, exc)
     assert rp._connection_tries >= attempt_limit, "Expect signal to event loop"
 
@@ -191,8 +202,7 @@ def test_rp_stops_trying_on_unrecoverable(randomstring, mock_log):
 
 
 def test_rp_handles_bulk_ack_deliveries():
-    queue_info = {**q_info}
-    rp = ResultPublisher(queue_info=queue_info)
+    rp = ResultPublisher(cred_fn=lambda: {**q_info})
     multiple_dtag = rp._delivery_tag_index + random.randint(5, 30)
     mock_frame = mock.Mock()
     mock_frame.method.INDEX = pika.spec.Basic.Ack.INDEX
@@ -217,8 +227,7 @@ def test_rp_handles_bulk_ack_deliveries():
 
 
 def test_rp_handles_bulk_nack_deliveries():
-    queue_info = {**q_info}
-    rp = ResultPublisher(queue_info=queue_info)
+    rp = ResultPublisher(cred_fn=lambda: {**q_info})
     multiple_dtag = rp._delivery_tag_index + random.randint(5, 30)
     mock_frame = mock.Mock()
     mock_frame.method.INDEX = pika.spec.Basic.Nack.INDEX
@@ -243,8 +252,7 @@ def test_rp_handles_bulk_nack_deliveries():
 
 
 def test_rp_event_watcher_publishes(randomstring):
-    queue_info = {**q_info}
-    rp = ResultPublisher(queue_info=queue_info)
+    rp = ResultPublisher(cred_fn=lambda: {**q_info})
     rp._connection = mock.Mock()
     rp._mq_conn = mock.Mock()
     rp._mq_chan = mock.Mock()
@@ -273,8 +281,7 @@ def test_rp_event_watcher_publishes(randomstring):
 
 
 def test_rp_publish_enqueues_message(randomstring):
-    queue_info = {**q_info}
-    rp = ResultPublisher(queue_info=queue_info)
+    rp = ResultPublisher(cred_fn=lambda: {**q_info})
     rp._mq_chan = mock.Mock()
     rp.is_alive = mock.Mock()
 
@@ -300,7 +307,7 @@ def test_rp_on_connection_closed_logs(mock_log, attempt_limit):
     assert attempt_limit > 2, "At least 3 states tested"
 
     exc = pika.exceptions.ChannelClosedByClient(200, "Some text")
-    cq = ResultPublisher(queue_info={**q_info})
+    cq = ResultPublisher(cred_fn=lambda: {**q_info})
     mock_conn = mock.Mock(spec=pika.BaseConnection)
     assert not mock_log.debug.called, "Verify test setup"
     cq._on_connection_closed(mock_conn, exc)

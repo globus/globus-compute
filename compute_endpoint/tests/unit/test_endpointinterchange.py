@@ -17,9 +17,11 @@ _mock_base = "globus_compute_endpoint.endpoint.interchange."
 
 def empty_reg_info() -> dict:
     return {
-        "task_queue_info": {},
-        "result_queue_info": {},
-        "heartbeat_queue_info": {},
+        "amqp_creds": {
+            "task_queue_info": {},
+            "result_queue_info": {},
+            "heartbeat_queue_info": {},
+        }
     }
 
 
@@ -68,7 +70,7 @@ def ei(endpoint_uuid, mock_gce, mock_quiesce, mock_ep_info):
     _ei = EndpointInterchange(
         config=UserEndpointConfig(engine=mock_gce),
         endpoint_id=endpoint_uuid,
-        reg_info=empty_reg_info(),
+        cred_fn=empty_reg_info,
         ep_info=mock_ep_info,
     )
     _ei._quiesce_event = mock_quiesce
@@ -202,7 +204,7 @@ def test_audit_func_cleared_if_not_ha(mock_gce, task_uuid, audit_fd, is_ha, mock
     conf = UserEndpointConfig(high_assurance=is_ha, engine=mock_gce)
     f = GCFuture(task_uuid)
     ei = EndpointInterchange(
-        conf, reg_info=empty_reg_info(), ep_info={}, audit_fd=audit_fd
+        conf, cred_fn=empty_reg_info, ep_info={}, audit_fd=audit_fd
     )
     assert not ei.time_to_quit
 
@@ -215,7 +217,7 @@ def test_audit_func_cleared_if_not_ha(mock_gce, task_uuid, audit_fd, is_ha, mock
 def test_amqp_threads_stop_at_quiesce(mock_log, mock_gce, mock_rp, mock_tqs):
     conf = UserEndpointConfig(engine=mock_gce)
     mock_gce.get_status_report.side_effect = MemoryError("bad things!")
-    ei = EndpointInterchange(conf, reg_info=empty_reg_info(), ep_info={})
+    ei = EndpointInterchange(conf, cred_fn=empty_reg_info, ep_info={})
 
     with pytest.raises(MemoryError):
         ei._main_loop()

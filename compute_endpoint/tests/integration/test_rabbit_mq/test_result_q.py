@@ -116,7 +116,7 @@ def test_broken_connection(
 
     q_info = create_result_queue_info(connection_url=conn_url)
 
-    rp = ResultPublisher(queue_info=q_info)
+    rp = ResultPublisher(cred_fn=lambda: q_info)
     mock_cb = mocker.patch.object(rp, "_on_open_failed")
     try:
         rp.start()

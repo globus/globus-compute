@@ -481,7 +481,7 @@ class Endpoint:
         endpoint_uuid,
         endpoint_config: UserEndpointConfig,
         log_to_console: bool,
-        reg_info: dict,
+        cred_fn: t.Callable[[], dict[str, dict]],
         ep_info: dict,
         audit_fd: int | None = None,
     ):
@@ -520,6 +520,7 @@ class Endpoint:
             raise
 
         try:
+            reg_info = cred_fn()["amqp_creds"]
             ret_ep_uuid = reg_info["endpoint_id"]
             tq_info, rq_info, hbq_info = (
                 reg_info["task_queue_info"],
@@ -588,7 +589,7 @@ class Endpoint:
             endpoint_uuid,
             endpoint_dir,
             endpoint_config,
-            reg_info,
+            cred_fn,
             result_store,
             parent_pid,
             ep_info,
@@ -600,7 +601,7 @@ class Endpoint:
         endpoint_uuid,
         endpoint_dir,
         endpoint_config: UserEndpointConfig,
-        reg_info,
+        cred_fn: t.Callable[[], dict[str, dict]],
         result_store: ResultStore,
         parent_pid: int,
         ep_info: dict,
@@ -610,7 +611,7 @@ class Endpoint:
 
         interchange = EndpointInterchange(
             config=endpoint_config,
-            reg_info=reg_info,
+            cred_fn=cred_fn,
             endpoint_id=endpoint_uuid,
             endpoint_dir=endpoint_dir,
             result_store=result_store,
