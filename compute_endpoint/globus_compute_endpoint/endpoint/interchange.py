@@ -56,7 +56,7 @@ class EndpointInterchange:
     def __init__(
         self,
         config: UserEndpointConfig,
-        reg_info: dict[str, dict],
+        cred_fn: t.Callable[[], dict[str, dict]],
         ep_info: dict,
         logdir=".",
         endpoint_id=None,
@@ -72,11 +72,8 @@ class EndpointInterchange:
         config : globus_compute_sdk.UserEndpointConfig object
              Globus Compute config object describing how compute should be provisioned
 
-        reg_info : dict[str, dict]
-             Dictionary containing connection information for the task, result, and
-             heartbeat queues.  The required data structure is returned from the
-             Endpoint registration API call, encapsulated in the SDK by
-             `Client.register_endpoint()`.
+        cred_fn :
+            A callable to dynamically collect AMQP connection credentials.
 
         logdir : str
              Parsl log directory paths. Logs and temp files go here. Default: '.'
@@ -100,9 +97,15 @@ class EndpointInterchange:
         self._audit_fd = audit_fd
         self.endpoint_dir = endpoint_dir
 
-        self.task_q_info = reg_info["task_queue_info"]
-        self.result_q_info = reg_info["result_queue_info"]
-        self.heartbeat_q_info = reg_info["heartbeat_queue_info"]
+        if cred_fn()["amqp_creds"] is None:
+            # require creds now, for better UX if not provided
+            raise ValueError("No AMQP credentials specified")
+
+        self.task_q_info_fn = lambda: cred_fn()["amqp_creds"]["task_queue_info"]
+        self.result_q_info_fn = lambda: cred_fn()["amqp_creds"]["result_queue_info"]
+        self.heartbeat_q_info_fn = lambda: cred_fn()["amqp_creds"][
+            "heartbeat_queue_info"
+        ]
 
         self.time_to_quit = False
         self.heartbeat_period = self.config.heartbeat_period
@@ -519,12 +522,12 @@ class EndpointInterchange:
             return f
 
         task_q_subscriber = TaskQueueSubscriber(
-            queue_info=self.task_q_info,
+            cred_fn=self.task_q_info_fn,
             pending_task_queue=self.pending_task_queue,
             thread_name="TQS",
         )
-        results_publisher = ResultPublisher(queue_info=self.result_q_info)
-        heartbeat_publisher = ResultPublisher(queue_info=self.heartbeat_q_info)
+        results_publisher = ResultPublisher(cred_fn=self.result_q_info_fn)
+        heartbeat_publisher = ResultPublisher(cred_fn=self.heartbeat_q_info_fn)
         stored_processor_thread = threading.Thread(
             target=process_stored_results, daemon=True, name="Stored Result Handler"
         )

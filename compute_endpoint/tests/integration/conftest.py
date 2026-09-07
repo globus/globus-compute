@@ -233,7 +233,7 @@ def start_task_q_subscriber(
         q_info = task_queue_info if override_params is None else override_params
         ensure_task_queue(queue_opts={"queue": q_info["queue"]})
 
-        qs = TaskQueueSubscriber(queue_info=q_info, pending_task_queue=task_queue)
+        qs = TaskQueueSubscriber(cred_fn=lambda: q_info, pending_task_queue=task_queue)
         qs.start()
         qs_list.append(qs)
         return qs
@@ -300,7 +300,7 @@ def start_result_q_publisher(
             queue_opts = {"queue": queue_name, "durable": True}
             ensure_result_queue(exchange_opts=exchange_opts, queue_opts=queue_opts)
 
-        qp = ResultPublisher(queue_info=q_info)
+        qp = ResultPublisher(cred_fn=lambda: q_info)
         qp.start()
         qp_list.append(qp)
         if queue_purge:  # Make sure queue is empty
@@ -334,7 +334,7 @@ def start_heartbeat_q_publisher(heartbeat_queue_info, ensure_heartbeat_queue):
             queue_opts = {"queue": queue_name, "durable": True}
             ensure_heartbeat_queue(exchange_opts=exchange_opts, queue_opts=queue_opts)
 
-        qp = ResultPublisher(queue_info=q_info)
+        qp = ResultPublisher(cred_fn=lambda: q_info)
         qp.start()
         qp_list.append(qp)
         if queue_purge:  # Make sure queue is empty

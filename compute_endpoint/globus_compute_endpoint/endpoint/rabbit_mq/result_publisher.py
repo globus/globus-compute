@@ -27,21 +27,23 @@ log = logging.getLogger(__name__)
 
 class ResultPublisher(threading.Thread):
     """
-    Publish results to the AMQP service, per the routing information in `queue_info`.
+    Publish results to the AMQP service, per the routing information returned by
+    a connection callable.
     """
 
     def __init__(
         self,
         *,
-        queue_info: dict,
+        cred_fn: t.Callable[[], dict],
         poll_period_s: float = 0.5,
         connect_attempt_limit: int = 7200,
         channel_close_window_s: int = 10,
         channel_close_window_limit: int = 3,
     ):
         """
-        :param queue_info: Pika connection parameters to connect to RabbitMQ;
-            typically as returned from the web-service by the web-service
+        :param cred_fn: a callable to dynamically collect Pika connection
+            parameters (e.g., credentials to the AMQP service); typically as
+            returned by the web-service
         :param poll_period_s: [default: 0.5] how frequently to check for and
             handle events.  For example, if the thread should stop or if there
             are results to send along.
@@ -53,6 +55,8 @@ class ResultPublisher(threading.Thread):
         :param channel_close_window_limit: Limit of channel close events (within
             ``channel_close_window_s``) before shutting down the thread.
         """
+        self.cred_fn = cred_fn
+
         # how often to check for work; every `poll_period_s`, the `_event_watcher`
         # method will handle any outstanding work.
         self.poll_period_s = max(0.01, poll_period_s)
@@ -88,7 +92,7 @@ class ResultPublisher(threading.Thread):
         self.status = RabbitPublisherStatus.closed
 
         self._publish_kwargs: dict[str, t.Any] = {}
-        self._queue_info = queue_info
+        self._queue_info: dict[str, t.Any] = {}
 
         super().__init__()
 
@@ -177,6 +181,8 @@ class ResultPublisher(threading.Thread):
             self.join(timeout=timeout)
 
     def _connect(self) -> pika.SelectConnection:
+        self._queue_info = self.cred_fn()
+
         publish_kw = dict(**self._queue_info["queue_publish_kwargs"])
         if "properties" in publish_kw:
             publish_kw["properties"] = BasicProperties(**publish_kw["properties"])

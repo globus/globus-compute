@@ -29,7 +29,7 @@ def _run_ixproc(reg_info: dict, endpoint_uuid, endpoint_dir):
     ix = EndpointInterchange(
         config=UserEndpointConfig(engine=mock_exe),
         endpoint_id=endpoint_uuid,
-        reg_info=reg_info,
+        cred_fn=lambda: {"amqp_creds": reg_info},
         ep_info={},
         endpoint_dir=endpoint_dir,
         logdir=endpoint_dir,

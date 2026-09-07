@@ -23,7 +23,7 @@ class TaskQueueSubscriber(threading.Thread):
     def __init__(
         self,
         *,
-        queue_info: dict,
+        cred_fn: t.Callable[[], dict],
         pending_task_queue: queue.SimpleQueue,
         poll_period_s: float = 0.5,
         connect_attempt_limit: int = 7200,
@@ -35,10 +35,10 @@ class TaskQueueSubscriber(threading.Thread):
 
         Parameters
         ----------
-        queue_info: dict
-            Dictionary that includes the key "connection_url", as well as
-            exchange and queue declaration information specified by the
-            server.
+        cred_fn
+            A callable to dynamically collect Pika connection parameters (e.g.,
+            credentials to the AMQP service); typically as returned by the
+            web-service
 
         pending_task_queue: queue.SimpleQueue
             Messages from upstream will be placed in this queue. Consumers of
@@ -70,7 +70,8 @@ class TaskQueueSubscriber(threading.Thread):
 
         super().__init__()
 
-        self._queue_info = queue_info
+        self.cred_fn = cred_fn
+        self._queue_info: dict[str, t.Any] = {}
         self.pending_task_queue = pending_task_queue
         self._to_ack: queue.SimpleQueue[int] = queue.SimpleQueue()
         self._stop_event = threading.Event()
@@ -176,6 +177,8 @@ class TaskQueueSubscriber(threading.Thread):
         self._stop_event.set()
 
     def _connect(self) -> pika.SelectConnection:
+        self._queue_info = self.cred_fn()
+
         pika_params = pika.URLParameters(self._queue_info["connection_url"])
         return pika.SelectConnection(
             pika_params,

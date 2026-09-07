@@ -208,3 +208,24 @@ def user_input_select(prompt: str, options: list[str]) -> str | None:
                 if 0 < input_num <= len(options):
                     return options[input_num - 1]
             print(f"Invalid choice: {input_raw}")
+
+
+def make_credential_provider(
+    reg_info: dict | None = None,
+) -> t.Callable[[], dict[str, dict]]:
+    """
+    Dynamically query a credential source.
+
+    The returned data structure is from the Endpoint registration API call,
+    encapsulated in the SDK by `Client.register_endpoint()`.  It currently contains
+    connection information for the task, result, and heartbeat queues.
+    """
+    if reg_info is None:
+        raise KeyError("No credential info provided")
+
+    amqp_creds: dict = {"amqp_creds": reg_info}
+
+    def _credential_provider() -> dict:
+        return amqp_creds
+
+    return _credential_provider

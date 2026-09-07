@@ -2448,17 +2448,19 @@ def test_ep_dir_log_path_envs_passed_to_render(
 
 
 @pytest.mark.parametrize("is_valid", (True, False))
-def test_pipe_size_limit(mocker, mock_log, successful_exec_from_mocked_root, is_valid):
+def test_pipe_size_limit(mock_log, successful_exec_from_mocked_root, is_valid):
     *_, em = successful_exec_from_mocked_root
 
     stdin_data_size = 235  # Empirically/designed size of `stdin_data` string
     pipe_buffer_size = 255 + stdin_data_size + is_valid  # manufacture error/success
 
     conf_str = "k: v"  # some key, some value; valid YAML string
-    mocker.patch.object(fcntl, "fcntl", return_value=pipe_buffer_size)
-    mocker.patch(f"{_MOCK_BASE}render_config_user_template", return_value=conf_str)
 
-    with pytest.raises(SystemExit) as pyexc:
+    with (
+        mock.patch.object(fcntl, "fcntl", return_value=pipe_buffer_size),
+        mock.patch(f"{_MOCK_BASE}render_config_user_template", return_value=conf_str),
+        pytest.raises(SystemExit) as pyexc,
+    ):
         em._event_loop()
 
     if is_valid:

@@ -44,6 +44,7 @@ from globus_compute_endpoint.endpoint.identity_mapper import MappedPosixIdentity
 from globus_compute_endpoint.endpoint.utils import has_pyprctl as _has_multi_user
 from globus_compute_endpoint.endpoint.utils import (
     is_privileged,
+    make_credential_provider,
     pyprctl_import_error,
     send_endpoint_startup_failure_to_amqp,
     user_input_select,
@@ -1016,12 +1017,13 @@ def _start_user_endpoint(
         pid_path = Endpoint.pid_path(ep_dir)
         stk.enter_context(_pidfile(pid_path, ep_config.heartbeat_period * 3))
 
+        cred_fn = make_credential_provider(reg_info)
         get_cli_endpoint(ep_config).start_endpoint(
             endpoint_dir=ep_dir,
             endpoint_uuid=endpoint_uuid,
             endpoint_config=ep_config,
             log_to_console=state.log_to_console,
-            reg_info=reg_info,
+            cred_fn=cred_fn,
             ep_info=ep_info,
             audit_fd=audit_fd,
         )

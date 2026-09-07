@@ -284,7 +284,7 @@ class EndpointManager:
             stop_event=self._command_stop_event,
             thread_name="CQS",
         )
-        self._heartbeat_publisher = ResultPublisher(queue_info=hbq_info)
+        self._heartbeat_publisher = ResultPublisher(cred_fn=lambda: hbq_info)
 
     @staticmethod
     def get_metadata(ep_dir: pathlib.Path, config: ManagerEndpointConfig) -> dict:
