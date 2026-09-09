@@ -2451,13 +2451,32 @@ def test_ep_dir_log_path_envs_passed_to_render(
 def test_pipe_size_limit(mock_log, successful_exec_from_mocked_root, is_valid):
     *_, em = successful_exec_from_mocked_root
 
-    stdin_data_size = 235  # Empirically/designed size of `stdin_data` string
-    pipe_buffer_size = 255 + stdin_data_size + is_valid  # manufacture error/success
+    # obviously incorrect values until test_injection fixes them
+    stdin_data_size = -1
+    pipe_buffer_size = -1
+
+    original_dumps = json.dumps
+
+    def test_injection(obj, **k):
+        rv = original_dumps(obj, **k)
+        if isinstance(obj, dict) and "ep_info" in obj:
+            nonlocal stdin_data_size, pipe_buffer_size
+
+            # is_valid ==> manufacture error/success
+            stdin_data_size = len(rv)
+            pipe_buffer_size = 255 + stdin_data_size + is_valid
+
+        return rv
+
+    def mock_pipe_buffer_size(*a, **k) -> int:
+        nonlocal pipe_buffer_size
+        return pipe_buffer_size
 
     conf_str = "k: v"  # some key, some value; valid YAML string
 
     with (
-        mock.patch.object(fcntl, "fcntl", return_value=pipe_buffer_size),
+        mock.patch.object(json, "dumps", side_effect=test_injection),
+        mock.patch.object(fcntl, "fcntl", side_effect=mock_pipe_buffer_size),
         mock.patch(f"{_MOCK_BASE}render_config_user_template", return_value=conf_str),
         pytest.raises(SystemExit) as pyexc,
     ):
@@ -2467,7 +2486,10 @@ def test_pipe_size_limit(mock_log, successful_exec_from_mocked_root, is_valid):
         assert pyexc.value.code == _GOOD_EC, "Q&D: verify we exec'ed, based on '+= 1'"
     else:
         assert pyexc.value.code < _GOOD_EC
-        assert f"{stdin_data_size} bytes" in mock_log.error.call_args[0][0]
+
+        (m, *_), _ = mock_log.error.call_args
+        assert f"{stdin_data_size} bytes" in m, "Expect number of bytes to write in msg"
+        assert f"{pipe_buffer_size - 256} bytes" in m, "Expect pipe limit in error msg"
 
 
 def test_able_to_render_user_config_sc28360(successful_exec_from_mocked_root, conf_dir):
