@@ -126,11 +126,12 @@ You will also need the following credentials:
    for instructions.
 
    **⚠️ Note:** The automatically generated changelog from GitHub includes every PR in
-   the release, but not every PR is of interest.  Cull from the changelog items in the
-   generated notes those PRs that are only of interest to Compute developers.  For
-   example, test-only changes, or [pre-commit] PRs may be removed.  (If users are
-   interested to see the exact set of changes, then they may use the "Full Changelog"
-   link at the bottom of the generated notes.)
+   the release, but not every PR is of interest to users, our intended target audience.
+   Cull from the generated notes those PRs that are only of interest to Compute developers.
+   For example, test-only changes, removal of unused code or [pre-commit] PRs should be
+   removed.  (If users are interested to see the exact set of changes, then they may use
+   the "Full Changelog" link at the bottom of the generated notes.  Developers can use
+   variations of `git log/shortlog`.)
 
 1. Navigate to the [Build with Parameters](https://builds.globus.org/jenkins/job/BuildGlobusComputeAgentPackages/build?delay=0sec) Jenkins page.
 
