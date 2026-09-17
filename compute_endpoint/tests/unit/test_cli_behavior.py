@@ -445,7 +445,7 @@ def test_start_ep_hookup(is_uep, make_endpoint_dir, ep_name):
     with contextlib.ExitStack() as stk:
         pyt_e = stk.enter_context(pytest.raises(SystemExit))
         m_uep = stk.enter_context(mock.patch(f"{_MOCK_BASE}_start_user_endpoint"))
-        m_cep = stk.enter_context(mock.patch(f"{_MOCK_BASE}_start_endpoint_manager"))
+        m_cep = stk.enter_context(mock.patch(f"{_MOCK_BASE}_start_core_endpoint"))
         stk.enter_context(mock.patch.object(sys.stdin, "isatty", return_value=False))
 
         cli.app.main(args=cli_args, prog_name=cli.app.name)

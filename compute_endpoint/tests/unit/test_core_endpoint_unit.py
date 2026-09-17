@@ -2283,7 +2283,7 @@ def test_update_uep_credentials(
     randomstring, conf_dir, mock_conf, mock_client, mock_reg_info
 ):
     ep_uuid, mock_gcc = mock_client
-    em = EndpointManager(conf_dir, ep_uuid, mock_conf, mock_reg_info)
+    em = CoreEndpoint(conf_dir, ep_uuid, mock_conf, mock_reg_info)
 
     # The `fs` fixture is pulled in by conf_dir, but doesn't handle memfd_create.
     # This test only needs the EndpointManager() instance, so can turn fs off now.
