@@ -89,6 +89,91 @@ if has_pyprctl:
     }
 
 
+if not hasattr(_os, "memfd_create"):
+    # If `os.memfd_create` does not exist, then either this is running on a *really*
+    # old Linux kernel (< 3.17) or the glibc wrapper available during the Python build
+    # was too old (glibc < 2.27).  Under the assumption that ~no one is using so out-
+    # -of-date a kernel, implement memfd_create manually.  This implementation simply
+    # makes the request directly to the kernel (via a syscall), rather than
+    # outsourcing to glibc.
+
+    def _create_memfd_shim():
+        import ctypes
+        import errno
+
+        arch = _os.uname().machine.lower()
+        try:
+            _MEMFD_CREATE_SYSCALL_ID = {
+                # - architecture specific syscall codes, as found in the kernel sources
+                #   ... links given inline
+                # - if we need to support additional architectures on *really old
+                #   distros*, then augment this data structure accordingly.
+                # - the keys of this structure are my best guess at what the local libc
+                #   uname() returns on different platforms.  Let's wait for bug reports
+                #   before trying to augment this too fully.
+                #
+                # https://github.com/torvalds/linux/blob/v7.2/include/uapi/asm-generic/unistd.h#L675
+                "aarch64": 279,
+                "arm64": 279,
+                # https://github.com/torvalds/linux/blob/v7.2/arch/x86/entry/syscalls/syscall_64.tbl#L331
+                "amd64": 319,
+                "x86_64": 319,
+                # https://github.com/torvalds/linux/blob/v7.2/arch/x86/entry/syscalls/syscall_32.tbl#L371
+                "i386": 356,
+                "i686": 356,
+                # https://github.com/torvalds/linux/blob/v7.2/arch/arm/tools/syscall.tbl#L403
+                "armv7": 385,
+                "armv7l": 385,
+                # https://github.com/torvalds/linux/blob/v7.2/arch/s390/kernel/syscalls/syscall.tbl#L304
+                "s390x": 350,
+                # https://github.com/torvalds/linux/blob/v7.2/arch/powerpc/kernel/syscalls/syscall.tbl#L464
+                "ppc64le": 360,
+            }[arch]
+        except KeyError as e:
+            raise OSError(
+                errno.ENOSYS,
+                f"Compute's memfd_create() shim: architecture undefined for {arch!r}",
+            ) from e
+
+        for mfd_const, val in (
+            ("MFD_CLOEXEC", 1),
+            ("MFD_ALLOW_SEALING", 2),
+            ("MFD_HUGETLB", 4),
+            ("MFD_HUGE_SHIFT", 26),
+            ("MFD_HUGE_MASK", 63),
+            ("MFD_HUGE_64KB", 1073741824),
+            ("MFD_HUGE_512KB", 1275068416),
+            ("MFD_HUGE_1MB", 1342177280),
+            ("MFD_HUGE_2MB", 1409286144),
+            ("MFD_HUGE_8MB", 1543503872),
+            ("MFD_HUGE_16MB", 1610612736),
+            ("MFD_HUGE_32MB", 1677721600),
+            ("MFD_HUGE_256MB", 1879048192),
+            ("MFD_HUGE_512MB", 1946157056),
+            ("MFD_HUGE_1GB", 2013265920),
+            ("MFD_HUGE_2GB", 2080374784),
+            ("MFD_HUGE_16GB", 2281701376),
+        ):
+            if not hasattr(_os, mfd_const):
+                setattr(_os, mfd_const, val)
+
+        libc = ctypes.CDLL(None, use_errno=True)
+        libc.syscall.argtypes = [ctypes.c_long, ctypes.c_char_p, ctypes.c_uint]
+        libc.syscall.restype = ctypes.c_long
+
+        def _memfd_create_shim(name: str, flags: int = _os.MFD_CLOEXEC) -> int:
+            name_b = _os.fsencode(name)
+            fd = libc.syscall(_MEMFD_CREATE_SYSCALL_ID, name_b, flags)
+            if fd == -1:
+                err_num = ctypes.get_errno()
+                raise OSError(err_num, _os.strerror(err_num))
+            return int(fd)  # back to Python's integer from a c_long
+
+        _os.memfd_create = _memfd_create_shim
+
+    _create_memfd_shim()
+
+
 def _redact_url_creds(raw: _T, redact_user=True, repl="***", count=0) -> _T:
     """
     Redact URL credentials found in `raw`, by replacing the password and
