@@ -2,7 +2,6 @@ from __future__ import annotations
 
 import fcntl as _fcntl
 import json
-import os
 import os as _os
 import pwd as _pwd
 import re as _re
@@ -333,9 +332,9 @@ def make_credential_provider(
             try_count = 1
             while True:
                 try:
-                    os.lseek(_cred_fd, 0, os.SEEK_SET)
+                    _os.lseek(_cred_fd, 0, _os.SEEK_SET)
                     dyn_data_b = b""
-                    while chunk := os.read(_cred_fd, 2**15):
+                    while chunk := _os.read(_cred_fd, 2**15):
                         dyn_data_b += chunk
 
                     enc = Fernet(key)
