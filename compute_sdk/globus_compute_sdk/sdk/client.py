@@ -9,6 +9,7 @@ import platform
 import threading
 import typing as t
 import warnings
+from dataclasses import asdict, dataclass
 
 import globus_sdk
 from globus_compute_common.sdk_version_sharing import user_agent_substring
@@ -37,22 +38,14 @@ from .batch import Batch, create_user_runtime
 logger = logging.getLogger(__name__)
 
 
+@dataclass
 class FunctionRegistrationMetadata:
-    def __init__(self, python_version: str, sdk_version: str, serde_identifier: str):
-        self.python_version = python_version
-        self.sdk_version = sdk_version
-        self.serde_identifier = serde_identifier
+    python_version: str
+    sdk_version: str
+    serde_identifier: str
 
-    def to_dict(self):
-        return {
-            "python_version": self.python_version,
-            "sdk_version": self.sdk_version,
-            "serde_identifier": self.serde_identifier,
-        }
-
-    def __repr__(self) -> str:
-        args = ", ".join(f"{k}={v!r}" for k, v in self.__dict__.items())
-        return f"FunctionRegistrationMetadata({args})"
+    def to_dict(self) -> dict[str, str]:
+        return asdict(self)
 
 
 class FunctionRegistrationData:
