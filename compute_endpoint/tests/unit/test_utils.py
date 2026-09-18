@@ -1,4 +1,6 @@
+import errno
 import fcntl
+import importlib
 import json
 import os
 import resource
@@ -7,6 +9,7 @@ import uuid
 from collections import namedtuple
 from unittest import mock
 
+import globus_compute_endpoint.endpoint.utils
 import pika
 import pytest
 from cryptography.fernet import Fernet
@@ -43,6 +46,51 @@ def mock_mq_chan(mocker):
     _mq_conn.channel.return_value = _mq_chan
     with mock.patch.dict(sys.modules, {"pika": mock_pika}):
         yield _mq_chan
+
+
+def test_os_memfd_shim():
+
+    def is_memfd(fd: int):
+        try:
+            fcntl.fcntl(fd, fcntl.F_GET_SEALS)
+            return True
+        except OSError as e:
+            if e.errno == errno.EINVAL:
+                return False
+            raise
+
+    orig_fn = os.memfd_create
+    with mock.patch.object(os, "memfd_create", None):
+        delattr(os, "memfd_create")
+
+        importlib.reload(globus_compute_endpoint.endpoint.utils)
+        new_memfd_create = os.memfd_create
+
+    assert new_memfd_create is not orig_fn, "Expect shim installed"
+    assert os.memfd_create is orig_fn, "Test teardown; ensure env reset"
+
+    fd = new_memfd_create("test_mem_file")
+    assert is_memfd(fd)
+    os.close(fd)
+
+
+def test_os_memfd_shim_missing_architecture(randomstring):
+    unknown_arch = randomstring().lower()
+    mock_uname = mock.Mock(machine=unknown_arch)
+    with (
+        mock.patch.object(os, "memfd_create", None),
+        mock.patch(f"{_MOCK_BASE}_os.uname", return_value=mock_uname),
+        pytest.raises(OSError) as pyt_e,
+    ):
+        delattr(os, "memfd_create")
+
+        importlib.reload(globus_compute_endpoint.endpoint.utils)
+
+    e = pyt_e.value
+    assert e.errno == errno.ENOSYS
+    assert "shim" in str(e), "Expect transparency that it's our shim"
+    assert "architecture undefined" in str(e), "Expect problem stated"
+    assert unknown_arch in str(e), "Expect discovered arch in error"
 
 
 def test_url_redaction(randomstring):
