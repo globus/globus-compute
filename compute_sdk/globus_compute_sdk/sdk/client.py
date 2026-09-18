@@ -26,7 +26,6 @@ from globus_compute_sdk.sdk.utils.gare import gare_handler
 from globus_compute_sdk.sdk.utils.uuid_like import UUID_LIKE_T
 from globus_compute_sdk.serialize import (
     ComputeSerializer,
-    PureSourceTextInspect,
     SerializationStrategy,
 )
 from globus_compute_sdk.version import __version__, compare_versions
@@ -42,10 +41,10 @@ logger = logging.getLogger(__name__)
 class FunctionRegistrationMetadata:
     python_version: str
     sdk_version: str
-    serde_identifier: str
+    serde_identifier: str | None = None
 
-    def to_dict(self) -> dict[str, str]:
-        return asdict(self)
+    def to_dict(self) -> dict[str, str | None]:
+        return {k: v for k, v in asdict(self).items() if v}
 
 
 class FunctionRegistrationData:
@@ -60,6 +59,7 @@ class FunctionRegistrationData:
         public: bool = False,
         group: t.Optional[UUID_LIKE_T] = None,
         serializer: t.Optional[ComputeSerializer] = None,
+        serialized: bool = True,
         ha_endpoint_id: t.Optional[UUID_LIKE_T] = None,
     ):
         if function is not None:
@@ -69,15 +69,18 @@ class FunctionRegistrationData:
                     " `function_name`, or `metadata`"
                 )
 
-            serializer = serializer if serializer else ComputeSerializer()
+            if not serialized:
+                raise ValueError("`serialized` must be True if `function` specified")
+
+            serde = serializer if serializer else ComputeSerializer()
             function_name = function.__name__
-            function_code = serializer.pack_buffers([serializer.serialize(function)])
+            function_code = serde.pack_buffers([serde.serialize(function)])
             if description is None:
                 description = inspect.getdoc(function)
             metadata = FunctionRegistrationMetadata(
                 python_version=platform.python_version(),
                 sdk_version=__version__,
-                serde_identifier=serializer.code_serializer.identifier.strip(),
+                serde_identifier=serde.code_serializer.identifier.strip(),
             )
 
         elif None in (function_name, function_code, metadata):
@@ -97,12 +100,14 @@ class FunctionRegistrationData:
         self.metadata = metadata
         self.public = public
         self.group = group
+        self.serialized = serialized
         self.ha_endpoint_id = ha_endpoint_id
 
     def to_dict(self):
         data = {
             "function_name": self.function_name,
             "function_code": self.function_code,
+            "serialized": self.serialized,
             "meta": self.metadata.to_dict() if self.metadata else None,
         }
         if self.description:
@@ -841,28 +846,22 @@ class Client:
         str
             UUID string of the registered function
         """
-        # Simulate PureSourceTextInspect strategy
-        serde_iden = PureSourceTextInspect.identifier
-        serde_sep = PureSourceTextInspect._separator
-        serialized = f"{serde_iden}{function_name}{serde_sep}{source}"
-        packed = ComputeSerializer.pack_buffers([serialized])
-
         if metadata:
-            metadata["serde_identifier"] = serde_iden.strip()
             reg_meta = FunctionRegistrationMetadata(**metadata)
         else:
             reg_meta = FunctionRegistrationMetadata(
                 python_version=platform.python_version(),
                 sdk_version=__version__,
-                serde_identifier=serde_iden.strip(),
             )
+
         data = FunctionRegistrationData(
-            function_code=packed,
+            function_code=source,
             function_name=function_name,
             description=description,
             metadata=reg_meta,
             public=public,
             group=group,
+            serialized=False,
             ha_endpoint_id=ha_endpoint_id,
         )
         logger.info("Registering function: %s", data.function_name)
