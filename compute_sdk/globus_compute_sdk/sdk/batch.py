@@ -23,7 +23,7 @@ _default_serde = ComputeSerializer()
 @dataclass
 class UserRuntime:
     """Information about a user's runtime environment, which is sent along with task
-    submissions to the MEP user config renderer.
+    submissions to the CEP user config renderer.
 
     Parameters
     ----------

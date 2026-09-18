@@ -21,7 +21,7 @@ import pytest
 import yaml
 from globus_compute_endpoint.endpoint import endpoint
 from globus_compute_endpoint.endpoint.config import (
-    ManagerEndpointConfig,
+    CoreEndpointConfig,
     UserEndpointConfig,
 )
 from globus_compute_endpoint.endpoint.endpoint import Endpoint
@@ -206,7 +206,7 @@ def test_configure_ha_audit_default(mock_print, conf_dir, ha):
         assert conf.get("audit_log_path") == str(audit_path), conf
 
 
-@pytest.mark.parametrize("manager_config", ("some-config.yaml", None))
+@pytest.mark.parametrize("core_config", ("some-config.yaml", None))
 @pytest.mark.parametrize("template_config", ("some-template.yaml.j2", None))
 @pytest.mark.parametrize("schema_config", ("some-schema.json", None))
 @pytest.mark.parametrize("user_env_config", ("some-env.yaml", None))
@@ -215,16 +215,16 @@ def test_configure_config_arguments(
     fs,
     mock_print,
     conf_dir,
-    manager_config,
+    core_config,
     template_config,
     schema_config,
     user_env_config,
     id_mapping_config,
 ):
     # convert to Path here instead of in the parametrize so pyfakefs can patch properly
-    if manager_config:
-        manager_config = pathlib.Path(manager_config)
-        manager_config.write_text("public: false\n")
+    if core_config:
+        core_config = pathlib.Path(core_config)
+        core_config.write_text("public: false\n")
     if template_config:
         template_config = pathlib.Path(template_config)
         template_config.write_text("key: {{ value }}\n")
@@ -240,7 +240,7 @@ def test_configure_config_arguments(
 
     Endpoint.configure_endpoint(
         conf_dir,
-        endpoint_config=manager_config,
+        endpoint_config=core_config,
         user_config_template=template_config,
         user_config_schema=schema_config,
         user_environment=user_env_config,
@@ -250,7 +250,7 @@ def test_configure_config_arguments(
 
     dest_config = Endpoint._config_file_path(conf_dir)
     assert dest_config.exists()
-    assert ("public: false" in dest_config.read_text()) is bool(manager_config)
+    assert ("public: false" in dest_config.read_text()) is bool(core_config)
 
     dest_template = Endpoint.user_config_template_path(conf_dir)
     assert dest_template.exists()
@@ -975,7 +975,7 @@ def test_migrate_to_template_capable_success(
 
 def test_migrate_to_template_capable_already_template_capable(mock_get_config):
     mock_config_path = pathlib.Path("some/config/dir")
-    mock_get_config.return_value = mock.Mock(spec=ManagerEndpointConfig)
+    mock_get_config.return_value = mock.Mock(spec=CoreEndpointConfig)
 
     with pytest.raises(ValueError) as pyt_exc:
         Endpoint.migrate_to_template_capable(mock_config_path)

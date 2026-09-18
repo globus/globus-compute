@@ -3,19 +3,20 @@ import io
 import json
 import logging
 import os
+import pathlib
 import textwrap
 import threading
 from unittest import mock
 
 import pytest
-from globus_compute_endpoint.endpoint.config import ManagerEndpointConfig
-from globus_compute_endpoint.endpoint.endpoint_manager import (
-    EndpointManager,
+from globus_compute_endpoint.endpoint.config import CoreEndpointConfig
+from globus_compute_endpoint.endpoint.core_endpoint import (
+    CoreEndpoint,
     MappedPosixIdentity,
 )
 from tests.utils import try_assert
 
-_MOCK_BASE = "globus_compute_endpoint.endpoint.endpoint_manager."
+_MOCK_BASE = "globus_compute_endpoint.endpoint.core_endpoint."
 _GOOD_UNPRIVILEGED_EC = 84
 
 
@@ -64,7 +65,7 @@ def conf_tmpl():
 @pytest.fixture
 def conf(tmp_path):
     (tmp_path / "user_config_template.yaml.j2").write_text(conf_tmpl())
-    mec = ManagerEndpointConfig(high_assurance=True)
+    mec = CoreEndpointConfig(high_assurance=True)
     mec.audit_log_path = tmp_path / "audit.log"
     test_environ = {
         "HOME": str(tmp_path),
@@ -111,7 +112,7 @@ def mock_os():
 
 
 def test_audit_log_write(tmp_path, conf, ep_uuid, reg_info):
-    em = EndpointManager(tmp_path, ep_uuid, conf, reg_info)
+    em = CoreEndpoint(tmp_path, ep_uuid, conf, reg_info)
 
     r, w = os.pipe2(os.O_DIRECT)
     os.write(w, b"Test1")
@@ -131,7 +132,7 @@ def test_audit_log_write(tmp_path, conf, ep_uuid, reg_info):
 
 
 def test_audit_log_write_unknown_fd(mock_log, tmp_path, conf, ep_uuid, reg_info):
-    em = EndpointManager(tmp_path, ep_uuid, conf, reg_info)
+    em = CoreEndpoint(tmp_path, ep_uuid, conf, reg_info)
 
     assert not em._audit_pipes, "Verify test setup"
     r, w = os.pipe2(os.O_DIRECT)
@@ -147,7 +148,7 @@ def test_audit_log_write_unknown_fd(mock_log, tmp_path, conf, ep_uuid, reg_info)
 def test_audit_log_write_close_on_closed_pipe(
     mock_log, tmp_path, conf, ep_uuid, reg_info
 ):
-    em = EndpointManager(tmp_path, ep_uuid, conf, reg_info)
+    em = CoreEndpoint(tmp_path, ep_uuid, conf, reg_info)
 
     r, w = os.pipe2(os.O_DIRECT)
     os.write(w, b"Test")
@@ -169,7 +170,7 @@ def test_audit_log_write_close_on_closed_pipe(
 def test_audit_log_shutsdown_on_write_error(
     mock_log, tmp_path, conf, ep_uuid, reg_info
 ):
-    em = EndpointManager(tmp_path, ep_uuid, conf, reg_info)
+    em = CoreEndpoint(tmp_path, ep_uuid, conf, reg_info)
 
     r, w = os.pipe2(os.O_DIRECT)
     os.write(w, b"Test1")
@@ -188,7 +189,7 @@ def test_audit_log_shutsdown_on_write_error(
 def test_audit_log_shutsdown_on_general_error(
     tmp_path, ep_uuid, conf, reg_info, mock_os, randomstring
 ):
-    em = EndpointManager(tmp_path, ep_uuid, conf, reg_info)
+    em = CoreEndpoint(tmp_path, ep_uuid, conf, reg_info)
 
     exc_text = randomstring()
     with mock.patch(f"{_MOCK_BASE}open", side_effect=MemoryError(exc_text)):
@@ -201,7 +202,7 @@ def test_audit_log_shutsdown_on_general_error(
 def test_audit_log_pipe_hookup(
     mock_log, tmp_path, ep_uuid, conf, reg_info, mock_os, mock_close_fds
 ):
-    em = EndpointManager(tmp_path, ep_uuid, conf, reg_info)
+    em = CoreEndpoint(tmp_path, ep_uuid, conf, reg_info)
     audit_w = -1
 
     def test_os_pipe2(*a, **k):

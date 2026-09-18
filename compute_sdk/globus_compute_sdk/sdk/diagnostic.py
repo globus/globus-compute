@@ -28,7 +28,7 @@ from globus_compute_sdk.sdk._environments import (
     get_web_service_url,
 )
 from globus_compute_sdk.sdk.client import _ComputeWebClient
-from globus_compute_sdk.sdk.compute_dir import COMPUTE_DIR_ENV, ensure_compute_dir
+from globus_compute_sdk.sdk.compute_dir import ensure_compute_dir
 from globus_compute_sdk.sdk.executor import _RESULT_WATCHERS
 from globus_compute_sdk.sdk.hardware_report import hardware_commands_list
 from globus_compute_sdk.sdk.utils import display_name
@@ -529,7 +529,7 @@ def run_all_diags_wrapper(
             else:
                 diagnostic_output.append(cur_output + "\n")
 
-    # Should we provide default UUID as the Tutorial MEP?  It would
+    # Should we provide default UUID as the Tutorial MUEP?  It would
     # likely slow down the diagnostic by 10-20 seconds while starting the UEP
     # if ep_uuid is None:
     #     ep_uuid = TUTORIAL_EP_UUID
@@ -645,7 +645,7 @@ def do_diagnostic_base(diagnostic_args):
         help=(
             "Gather endpoint configuration and log info from the specified"
             " parent directory instead of the default ~/.globus_compute or"
-            f" what is set in ${COMPUTE_DIR_ENV}"
+            f" what is set in $GLOBUS_COMPUTE_USER_DIR"
         ),
     )
     parser.add_argument(

@@ -3,7 +3,7 @@ Configuration Reference
 
 Globus Compute endpoints require two configuration files:
 
-- ``config.yaml`` for the manager endpoint process
+- ``config.yaml`` for the core endpoint process
 - ``user_config_template.yaml.j2`` for user endpoint processes
 
 These two YAML files serve as convenience interfaces to the Python configuration
@@ -175,6 +175,7 @@ rough equivalent to the ``ProcessPoolEngine`` example would be:
      provider:
        type: LocalProvider
        max_blocks: 4
+
 
 Retries
 ^^^^^^^
@@ -360,15 +361,15 @@ both the |HighThroughputExecutor|_ and the `available providers`_.
 .. _Parsl implements a number of providers: https://parsl.readthedocs.io/en/stable/reference.html#providers
 .. _available providers: https://parsl.readthedocs.io/en/stable/reference.html#providers
 
-.. _endpoint-manager-config:
+.. _core-endpoint-config:
 
-Manager Endpoint Configuration
-==============================
+Core Endpoint Configuration
+===========================
 
-The ``config.yaml`` file contains the YAML configuration for the manager
+The ``config.yaml`` file contains the YAML configuration for the core
 endpoint process, which manages user endpoint processes.  Under the hood, all
 configuration options in this file are used to create an instance of the
-|ManagerEndpointConfig| class.
+|CoreEndpointConfig| class.
 
 - ``public``
 
@@ -429,7 +430,7 @@ configuration options in this file are used to create an instance of the
 
   The path to the user endpoint configuration JSON schema file.  If not
   specified, the default schema path will be used:
-  ``~/.globus_compute/my-mep/user_config_schema.json``.
+  ``~/.globus_compute/my-ep/user_config_schema.json``.
 
   See :ref:`user-config-schema-json` for more information.
 
@@ -537,7 +538,7 @@ available options.
    :inherited-members:
    :show-inheritance:
 
-.. autoclass:: globus_compute_endpoint.endpoint.config.config.ManagerEndpointConfig
+.. autoclass:: globus_compute_endpoint.endpoint.config.config.CoreEndpointConfig
    :members:
    :member-order: bysource
    :inherited-members:
