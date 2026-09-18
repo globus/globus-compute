@@ -459,7 +459,6 @@ def test_register_source_code(gcc: gc.Client):
     metadata = {
         "python_version": platform.python_version(),
         "sdk_version": __version__,
-        "serde_identifier": "st",  # PureSourceTextInspect
     }
 
     gcc.register_source_code(
@@ -468,8 +467,7 @@ def test_register_source_code(gcc: gc.Client):
         description=description,
     )
 
-    serialized = PureSourceTextInspect().serialize(hello)
-    function_code = ComputeSerializer.pack_buffers([serialized])
+    function_code = source
 
     (data,), _ = gcc._compute_web_client.v3.register_function.call_args
     assert data["function_code"] == function_code
@@ -480,11 +478,7 @@ def test_register_source_code(gcc: gc.Client):
 
 def test_register_source_code_metadata_override(gcc: gc.Client):
     gcc._compute_web_client.v3.register_function.return_value = mock.MagicMock()
-    metadata = {
-        "python_version": "3.11.5",
-        "sdk_version": "3.11.0",
-        "serde_identifier": "foo",
-    }
+    metadata = {"python_version": "3.11.5", "sdk_version": "3.11.0"}
 
     gcc.register_source_code(
         source="def noop():\n    return\n", function_name="noop", metadata=metadata
@@ -493,7 +487,7 @@ def test_register_source_code_metadata_override(gcc: gc.Client):
     (data,), _ = gcc._compute_web_client.v3.register_function.call_args
     assert data["meta"]["python_version"] == metadata["python_version"]
     assert data["meta"]["sdk_version"] == metadata["sdk_version"]
-    assert data["meta"]["serde_identifier"] == "st", "serde iden should always be 'st'"
+    assert data["meta"].get("serde_identifier") is None, "WS serializes; not SDK"
 
 
 @pytest.mark.parametrize("desc", ("some desc", None))
