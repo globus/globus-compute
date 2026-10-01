@@ -4,12 +4,9 @@ from pathlib import Path
 from setuptools import find_packages, setup
 
 REQUIRES = [
-    "requests>=2.31.0,<3",
     "globus-sdk",  # version will be bounded by `globus-compute-sdk`
     "globus-compute-sdk==4.17.1",
     "globus-identity-mapping==0.5.0",
-    # table printing used in list-endpoints
-    "texttable>=1.6.4,<2",
     # although psutil does not declare itself to use semver, it appears to offer
     # strong backwards-compatibility promises based on its changelog, usage, and
     # history
@@ -23,25 +20,23 @@ REQUIRES = [
     # CLI parsing
     "click>=8.3.3,<8.4.0",
     "click-option-group>=0.5.6,<1",
-    "pyzmq>=24,<=28",
+    "pyzmq>=26,<=28",
     "parsl>=2026.7.27",
-    # May 2026: Parsl 1.4.0 just released; has an as-yet undiagnosed iteration bug
-    "pika>=1.2,<1.5",
     "pyprctl<0.2.0",
     "setproctitle>=1.3.2,<1.4",
     "pyyaml>=6.0,<7.0",
     "jinja2>=3.1.6,<3.2",
-    "jsonschema>=4.21,<5",
-    "cachetools>=5.3.1",
-    "types-cachetools>=5.3.0.6",
-    "cryptography>=48",
+    "jsonschema>=4.22,<5",
+    "cachetools>=6",
+    "types-cachetools>=6.0.0.20250525",
+    "cryptography>=50",
 ]
 
 TEST_REQUIRES = [
     "responses",
-    "pytest>=7.2",
-    "coverage>=5.2",
-    "pytest-mock==3.2.0",
+    "pytest>=9.1",
+    "coverage>=7.16",
+    "pytest-mock>=3.16",
     "pyfakefs<5.9.2",  # 5.9.2 (Jul 30, 2025), breaks us; retry after 6.0.0 lands?
 ]
 
