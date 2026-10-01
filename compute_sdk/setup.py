@@ -6,25 +6,22 @@ from setuptools import find_namespace_packages, setup
 
 REQUIRES = [
     # request sending and authorization tools
-    "requests>=2.31.0,<3",
+    "requests>=2.32,<3",
     "globus-sdk>=4.4.0,<5",
     "globus-compute-common==1.0.0",
     # dill is an extension of `pickle` to a wider array of native python types
     # pin to the latest version, as 'dill' is not at 1.0 and does not have a clear
     # versioning and compatibility policy
     "dill==0.3.9",
-    # typing_extensions, so we can use Protocol and other typing features on python3.7
-    'typing_extensions>=4.0;python_version<"3.8"',
     # packaging, allowing version parsing
     # set a version floor but no ceiling as the library offers a stable API under CalVer
     "packaging>=21.1",
-    # May 2026: Parsl 1.4.0 just released; has an as-yet undiagnosed iteration bug
-    "pika>=1.2,<1.4",
-    "tblib==1.7.0",
-    "texttable>=1.6.7",
+    "pika>=1.3",
+    "tblib>=3",
+    "texttable>=1.7",
     # 3 below for color highlighting related console print
     "colorama>=0.4.6,<1",
-    "rich>=13.7.1,<15",
+    "rich>=14,<15",
     "exceptiongroup>=1.2.2",  # until we drop support for python < 3.11
 ]
 DOCS_REQUIRES = [
@@ -35,7 +32,7 @@ DOCS_REQUIRES = [
 TEST_REQUIRES = [
     "flake8==3.8.0",
     "psutil",
-    "pytest>=7.2",
+    "pytest>=9.1",
     "pytest-mock",
     "pyfakefs",
     "coverage",
