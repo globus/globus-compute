@@ -56,3 +56,6 @@ Documentation
 
 Complete documentation for Globus Compute is available `here <https://globus-compute.readthedocs.io>`_
 
+Acknowledgements
+=============
+This work was supported in part by the National Science Foundation under award `2004894 <https://www.nsf.gov/awardsearch/showAward?AWD_ID=2004894>`_ and by the U.S. Department of Energy.
