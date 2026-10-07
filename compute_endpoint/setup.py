@@ -5,7 +5,7 @@ from setuptools import find_packages, setup
 
 REQUIRES = [
     "globus-sdk",  # version will be bounded by `globus-compute-sdk`
-    "globus-compute-sdk==4.18.0a0",
+    "globus-compute-sdk==4.18.0",
     "globus-identity-mapping==0.5.0",
     # although psutil does not declare itself to use semver, it appears to offer
     # strong backwards-compatibility promises based on its changelog, usage, and
