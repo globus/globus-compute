@@ -9,9 +9,9 @@ env:
   TARGET_PYTHON_VERSION: '3.11'
 
 jobs:
-  smoke-test-staging:
+  smoke-test-integration:
     timeout-minutes: 10
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-slim
     steps:
     - uses: actions/checkout@v7
       with:
@@ -19,16 +19,18 @@ jobs:
     - uses: actions/setup-python@v7
       with:
         python-version: '${{ env.TARGET_PYTHON_VERSION }}'
-    - run: |
+    - name: Create venv, install tox
+      run: |
         python -m venv .venv
-        .venv/bin/python -m pip install --upgrade pip setuptools wheel
-        .venv/bin/python -m pip install tox
-    - name: run smoke tests (ECS staging)
+        source .venv/bin/activate
+        python -m pip install --upgrade pip
+        python -m pip install tox
+    - name: Run smoke tests (ECS, integration environment)
       env:
         FUNCX_SMOKE_CLIENT_ID: ${{ secrets.API_CLIENT_ID }}
-        FUNCX_SMOKE_CLIENT_SECRET: ${{ secrets.API_CLIENT_SECRET_STAGING }}
-        GLOBUS_SDK_ENVIRONMENT: "staging"
+        FUNCX_SMOKE_CLIENT_SECRET: ${{ secrets.API_CLIENT_SECRET_INTEGRATION }}
+        GLOBUS_SDK_ENVIRONMENT: "intregration"
       run: |
         source .venv/bin/activate
         cd smoke_tests
-        make staging
+        make integration
