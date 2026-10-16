@@ -330,3 +330,46 @@ def test_rp_on_connection_closed_logs(mock_log, attempt_limit):
         assert mock_log.debug.called, "Debug always emitted"
         assert not mock_log.info.called, "Log informed; don't spam it"
         assert not mock_log.warning.called, "Log informed; don't spam it"
+
+
+def test_rp_publishes_before_stopping(randomstring):
+    rp = ResultPublisher(cred_fn=lambda: {**q_info})
+    rp._mq_conn = mock.Mock()
+    rp._mq_chan = mock.Mock()
+    rp.is_alive = mock.Mock()
+    rp.status = RabbitPublisherStatus.connected
+
+    data = [randomstring().encode() for _ in range(random.randint(1, 30))]
+    futs = [rp.publish(msg) for msg in data]
+    rp._stop_event.set()  # e.g., interchange quiescing just after enqueuing results
+
+    rp._event_watcher()
+
+    assert rp._mq_chan.basic_publish.call_count == len(data), (
+        "Enqueued results sent before stopping"
+    )
+    assert not rp._outstanding.qsize()
+    assert len(rp._awaiting_confirmation) == len(data)
+    assert all(f in rp._awaiting_confirmation.values() for f in futs)
+    assert rp._mq_chan.close.called, "Then shuts down"
+
+
+def test_rp_warns_unsent_on_stop(mock_log, randomstring):
+    rp = ResultPublisher(cred_fn=lambda: {**q_info})
+    rp._mq_conn = mock.Mock()
+    rp._mq_chan = mock.Mock()
+    rp.is_alive = mock.Mock()
+    rp.status = RabbitPublisherStatus.closed
+
+    num_msgs = random.randint(1, 30)
+    for _ in range(num_msgs):
+        rp.publish(randomstring().encode())
+    rp._stop_event.set()
+
+    rp._event_watcher()
+
+    assert not rp._mq_chan.basic_publish.called, "Not connected; can't send"
+    assert mock_log.warning.called, "Don't drop enqueued results silently"
+    a, _k = mock_log.warning.call_args
+    assert "unable to send" in a[0]
+    assert f" {num_msgs} enqueued message" in a[0]
