@@ -331,6 +331,15 @@ class ResultPublisher(threading.Thread):
 
     def _event_watcher(self):
         if self._stop_event.is_set():
+            # publish() only enqueues: send what's queued before stopping, or
+            # results enqueued since the last tick are lost
+            if self.status == RabbitPublisherStatus.connected:
+                self._publish_outstanding()
+            elif self._outstanding.qsize():
+                log.warning(
+                    f"{self!r} Stopping while not connected; unable to send"
+                    f" {self._outstanding.qsize():,} enqueued message(s)"
+                )
             log.debug("%r Shutting down due to stop event set.", self)
             self._stop_ioloop()
             return
@@ -349,6 +358,16 @@ class ResultPublisher(threading.Thread):
                 log.debug("%r not yet connected; holding enqueued messages", self)
                 raise queue.Empty()
 
+            self._publish_outstanding()
+
+        except queue.Empty:
+            pass
+
+        finally:
+            self._mq_conn.ioloop.call_later(self.poll_period_s, self._event_watcher)
+
+    def _publish_outstanding(self):
+        try:
             while True:
                 f, msg_bytes = self._outstanding.get(block=False)
                 try:
@@ -373,9 +392,6 @@ class ResultPublisher(threading.Thread):
 
         except queue.Empty:
             pass
-
-        finally:
-            self._mq_conn.ioloop.call_later(self.poll_period_s, self._event_watcher)
 
     def _stop_ioloop(self):
         """
