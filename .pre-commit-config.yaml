@@ -13,12 +13,12 @@ repos:
   hooks:
     - id: check-github-workflows
 - repo: https://github.com/asottile/pyupgrade
-  rev: v3.21.2
+  rev: v3.22.0
   hooks:
     - id: pyupgrade
       args: ["--py310-plus"]
 - repo: https://github.com/astral-sh/ruff-pre-commit
-  rev: v0.16.10
+  rev: v0.17.1
   hooks:
     - id: ruff-check
       types_or: [ python ]
