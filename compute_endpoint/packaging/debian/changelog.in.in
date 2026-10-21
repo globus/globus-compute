@@ -1,4 +1,4 @@
-@PACKAGE_NAME@ (@PACKAGE_VERSION@-1.@distro@) @distro@; urgency=low
+@PACKAGE_NAME@ (@PACKAGE_VERSION@-2.@distro@) @distro@; urgency=low
 
   * Initial release as a Debian package
 
