@@ -23,7 +23,7 @@ Name:           @PACKAGE_NAME@
 %global __provides_exclude_from ^%{VIRTUAL_ENV}/.*\\.so.*$
 
 Version:        @PACKAGE_VERSION@
-Release:        1%{?dist}
+Release:        2%{?dist}
 Vendor:         %{?vendor}%{!?vendor:Unknown}
 Summary:        Globus Compute Endpoint agent for system-level installs
 
