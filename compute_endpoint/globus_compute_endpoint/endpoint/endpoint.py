@@ -881,7 +881,12 @@ class Endpoint:
             )
             return
 
+        tsize = shutil.get_terminal_size()
+        max_width = max(68, tsize.columns)  # require at least a reasonable size ...
+
         table = texttable.Texttable()
+        table.set_max_width(max_width)  # ... but allow to expand to terminal width
+
         headings = ["Endpoint ID", "Status", "Endpoint Name"]
         table.header(headings)
 
@@ -890,28 +895,16 @@ class Endpoint:
         idx_name = 2
         width_st = len(headings[idx_st])
         width_id = len(headings[idx_id])
+        width_n = len(headings[idx_name])
         for ep_name, ep_info in endpoints.items():
             table.add_row([ep_info["id"], ep_info["status"], ep_name])
             width_id = max(width_id, len(str(ep_info["id"])))
             width_st = max(width_st, len(str(ep_info["status"])))
+            width_n = max(width_n, len(str(ep_name)))
 
-        tsize = shutil.get_terminal_size()
-        max_width = max(68, tsize.columns)  # require at least a reasonable size ...
-        table.set_max_width(max_width)  # ... but allow to expand to terminal width
-
-        # trickery here, but don't want to subclass texttable -- a very stable
-        # library -- at this time; ensure that the only "fungible" column is the
-        # name.  Can redress ~when~ *if* this becomes a problem.  "Simple"
-        table._compute_cols_width()
-        if table._width[idx_id] < width_id:
-            table._width[idx_name] -= width_id - table._width[idx_id]
-            table._width[idx_id] = width_id
-        if table._width[idx_st] < width_st:
-            table._width[idx_name] -= width_st - table._width[idx_st]
-            table._width[idx_st] = width_st
-
-        # ensure no mistakes -- width of name (well, _any_) column can't be < 0
-        table._width[idx_name] = max(10, table._width[idx_name])
+        width_n = min(max_width - width_st - width_st, width_n)
+        width_n = max(10, width_n)  # anything less is silly
+        table.set_cols_width([width_id, width_st, width_n])
 
         print(table.draw(), file=ofile)
 
