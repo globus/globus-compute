@@ -4,7 +4,8 @@
   "properties": {
     "endpoint_setup": { "type": "string" },
     "worker_init": { "type": "string" },
-    "requirements": { "type": "string", "minLength": 1 }
+    "requirements": { "type": "string", "minLength": 1 },
+    "venvs_dir": { "type": "string", "minLength": 1 }
   },
   "additionalProperties": true
 }
