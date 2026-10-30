@@ -318,7 +318,7 @@ class Client:
         self,
         return_msg: str | t.Dict,
         task_id: str,
-    ):
+    ) -> dict:
         """
         Parses the return message from the service and updates the
         internal _task_status_table
@@ -349,6 +349,7 @@ class Client:
                 logger.error(err_msg)
                 raise ValueError(err_msg)
 
+            t_exc: Exception  # help mypy out ...
             completion_t = r_dict.get("completion_t", "unknown")
             self._log_version_mismatch(r_dict.get("details"))
             if "result" not in r_dict and "exception" not in r_dict:
@@ -356,14 +357,20 @@ class Client:
             elif "result" in r_dict:
                 try:
                     r_obj = self.fx_serializer.deserialize(r_dict["result"])
-                except Exception:
-                    raise SerializationError("Result Object Deserialization")
-                else:
                     status.update({"result": r_obj, "completion_t": completion_t})
+                except Exception as e:
+                    t_exc = SerializationError("Result returned; failed to deserialize")
+                    t_exc.__cause__ = e
+                    status.update({"exception": t_exc, "completion_t": completion_t})
+
             elif "exception" in r_dict:
-                raise TaskExecutionFailed(r_dict["exception"], completion_t)
+                t_exc = TaskExecutionFailed(r_dict["exception"], completion_t)
+                status.update({"exception": t_exc, "completion_t": completion_t})
+
             else:
-                raise NotImplementedError("unreachable")
+                logger.warning("Result returned unrecognized type")
+                t_exc = ValueError("Failed to parse service-returned status structure")
+                status.update({"exception": t_exc, "completion_t": completion_t})
 
         self._task_status_table[task_id] = status
         return status
