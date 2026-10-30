@@ -54,6 +54,7 @@ class MockedExecutor(Executor):
                 v3=mock.Mock(ComputeClientV3),
             ),
             fx_serializer=mock.Mock(spec=ComputeSerializer),
+            _request_lock=threading.Lock(),
         )
         # Unless test overrides, set default response:
         fn_id = str(uuid.uuid4())
