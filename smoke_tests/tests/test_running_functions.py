@@ -1,4 +1,5 @@
 import concurrent.futures
+import random
 import typing as t
 
 import globus_compute_sdk as gc
@@ -7,6 +8,11 @@ from globus_compute_sdk.errors import TaskPending
 from packaging.version import Version
 
 sdk_version = Version(gc.version.__version__)
+
+FN_HARDCODE_STR = "some hardcoded text"
+FN_CODE_TEXT = f"def f(*a, **k):\n return f'{FN_HARDCODE_STR} -> {{a=}} {{k=}}'"
+compiled_ns = {}
+exec(FN_CODE_TEXT, compiled_ns)
 
 
 def test_run_pre_registered_function(
@@ -101,3 +107,37 @@ def test_executor(compute_client, endpoint, tutorial_function_id, timeout_s: int
         assert all("Hello World!" == item for item in results), (
             f"Invalid result: {results}"
         )
+
+
+def test_source_code_fn(compute_client: Client, endpoint, timeout_s: int):
+    f_a, f_k = (random.randint(0, 2**16),), {}
+    exp_output = compiled_ns["f"](*f_a, **f_k)
+
+    fn_id = compute_client.register_source_code(FN_CODE_TEXT, "f")
+    with Executor(endpoint_id=endpoint, client=compute_client) as ex:
+        fut = ex.submit_to_registered_function(fn_id, args=f_a, kwargs=f_k)
+
+    assert exp_output == fut.result()
+
+
+def test_source_code_args(compute_client: Client, endpoint, timeout_s: int):
+    f_a, f_k = (random.randint(0, 2**16),), {}
+    exp_output = compiled_ns["f"](*f_a, **f_k)
+
+    fn_id = compute_client.register_source_code(FN_CODE_TEXT, "f")
+
+    data = {"create_queue": True, "tasks": {fn_id: ((f_a, f_k),)}}
+
+    route = f"/v3/endpoints/{endpoint}/submit"
+    r = compute_client._compute_web_client.v2.post(route, data=data)
+    assert r.http_status == 200
+
+    t_id = r.data["tasks"][fn_id][0]
+    tg_id = r.data["task_group_id"]
+    with Executor(client=compute_client) as ex:
+        futs = ex.reload_tasks(tg_id)
+        assert len(futs) == 1, futs
+        f = next(iter(futs))
+
+        assert f.task_id == t_id
+        assert f.result() == exp_output
