@@ -330,11 +330,6 @@ class ResultPublisher(threading.Thread):
                         f.set_exception(exc)
 
     def _event_watcher(self):
-        if self._stop_event.is_set():
-            log.debug("%r Shutting down due to stop event set.", self)
-            self._stop_ioloop()
-            return
-
         if self._connection_tries and self._connected_at:
             # we're connected ...
             if time.time() - self._connected_at > 60:
@@ -375,7 +370,11 @@ class ResultPublisher(threading.Thread):
             pass
 
         finally:
-            self._mq_conn.ioloop.call_later(self.poll_period_s, self._event_watcher)
+            if self._stop_event.is_set():
+                log.debug("%r Shutting down due to stop event set.", self)
+                self._stop_ioloop()
+            else:
+                self._mq_conn.ioloop.call_later(self.poll_period_s, self._event_watcher)
 
     def _stop_ioloop(self):
         """
