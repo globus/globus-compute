@@ -187,29 +187,34 @@ def test_compute_web_client():
 
 
 @pytest.mark.parametrize(
-    "api_data",
-    [
-        {"status": "Success"},  # success without result|exception
-        {"status": "FAILED"},  # failure without result|exception
-        "abc123",  # string, but not valid JSON
-    ],
+    "reason,api_data",
+    (
+        ("string-but-not-valid-JSON", "abc123"),
+        ("valid-JSON-but-not-a-dict-or-object", "'abc123'"),
+        ("task_id-does-not-match-request", {"status": "Success"}),
+    ),
 )
-def test_update_task_table_on_invalid_data(gcc, api_data):
+def test_update_task_table_on_invalid_data(gcc, reason, api_data):
     with pytest.raises(ValueError):
         gcc._update_task_table(api_data, "task-id-foo")
 
 
-def test_update_task_table_on_exception(gcc):
+def test_update_task_table_stores_task_exception(randomstring, gcc):
+    tid = "task-id-foo"
+    exc_text = randomstring()
     api_data = {
         "status": "success",
-        "exception": "foo-bar-baz",
+        "exception": exc_text,
         "completion_t": "1.1",
-        "task_id": "task-id-foo",
+        "task_id": tid,
     }
 
-    with pytest.raises(TaskExecutionFailed) as excinfo:
-        gcc._update_task_table(api_data, "task-id-foo")
-    assert "foo-bar-baz" in str(excinfo.value)
+    status = gcc._update_task_table(api_data, tid)
+    assert status is gcc._task_status_table[tid], "Expect result stored"
+
+    exc = status["exception"]
+    assert isinstance(exc, TaskExecutionFailed), "Expect stringified exception wrapped"
+    assert exc_text in str(exc)
 
 
 def test_update_task_table_simple_object(gcc, randomstring):
@@ -710,9 +715,8 @@ def test_version_mismatch_warns_on_failure_and_success(
     gcc._compute_web_client.v2.get_task.return_value = mock_response(200, returned_task)
 
     if should_fail:
-        with pytest.raises(TaskExecutionFailed) as exc_info:
-            gcc.get_task(tid)
-        assert "Some Stack Trace" in str(exc_info)
+        t_status = gcc.get_task(tid)
+        assert "Some Stack Trace" in str(t_status["exception"])
     else:
         task_res = gcc.get_result(tid)
         assert task_res == result
@@ -1029,7 +1033,6 @@ def test_worker_lost_warn_serialization(gcc, mock_worker_lost_task):
     gcc._compute_web_client = mock.MagicMock()
     gcc._compute_web_client.v2.get_task.return_value = mock_v2_get_task
 
-    with pytest.raises(TaskExecutionFailed) as e:
-        gcc.get_task(tid)
+    t_status = gcc.get_task(tid)
 
-    assert "One common cause of WorkerLost exceptions" in str(e.value)
+    assert "One common cause of WorkerLost exceptions" in str(t_status["exception"])
