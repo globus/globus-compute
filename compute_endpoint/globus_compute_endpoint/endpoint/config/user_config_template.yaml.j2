@@ -37,10 +37,11 @@
 {%- set _arbitrary_user_interaction = true -%}
 
 {%- set _rt = _GC.user_runtime %}
-{%- set py_ver = (_rt.python.version_tuple | join(".")) if _rt.python is defined and _rt.python.version_tuple is defined else "$(python3 -V | awk {'print $2'})" %}
-{%- set sdk_ver = (_rt.globus_compute_sdk_version[1:-1]) if _rt.globus_compute_sdk_version is defined else "$(gce version | awk '{print $NF}')" %}
+{%- set sent_py_ver = (_rt.python.version_tuple | join(".")) if _rt.python is defined and _rt.python.version_tuple is defined else none %}
+{%- set sent_sdk_ver = (_rt.globus_compute_sdk_version[1:-1]) if _rt.globus_compute_sdk_version is defined else none %}
 {%- set requirements = _arbitrary_user_interaction and (requirements | default() ) or none %}
 
+{%- if sent_py_ver or sent_sdk_ver or requirements -%}
 {%- set default_worker_init -%}
 {#-
   The environment initialization script creates (or reuses) a per-task Python
@@ -56,10 +57,11 @@ if ! command -v uv &> /dev/null; then
   curl -LsSf https://astral.sh/uv/install.sh | sh
 fi
 
-PY_VER={{ py_ver }}
-SDK_VER={{ sdk_ver }}
+PY_VER="{{ sent_py_ver or "$(python3 -V | awk '{print $2}')" }}"
+SDK_VER="{{ sent_sdk_ver or "$(gce version | awk '{print $NF}')" }}"
+REQS={{ requirements or "" }}
 ENV_SITE={{ venvs_dir | default('"$HOME/.globus_compute/venvs"') }}
-ENV_HASH={{ requirements and "-$(printf '%s' {{ requirements }} | md5sum | awk '{print $1}')" or "" }}
+ENV_HASH={{ requirements and "-$(printf '%b' \"$REQS\" | md5sum | awk '{print $1}')" or "" }}
 ENV_NAME="py$PY_VER-sdk$SDK_VER$ENV_HASH"
 ENV_PATH="$ENV_SITE/$ENV_NAME"
 
@@ -82,15 +84,17 @@ uv venv --allow-existing "$ENV_PATH" --python "$PY_VER"
 source "$ENV_PATH/bin/activate"
 
 {# Install globus-compute-endpoint, ignoring dependency cooldowns. -#}
-UV_EXCLUDE_NEWER=false uv pip install globus-compute-endpoint=="$SDK_VER"
+env UV_EXCLUDE_NEWER=false uv pip install globus-compute-endpoint=="$SDK_VER"
 
   {%- if requirements %}
 {#- Install user requirements, but *don't* ignore cooldown period (if set, above) #}
-printf '%s' {{ requirements }} | uv pip install -r /dev/stdin
+printf '%b' "$REQS" | uv pip install -r -
   {%- endif %}
 
 {%- endset %} {#- default_worker_init #}
 {% set default_worker_init = '|\n      ' ~ default_worker_init | indent(6) %}
+{%- endif %}
+{%- set default_worker_init = default_worker_init | default() %}
 
 {#- --- END DYNAMIC UV LOGIC --- -#}
 
@@ -100,11 +104,15 @@ printf '%s' {{ requirements }} | uv pip install -r /dev/stdin
 idle_heartbeats_soft: 10
 idle_heartbeats_hard: 5760
 
+{%- if endpoint_setup is defined %}
+endpoint_setup: {{ endpoint_setup }}
+{%- endif %}
+
 engine:
   type: GlobusComputeEngine
   max_workers_per_node: 1
 
-  # Configuration for the compute backend (e.g., HPC cluster, personal laptop)
+  {# Configuration for the compute backend (e.g., HPC cluster, personal laptop) -#}
   provider:
     type: LocalProvider
 

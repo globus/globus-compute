@@ -3,6 +3,7 @@ import json
 import logging
 import os
 import pathlib
+import random
 import shlex
 import typing as t
 import uuid
@@ -20,6 +21,7 @@ from globus_compute_endpoint.endpoint.config import (
 )
 from globus_compute_endpoint.endpoint.config.utils import (
     RESERVED_USER_CONFIG_TEMPLATE_VARIABLES,
+    _sanitize_user_json,
     _validate_user_opts,
     get_config,
     load_config_yaml,
@@ -93,7 +95,27 @@ def conf_no_engine():
 
 
 @pytest.fixture
-def render_default_uep_template(fs, mapped_ident, conf_no_engine):
+def py_ver_t() -> tuple:
+    versions = tuple(
+        [3, minor, patch]
+        for minor in range(11, 17)  # current and next minor versions
+        for patch in range(30)  # typical patches over minor lifetime
+    )
+    return random.choice(versions)
+
+
+@pytest.fixture
+def sdk_ver_t() -> tuple:
+    versions = tuple(
+        [4, minor, patch]
+        for minor in range(50)  # let's see if we get this far!
+        for patch in range(4)  # usually (minor) release stay at 0
+    )
+    return random.choice(versions)
+
+
+@pytest.fixture
+def render_default_uep_template(fs, mapped_ident, conf_no_engine, py_ver_t, sdk_ver_t):
     template_path = DEF_CONFIG_DIR / "user_config_template.yaml.j2"
     schema_path = DEF_CONFIG_DIR / "user_config_schema.json"
     fs.add_real_file(template_path)
@@ -102,9 +124,10 @@ def render_default_uep_template(fs, mapped_ident, conf_no_engine):
     template = load_user_config_template(template_path)
     schema = load_user_config_schema(schema_path)
 
+    sdk_ver = ".".join(map(str, sdk_ver_t))
     default_user_runtime = {
-        "globus_compute_sdk_version": "2.3.4",
-        "python": {"version_tuple": [3, 11, 9]},
+        "globus_compute_sdk_version": sdk_ver,
+        "python": {"version_tuple": py_ver_t},
     }
 
     def _render(
@@ -798,25 +821,34 @@ def _env_path(env_name: str) -> str:
     return f'ENV_PATH="$HOME/.globus_compute/venvs/{env_name}"'
 
 
-def test_default_template_matches_submitter_runtime(render_default_uep_template):
+def test_default_template_matches_submitter_runtime(
+    py_ver_t, sdk_ver_t, render_default_uep_template
+):
     rendered_template = render_default_uep_template()
     wi = yaml.safe_load(rendered_template)["engine"]["provider"]["worker_init"]
 
+    py_ver = ".".join(map(str, py_ver_t))
+    sdk_ver = ".".join(map(str, sdk_ver_t))
+    assert f'\nPY_VER="{py_ver}"\n' in wi
+    assert f'\nSDK_VER="{sdk_ver}"\n' in wi
+
     assert "uv venv" in wi
-    assert "--python 3.11.9" in wi
+    assert f'--python "$PY_VER"' in wi
     assert "UV_EXCLUDE_NEWER=false uv pip install" in wi, (
         "endpoint package is never held back by a dependency cooldown"
     )
-    assert "globus-compute-endpoint==2.3.4" in wi
-    assert _env_path("py3.11.9-sdk2.3.4") in wi, (
+    assert f'globus-compute-endpoint=="$SDK_VER"' in wi
+    assert "ENV_HASH=\n" in wi, "no requirements yields empty hash"
+    assert f'ENV_NAME="py$PY_VER-sdk$SDK_VER$ENV_HASH"' in wi, (
         "python and sdk versions are known, so the env name is built from them"
     )
+    assert 'ENV_PATH="$ENV_SITE/$ENV_NAME"' in wi, "path built dynamically"
     assert "uv pip install -r" not in wi, "no requirements -> no user-package install"
     assert "md5sum" not in wi, "no requirements -> no per-reqs env hash"
 
 
 @pytest.mark.parametrize(
-    "requirements", ("numpy==2.1.0\nscikit-learn\n# comment\nrequests>=2.32", None)
+    "requirements", (None, "numpy==2.1.0\nscikit-learn\n# comment\nrequests>=2.32")
 )
 def test_default_template_user_requirements(render_default_uep_template, requirements):
     user_opts = {"requirements": requirements} if requirements is not None else {}
@@ -825,11 +857,17 @@ def test_default_template_user_requirements(render_default_uep_template, require
     wi = yaml.safe_load(rendered_template)["engine"]["provider"]["worker_init"]
 
     if requirements is not None:
-        assert "-reqs$(echo -e" in wi, "requirements are folded into the env name"
-        assert "uv pip install -r <(echo -e" in wi, (
-            "requested requirements are installed"
-        )
-        assert json.dumps(requirements) in wi, (
+        sanitized_reqs = _sanitize_user_json(user_opts)["requirements"]
+        uv_line = f"\nprintf '%b' \"$REQS\" | uv pip install -r -"
+
+        assert sanitized_reqs == json.dumps(requirements), "expect reqs sanitized!"
+
+        assert "ENV_HASH=-$(printf" in wi, "hash includes prefix dash (-)"
+        assert "ENV_HASH=-$(printf '%b'" in wi, "printf interprets escapes (e.g., \\n)"
+        assert "\" | md5sum | awk '{print $1}')\n" in wi, "requirements hashed"
+        assert f'ENV_NAME="py$PY_VER-sdk$SDK_VER$ENV_HASH"' in wi, "req hash in name"
+        assert uv_line in wi, "requested requirements are installed"
+        assert f"\nREQS={sanitized_reqs}" in wi, (
             "sanitized requirements survive verbatim into shell"
         )
     else:
@@ -837,9 +875,10 @@ def test_default_template_user_requirements(render_default_uep_template, require
             "no requirements -> no user-package install"
         )
         assert "md5sum" not in wi, "no requirements -> no per-reqs env hash"
+        assert "\nENV_HASH=\n", "... and expect hash is empty"
 
 
-@pytest.mark.parametrize("worker_init", ("module load cuda", None))
+@pytest.mark.parametrize("worker_init", ("module load cuda\ntrue", None))
 def test_default_template_worker_init(render_default_uep_template, worker_init):
     user_opts = {"worker_init": worker_init} if worker_init is not None else {}
 
@@ -847,9 +886,10 @@ def test_default_template_worker_init(render_default_uep_template, worker_init):
     wi = yaml.safe_load(rendered_template)["engine"]["provider"]["worker_init"]
 
     if worker_init is not None:
-        assert json.dumps(worker_init) in wi, (
-            "sanitized worker_init appears when the user supplies it"
-        )
+        sanitized_init = _sanitize_user_json(user_opts)["worker_init"]
+        wi_stanza = f"\n    worker_init: {sanitized_init}"
+        assert wi_stanza in rendered_template, "verify user input sanitized"
+        assert worker_init == wi, "parsed worker init conveys"
     else:
         assert "eval '$(echo -e" not in wi, "no worker_init -> nothing evaluated"
 
@@ -868,58 +908,56 @@ def test_default_template_worker_init_missing_runtime(
     )
 
 
-@pytest.mark.parametrize("user_runtime", ({}, {"python": {}}))
-def test_default_template_builds_env_for_requirements_alone(
-    render_default_uep_template, user_runtime
+@pytest.mark.parametrize("has_python", (False, True))
+@pytest.mark.parametrize("has_sdk", (False, True))
+@pytest.mark.parametrize("has_req", (False, True))
+def test_default_template_builds_env_any_sent_info(
+    py_ver_t, sdk_ver_t, render_default_uep_template, has_python, has_sdk, has_req
 ):
-    user_opts = {"requirements": "numpy==2.1.0"}
-    rendered_template = render_default_uep_template(
-        user_opts, user_runtime=user_runtime
-    )
+    py_ver = ".".join(map(str, py_ver_t))
+    sdk_ver = ".".join(map(str, sdk_ver_t))
+    k = {
+        "user_runtime": {
+            "globus_compute_sdk_version": sdk_ver,
+            "python": {"version_tuple": py_ver_t},
+        },
+        "user_opts": {"requirements": "numpy==2.1.0"},
+    }
+    if not has_python:
+        del k["user_runtime"]["python"]
+    if not has_sdk:
+        del k["user_runtime"]["globus_compute_sdk_version"]
+    if not has_req:
+        del k["user_opts"]
+
+    rendered_template = render_default_uep_template(**k)
     wi = yaml.safe_load(rendered_template)["engine"]["provider"]["worker_init"]
 
-    assert "uv venv" in wi, "requirements alone are enough to warrant an environment"
-    assert "md5sum" in wi, "requirements are folded into the env name"
-    assert "uv pip install -r <(echo -e" in wi, "requested requirements are installed"
-    assert "globus-compute-endpoint" in wi, (
-        "an environment we build must be able to run tasks"
-    )
-    assert "--python" not in wi, "no known python version -> uv picks the default"
-    assert "globus-compute-endpoint==" not in wi, (
-        "no known sdk version -> install the latest release"
-    )
+    assert bool(wi) == any((has_python, has_sdk, has_req)), "key test: if info, build"
 
+    if wi:
+        if has_python:
+            assert f'\nPY_VER="{py_ver}"\n' in wi
+        else:
+            assert "\nPY_VER=\"$(python3 -V | awk '{print $2}')\"\n" in wi
+        if has_sdk:
+            assert f'\nSDK_VER="{sdk_ver}"\n' in wi
+        else:
+            assert "\nSDK_VER=\"$(gce version | awk '{print $NF}')\"\n" in wi
 
-@pytest.mark.parametrize("pyver", ([3, 13, 9], [3, 14, 6], None))
-@pytest.mark.parametrize("sdkver", ("2.3.4", "1.2.3", None))
-def test_default_template_gracefully_handles_user_runtime(
-    render_default_uep_template,
-    pyver,
-    sdkver,
-):
-    user_runtime = {}
-    expected_uv_venv = 'uv venv --allow-existing "$ENV_PATH"'
-    expected_endpoint_spec = "globus-compute-endpoint"
-    expected_env_name = ""
-    if pyver:
-        user_runtime["python"] = {"version_tuple": pyver}
-        pystr = ".".join(str(d) for d in pyver)
-        expected_uv_venv += " --python " + pystr
-        expected_env_name = "py" + pystr
-    if sdkver:
-        user_runtime["globus_compute_sdk_version"] = sdkver
-        expected_endpoint_spec += "==" + sdkver
-        expected_env_name += f"-sdk{sdkver}" if expected_env_name else f"sdk{sdkver}"
+        assert 'uv venv --allow-existing "$ENV_PATH"' in wi, "reuse existing venv"
+        assert '--python "$PY_VER"' in wi, "venv matches passed/calc'd py version"
+        assert "globus-compute-endpoint==" in wi, (
+            "an environment we build must be able to run tasks"
+        )
 
-    rendered_template = render_default_uep_template(user_runtime=user_runtime)
-    wi = yaml.safe_load(rendered_template)["engine"]["provider"]["worker_init"]
-
-    assert ("--python" in wi) is bool(pyver)
-    assert ("globus-compute-endpoint==" in wi) is bool(sdkver)
-    if pyver or sdkver:
-        assert expected_uv_venv in wi
-        assert expected_endpoint_spec in wi
-        assert _env_path(expected_env_name) in wi
+        req_install = "\nprintf '%b' \"$REQS\" | uv pip install -r -"
+        if has_req:
+            reqs = _sanitize_user_json(k["user_opts"])["requirements"]
+            assert f"\nREQS={reqs}\n" in wi
+            assert req_install in wi
+        else:
+            assert req_install not in wi
 
 
 def test_default_template_rejects_empty_string_requirements(
