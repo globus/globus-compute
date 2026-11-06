@@ -2,14 +2,14 @@
   This is the default user-endpoint-process (UEP) template provided with
   newly-configured endpoints.  Endpoints generate a UEP-specific configuration
   by processing this YAML file as a Jinja template against SDK-provided (user)
-  variables -- please modify this template to suit your site's requirements.
+  variables -- modify this template to suit your site's requirements.
 
   As an optional security and user-debugging aid, consider also specifying a
   JSON schema for the user-provided variables.  If `user_config_schema.json`
   exists within the same directory, then before starting the UEP, the MEP will
   validate the variables against the schema before rendering.  This provides
-  an administrative peace of mind that users cannot specify invalid arguments.
-  From a usability standpoint, however, it also makes invalid values
+  an administrative assurance that users cannot specify invalid arguments.
+  Further, from a usability standpoint, it also makes invalid values
   prominently visible to users.
 
   There are a number of example configurations available in the documentation:
@@ -34,26 +34,23 @@
   For a longer form discussion on this file, see:
     https://globus-compute.readthedocs.io/en/stable/endpoints/templates.html#task-time-python-environments
 -#}
-{%- set _arbitrary_user_interaction = true %}
+{%- set _arbitrary_user_interaction = true -%}
 
 {%- set _rt = _GC.user_runtime %}
-{%- set py_ver = (_rt.python.version_tuple | join(".")) if _rt.python is defined and _rt.python.version_tuple is defined else none %}
-{%- set sdk_ver = (_rt.globus_compute_sdk_version[1:-1]) if _rt.globus_compute_sdk_version is defined else none %}
-{%- set requirements = requirements | default(none) %}
-{%- set env_name = [
-    ("py" ~ py_ver) if py_ver else none,
-    ("sdk" ~ sdk_ver) if sdk_ver else none,
-    ("reqs$(echo -en " ~ requirements ~ " | md5sum | awk '{print $1}')") if requirements else none,
-  ] | select | join("-") or none
-%}
+{%- set sent_py_ver = (_rt.python.version_tuple | join(".")) if _rt.python is defined and _rt.python.version_tuple is defined else none %}
+{%- set sent_sdk_ver = (_rt.globus_compute_sdk_version is defined) and (_rt.globus_compute_sdk_version[1:-1]) or none %}
+{%- set requirements = _arbitrary_user_interaction and (requirements | default() ) or none %}
+{%- set worker_init = _arbitrary_user_interaction and (worker_init | default()) or none %}
 
-{%- set default_worker_init %}
-  {%- if env_name is not none -%}
-# The environment initialization script creates (or reuses) a per-task Python
-# virtual environment with `uv`, matched to the submitting user's Python and
-# Globus Compute SDK versions.  If the user supplies a `requirements` option --
-# a requirements.txt file as a multi-line string -- those packages are
-# installed into the environment as well.
+{%- if sent_py_ver or sent_sdk_ver or requirements -%}
+{%- set default_worker_init -%}
+{#-
+  The environment initialization script creates (or reuses) a per-task Python
+  virtual environment with `uv`, matched to the submitting user's Python and
+  Globus Compute SDK versions.  If the user supplies a `requirements` option --
+  a requirements.txt file as a multi-line string -- those packages are
+  installed into the environment as well.
+-#}
 
 export PATH="$HOME/.local/bin:$PATH"
 if ! command -v uv &> /dev/null; then
@@ -61,54 +58,65 @@ if ! command -v uv &> /dev/null; then
   curl -LsSf https://astral.sh/uv/install.sh | sh
 fi
 
-# Enable some useful performance tuning and debugging options.  See
-# https://docs.astral.sh/uv/reference/environment/ for details.
-export UV_LINK_MODE=hardlink
-export UV_COMPILE_BYTECODE=1
-export UV_TORCH_BACKEND=auto
+PY_VER="{{ sent_py_ver or "$(python3 -V | awk '{print $2}')" }}"
+SDK_VER="{{ sent_sdk_ver or "$(gce version | awk '{print $NF}')" }}"
+REQS={{ requirements or "" }}
+ENV_SITE={{ venvs_dir | default('"$HOME/.globus_compute/venvs"') }}
+ENV_HASH={{ requirements and "-$(printf '%b' \"$REQS\" | md5sum | awk '{print $1}')" or "" }}
+ENV_NAME="py$PY_VER-sdk$SDK_VER$ENV_HASH"
+ENV_PATH="$ENV_SITE/$ENV_NAME"
 
-# Dependency Cooldown (recommended):
-# Uncomment to prevent `uv` from installing packages published within a
-# certain timeframe, giving maintainers time to fix a compromised release.
-# See https://docs.astral.sh/uv/reference/cli/#uv-run--exclude-newer
-# export UV_EXCLUDE_NEWER="1 week"
+{#
+  Enable some useful performance tuning and debugging options.  See
+  https://docs.astral.sh/uv/reference/environment/ for details.
+-#}
+export UV_LINK_MODE=hardlink UV_COMPILE_BYTECODE=1 UV_TORCH_BACKEND=auto
 
-# Create the environment, if necessary, and activate it.
-ENV_PATH="$HOME/.globus_compute/venvs/{{ env_name }}"
-uv venv --allow-existing "$ENV_PATH"{% if py_ver %} --python {{ py_ver }}{% endif %}
+{#-
+  Dependency Cooldown (recommended):
+  Uncomment to prevent `uv` from installing packages published within a
+  certain timeframe, giving maintainers time to fix a compromised release.
+  See https://docs.astral.sh/uv/reference/cli/#uv-run--exclude-newer
+-#}
+{#- export UV_EXCLUDE_NEWER="1 week" #}
+
+{# Create the environment, if necessary, and activate it. -#}
+uv venv --allow-existing "$ENV_PATH" --python "$PY_VER"
 source "$ENV_PATH/bin/activate"
 
-# Install globus-compute-endpoint & user requirements, ignoring
-# dependency cooldowns for the former.
-UV_EXCLUDE_NEWER=false uv pip install globus-compute-endpoint{% if sdk_ver %}=={{ sdk_ver }}{% endif %}
+{# Install globus-compute-endpoint, ignoring dependency cooldowns. -#}
+env UV_EXCLUDE_NEWER=false uv pip install globus-compute-endpoint=="$SDK_VER"
 
-    {%- if _arbitrary_user_interaction and requirements %}
-# Install user requirements.
-uv pip install -r <(echo -e {{ requirements }})
-    {%- endif %} {# _arbitrary_user_interaction and requirements #}
-  {%- endif %} {# env_name is not none #}
+  {%- if requirements %}
+{#- Install user requirements, but *don't* ignore cooldown period (if set, above) #}
+printf '%b' "$REQS" | uv pip install -r -
+  {%- endif %}
 
-  {%- if _arbitrary_user_interaction and worker_init is defined %}
-# Run user-specified worker_init.
-eval '$(echo -e {{ worker_init }} )'
-  {%- endif %} {# _arbitrary_user_interaction and worker_init is defined #}
-{%- endset %} {# default_worker_init #}
+{%- endset %} {#- default_worker_init #}
+{% set default_worker_init = '|\n      ' ~ default_worker_init | indent(6) %}
+
+{%- endif %} {#- any(sent_py_ver, sent_sdk_ver, requirements) #}
+
+{%- set default_worker_init = default_worker_init | default() %}
+{%- set _wi = worker_init and worker_init or default_worker_init %}
 
 {#- --- END DYNAMIC UV LOGIC --- -#}
 
 {#- --- Endpoint settings start here --- -#}
 
-{#- Idle heartbeats; see: https://globus-compute.readthedocs.io/en/stable/endpoints/config_reference.html#idle-timeout #}
+{#- Idle heartbeats; see: https://globus-compute.readthedocs.io/en/stable/endpoints/config_reference.html#idle-timeout -#}
 idle_heartbeats_soft: 10
 idle_heartbeats_hard: 5760
 
-endpoint_setup: {{ endpoint_setup|default() }}
+{%- if endpoint_setup is defined %}
+endpoint_setup: {{ endpoint_setup }}
+{%- endif %}
 
 engine:
   type: GlobusComputeEngine
   max_workers_per_node: 1
 
-  # Configuration for the compute backend (e.g., HPC cluster, personal laptop)
+  {# Configuration for the compute backend (e.g., HPC cluster, personal laptop) -#}
   provider:
     type: LocalProvider
 
@@ -116,5 +124,6 @@ engine:
     max_blocks: 1
     init_blocks: 1
 
-    worker_init: |
-      {{ default_worker_init | default("") | indent(6) }}
+    {% if _wi -%}
+    worker_init: {{ _wi }}
+    {%- endif %}

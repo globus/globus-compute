@@ -26,12 +26,12 @@ surface as :ref:`deserialization errors, lost workers, or even incorrect
 results <avoiding-serde-errors>`.  Administrators cannot reasonably dictate the
 Python and SDK versions of every user who submits to their endpoint |nbsp| ---
 |nbsp| especially on a :doc:`multi-user <multi_user>` endpoint |nbsp| --- |nbsp|
-so, rather than ask users to match the endpoint, the endpoint builds an
+so, rather than ask users to match the endpoint, the default template builds an
 environment to match each user.
 
 The template that ``globus-compute-endpoint configure`` writes for a new
-endpoint includes an environment initialization script that runs during
-``worker_init``, before any user-specified ``worker_init`` behavior.  This script:
+endpoint includes a default environment initialization script for the
+``worker_init``.  This script:
 
 #. ensures `uv`_ is available, installing it to ``~/.local/bin`` if necessary;
 #. creates (or reuses) and activates a virtual environment under
@@ -42,9 +42,15 @@ endpoint includes an environment initialization script that runs during
    submitting client's SDK version; and
 #. installs any user-requested ``requirements`` into that environment.
 
+.. note::
+
+   If the user specifies a ``worker_init`` (e.g., ``ex.user_config_schema =
+   {"worker_init": "..."}``), then the default initialization script is not
+   utilized.
+
 The Python and SDK versions come from the :ref:`reserved
 <reserved-template-variables>` ``_GC.user_runtime`` variable; if either is
-unavailable, the script falls back to `uv`_ defaults instead.
+unavailable, the script falls back to what is locally available.
 
 The template also accepts an optional ``requirements`` variable |nbsp| ---
 |nbsp| a ``requirements.txt`` file supplied as a multi-line string |nbsp| ---
@@ -92,6 +98,20 @@ of user-defined ``worker_init`` scripts.
 
    .. __: https://blog.yossarian.net/2025/11/21/We-should-all-be-using-dependency-cooldowns
 
+Finally, as users often have quotas, the default initialization script also
+allows for a custom location for the ``uv``-created virtual environments.
+This is especially useful with large virtual environment installations (e.g.,
+users of ``pytorch``).  The user may set ``venvs_dir`` to a custom location to
+allow placement to a volatile store that has different quota restrictions:
+
+.. code-block:: python
+
+   with Executor(...) as ex:
+       ex.user_endpoint_config = {
+           "requirements": "...",
+           "venvs_dir": "/scratch/my_user_space/venvs/"
+       }
+       ...
 
 
 .. _testing-templates:
