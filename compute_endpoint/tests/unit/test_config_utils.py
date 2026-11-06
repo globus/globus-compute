@@ -95,7 +95,7 @@ def conf_no_engine():
 
 
 @pytest.fixture
-def py_ver_t() -> tuple:
+def py_ver_t() -> list:
     versions = tuple(
         [3, minor, patch]
         for minor in range(11, 17)  # current and next minor versions
@@ -105,7 +105,7 @@ def py_ver_t() -> tuple:
 
 
 @pytest.fixture
-def sdk_ver_t() -> tuple:
+def sdk_ver_t() -> list:
     versions = tuple(
         [4, minor, patch]
         for minor in range(50)  # let's see if we get this far!
@@ -899,9 +899,9 @@ def test_default_template_worker_init_missing_runtime(
     render_default_uep_template, user_runtime
 ):
     rendered_template = render_default_uep_template(user_runtime=user_runtime)
-    wi = yaml.safe_load(rendered_template)["engine"]["provider"]["worker_init"]
+    provider = yaml.safe_load(rendered_template)["engine"]["provider"]
 
-    assert not wi, (
+    assert "worker_init" not in provider, (
         "older SDKs may not report runtime; with nothing to match against and no "
         "requirements to install, there is no environment to build -- but the "
         "template must still render a valid config"
@@ -931,33 +931,35 @@ def test_default_template_builds_env_any_sent_info(
         del k["user_opts"]
 
     rendered_template = render_default_uep_template(**k)
-    wi = yaml.safe_load(rendered_template)["engine"]["provider"]["worker_init"]
+    wi = yaml.safe_load(rendered_template)["engine"]["provider"].get("worker_init")
 
     assert bool(wi) == any((has_python, has_sdk, has_req)), "key test: if info, build"
 
-    if wi:
-        if has_python:
-            assert f'\nPY_VER="{py_ver}"\n' in wi
-        else:
-            assert "\nPY_VER=\"$(python3 -V | awk '{print $2}')\"\n" in wi
-        if has_sdk:
-            assert f'\nSDK_VER="{sdk_ver}"\n' in wi
-        else:
-            assert "\nSDK_VER=\"$(gce version | awk '{print $NF}')\"\n" in wi
+    if not wi:
+        return
 
-        assert 'uv venv --allow-existing "$ENV_PATH"' in wi, "reuse existing venv"
-        assert '--python "$PY_VER"' in wi, "venv matches passed/calc'd py version"
-        assert "globus-compute-endpoint==" in wi, (
-            "an environment we build must be able to run tasks"
-        )
+    if has_python:
+        assert f'\nPY_VER="{py_ver}"\n' in wi
+    else:
+        assert "\nPY_VER=\"$(python3 -V | awk '{print $2}')\"\n" in wi
+    if has_sdk:
+        assert f'\nSDK_VER="{sdk_ver}"\n' in wi
+    else:
+        assert "\nSDK_VER=\"$(gce version | awk '{print $NF}')\"\n" in wi
 
-        req_install = "\nprintf '%b' \"$REQS\" | uv pip install -r -"
-        if has_req:
-            reqs = _sanitize_user_json(k["user_opts"])["requirements"]
-            assert f"\nREQS={reqs}\n" in wi
-            assert req_install in wi
-        else:
-            assert req_install not in wi
+    assert 'uv venv --allow-existing "$ENV_PATH"' in wi, "reuse existing venv"
+    assert '--python "$PY_VER"' in wi, "venv matches passed/calc'd py version"
+    assert "globus-compute-endpoint==" in wi, (
+        "an environment we build must be able to run tasks"
+    )
+
+    req_install = "\nprintf '%b' \"$REQS\" | uv pip install -r -"
+    if has_req:
+        reqs = _sanitize_user_json(k["user_opts"])["requirements"]
+        assert f"\nREQS={reqs}\n" in wi
+        assert req_install in wi
+    else:
+        assert req_install not in wi
 
 
 def test_default_template_rejects_empty_string_requirements(
