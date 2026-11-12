@@ -30,7 +30,7 @@ from tests.utils import try_assert, try_for_timeout
 
 _MOCK_BASE = "globus_compute_sdk.sdk.executor."
 _MOCK_BASE_CLIENT = "globus_compute_sdk.sdk.client."
-_chunk_size = 1024
+_serde = ComputeSerializer()
 
 
 def _is_stopped(thread: threading.Thread | None) -> t.Callable[..., bool]:
@@ -46,27 +46,32 @@ def noop():
 
 class MockedExecutor(Executor):
     def __init__(self, *args, **kwargs):
-        mock_client = mock.Mock(
-            spec=Client,
-            _compute_web_client=mock.Mock(
-                spec=_ComputeWebClient,
-                v2=mock.Mock(ComputeClientV2),
-                v3=mock.Mock(ComputeClientV3),
-            ),
-            fx_serializer=mock.Mock(spec=ComputeSerializer),
-            _request_lock=threading.Lock(),
+        gcc = Client(do_version_check=False)
+        gcc._compute_web_client = mock.Mock(
+            spec=_ComputeWebClient,
+            v2=mock.Mock(spec=ComputeClientV2),
+            v3=mock.Mock(spec=ComputeClientV3),
         )
         # Unless test overrides, set default response:
         fn_id = str(uuid.uuid4())
-        mock_client.register_function.return_value = fn_id
-        mock_client.register_source_code.return_value = fn_id
-        mock_client.batch_run.return_value = {
+        gcc.register_function = mock.Mock(
+            spec=gcc.register_function, return_value=fn_id
+        )
+        gcc.register_source_code = mock.Mock(
+            spec=gcc.register_source_code, return_value=fn_id
+        )
+        batch_rv = {
             "tasks": {fn_id: [str(uuid.uuid4())]},
             "task_group_id": str(uuid.uuid4()),
             "request_id": str(uuid.uuid4()),
             "endpoint_id": str(uuid.uuid4()),
         }
-        kwargs.setdefault("client", mock_client)
+        gcc.batch_run = mock.Mock(spec=gcc.batch_run, return_value=batch_rv)
+        gcc.create_batch = mock.Mock(spec=gcc.create_batch)
+        gcc.get_result_amqp_url = mock.Mock(spec=gcc.get_result_amqp_url)
+        gcc._log_version_mismatch = mock.Mock(spec=gcc._log_version_mismatch)
+        kwargs.setdefault("client", gcc)
+
         super().__init__(*args, **kwargs)
         Executor._default_task_group_id = None  # Reset for each test
         self._test_task_submitter_exception: t.Type[Exception] | None = None
@@ -120,7 +125,7 @@ def mock_result_watcher(mocker: MockerFixture):
 
 @pytest.fixture
 def gce(mock_result_watcher):
-    gc_executor = MockedExecutor(batch_size=_chunk_size)
+    gc_executor = MockedExecutor()
     gc_executor.endpoint_id = gc_executor.client.batch_run.return_value["endpoint_id"]
 
     yield gc_executor
@@ -904,23 +909,18 @@ def test_reload_tasks_all_completed(gce: Executor):
         0,
         1,
         3,
+        31,
+        32,
+        33,
         500,
-        1 * _chunk_size + -1,
-        1 * _chunk_size + 0,
-        1 * _chunk_size + 1,
-        2 * _chunk_size + -1,
-        2 * _chunk_size + 0,
-        2 * _chunk_size + 1,
-        3 * _chunk_size + -1,
-        3 * _chunk_size + 0,
-        3 * _chunk_size + 1,
+        12345,
     ),
 )
 def test_reload_chunks_tasks_requested(mock_log, gce, num_tasks):
     gcc = gce.client
 
-    exp_num_chunks = num_tasks // _chunk_size
-    exp_num_chunks += num_tasks % _chunk_size > 0
+    exp_num_chunks = num_tasks // gcc.max_task_request_size
+    exp_num_chunks += num_tasks % gcc.max_task_request_size > 0
 
     gce.task_group_id = uuid.uuid4()
     mock_data = {
@@ -945,7 +945,7 @@ def test_reload_chunks_tasks_requested(mock_log, gce, num_tasks):
     gce.reload_tasks()
 
     assert gbs.call_count == exp_num_chunks
-    expected_chunks = chunk_by(mock_data["tasks"], _chunk_size)
+    expected_chunks = chunk_by(mock_data["tasks"], gcc.max_task_request_size)
     for expected_chunk, (a, _k) in zip(expected_chunks, gbs.call_args_list):
         assert tuple(_t["id"] for _t in expected_chunk) == a[0]
 
@@ -1453,7 +1453,7 @@ def test_resultwatcher_does_not_check_if_no_results():
 
 def test_resultwatcher_checks_match_if_results():
     fut = ComputeFuture(task_id=str(uuid.uuid4()))
-    res = Result(task_id=fut.task_id, data="abc123")
+    res = Result(task_id=fut.task_id, data=_serde.serialize("abc123"))
 
     mrw = MockedResultWatcher()
     mrw._received_results[fut.task_id] = (mock.Mock(headers=None), res)
