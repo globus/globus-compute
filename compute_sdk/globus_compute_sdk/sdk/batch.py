@@ -182,7 +182,7 @@ class Batch:
         return self._task_group_id
 
     @task_group_id.setter
-    def task_group_id(self, new_id: UUID_LIKE_T):
+    def task_group_id(self, new_id: UUID_LIKE_T | None):
         self._task_group_id = as_optional_uuid(new_id)
 
     def add(
