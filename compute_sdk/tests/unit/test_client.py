@@ -226,6 +226,20 @@ def test_update_task_table_simple_object(gcc, randomstring):
     assert "exception" not in st
 
 
+def test_default_batch_size(gcc):
+    assert gcc.max_task_request_size == 32, "For now, a 'reasonable' (hard-coded 32)"
+
+
+def test_batch_size_clamped(gcc):
+    def _clamp(x, low, high):
+        return max(low, min(high, x))
+
+    for i in range(-1, 600):
+        gcc.max_task_request_size = i
+        exp_value = _clamp(i, 1, 512)
+        assert gcc.max_task_request_size == exp_value
+
+
 def test_pending_tasks_always_fetched(gcc):
     should_fetch_01 = str(uuid.uuid4())
     should_fetch_02 = str(uuid.uuid4())

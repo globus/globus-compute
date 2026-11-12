@@ -1,0 +1,7 @@
+Changed
+^^^^^^^
+
+- Following a service-side update to limit the number of tasks that may be
+  retrieved in any one REST call, |Client.get_batch_status|_ now retrieves
+  tasks from the Compute REST service in service-friendly sized chunks.  There
+  is no change to the SDK user-experience, just a under-the-covers update.

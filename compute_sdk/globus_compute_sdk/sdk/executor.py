@@ -752,7 +752,6 @@ class Executor(concurrent.futures.Executor):
         tasks: dict[str, ComputeFuture],
         *,
         client: Client,
-        batch_size: int = 128,
     ) -> list[ComputeFuture]:
         """
         Given a dictionary of task futures, load the task status from the Compute web
@@ -771,7 +770,7 @@ class Executor(concurrent.futures.Executor):
             For example, if ``len(tasks) == 152`` and ``batch_size == 50``, this
             method will reach out to the API 4 times (50, 50, 50, 2).
         """
-        batch_size = max(1, int(batch_size))
+        batch_size = client.max_task_request_size
         num_chunks = len(tasks) // batch_size
         num_chunks += len(tasks) % batch_size > 0
         serde = client.fx_serializer
@@ -788,7 +787,8 @@ class Executor(concurrent.futures.Executor):
                     len(data_chunk),
                 )
 
-            chunk_res = client._compute_web_client.v2.get_task_batch(data_chunk)
+            with client._request_lock:
+                chunk_res = client._compute_web_client.v2.get_task_batch(data_chunk)
 
             for tid, t_status in chunk_res.data.get("results", {}).items():
                 f = tasks.get(tid) or ComputeFuture(tid)
@@ -863,9 +863,7 @@ class Executor(concurrent.futures.Executor):
         tasks = {tid: ComputeFuture(tid) for tid in task_ids if tid not in open_futures}
         if tasks:
             # Already completed tasks will have futures already set
-            pending = Executor._load_tasks_status(
-                tasks, client=self.client, batch_size=self.batch_size
-            )
+            pending = Executor._load_tasks_status(tasks, client=self.client)
 
             if pending:
                 if rw is None:

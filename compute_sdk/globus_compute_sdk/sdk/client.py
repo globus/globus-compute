@@ -21,7 +21,7 @@ from globus_compute_sdk.errors import (
 )
 from globus_compute_sdk.sdk._environments import get_web_service_url
 from globus_compute_sdk.sdk.hardware_report import run_hardware_report
-from globus_compute_sdk.sdk.utils import check_version
+from globus_compute_sdk.sdk.utils import check_version, chunk_by
 from globus_compute_sdk.sdk.utils.gare import gare_handler
 from globus_compute_sdk.sdk.utils.uuid_like import UUID_LIKE_T
 from globus_compute_sdk.serialize import (
@@ -247,6 +247,14 @@ class Client:
 
         self._version_mismatch_already_warned_eps: t.Set[str | None] = set()
 
+        # For now, assume that ~no one will want to set this at construction
+        # time.  Should a user want to, they may use the setter.  I'm
+        # arbitrarily choosing 32 as a guess for "should be good for most
+        # users," as the majority of workloads either use the Executor, or
+        # have a small enough number of tasks that a few HTTP requests will
+        # not be an issue.
+        self.max_task_request_size = 32
+
         if do_version_check:
             self.version_check()
 
@@ -295,6 +303,22 @@ class Client:
 
         if self.app:
             self.app.logout()
+
+    @property
+    def max_task_request_size(self) -> int:
+        """
+        The maximum number of tasks to collect per REST call to the Compute web
+        service.
+
+        It is clamped to an integer between 1 and 512 -- note the web-service may have
+        a different restriction on number of results allowed in a single call;
+        """
+        return self._max_task_request_size
+
+    @max_task_request_size.setter
+    def max_task_request_size(self, val: int) -> None:
+        val = min(512, max(1, int(val)))
+        self._max_task_request_size = val
 
     def _log_version_mismatch(self, worker_details: dict | None) -> None:
         """
@@ -465,22 +489,38 @@ class Client:
         results = {tid: tst[tid] for tid in result_ids}
 
         if pending_task_ids:
-            with self._request_lock:
-                r = self._compute_web_client.v2.get_task_batch(pending_task_ids)
-            logger.debug("Response string: %s", r)
-
-            statuses = r["results"]
-            for task_id in pending_task_ids:
-                task = statuses.get(task_id)
-                if not task:
-                    logger.debug("Requested task not in service response: %s", task_id)
-                    continue
-                try:
-                    results[task_id] = self._update_task_table(task, task_id)
-                except Exception:
-                    logger.exception(
-                        "Failure while unpacking results from get_batch_result"
+            batch_size = self.max_task_request_size
+            num_chunks = len(pending_task_ids) // batch_size
+            num_chunks += len(pending_task_ids) % batch_size > 0
+            chunk_iter = chunk_by(pending_task_ids, batch_size)
+            for chunk_no, chunk in enumerate(chunk_iter, start=1):
+                if num_chunks > 1:
+                    logger.debug(
+                        "Loading large number of task (%d items; %d chunks);"
+                        " processing chunk %d (of %d tasks)",
+                        len(pending_task_ids),
+                        num_chunks,
+                        chunk_no,
+                        len(chunk),
                     )
+
+                with self._request_lock:
+                    r = self._compute_web_client.v2.get_task_batch(chunk)
+                logger.debug("Response (%d of %d) string: %s", num_chunks, chunk_no, r)
+
+                statuses: dict[str, dict[str, t.Any]] = r["results"]
+                for tid in chunk:
+                    task_data = statuses.get(str(tid))
+                    reason = str(task_data and task_data.get("reason", "") or "")
+                    if not task_data or reason.startswith("Unknown task id"):
+                        logger.debug("Service does not have task: %s", tid)
+                        continue
+                    try:
+                        results[tid] = self._update_task_table(task_data, tid)
+                    except Exception:
+                        logger.exception(
+                            "Failure while unpacking results from get_batch_result"
+                        )
 
         return results
 
