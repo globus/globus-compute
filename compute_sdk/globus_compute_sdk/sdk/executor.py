@@ -718,7 +718,7 @@ class Executor(concurrent.futures.Executor):
         self._tasks_to_send.put((fut, task))
         return fut
 
-    def map(self, fn: t.Callable, *iterables, timeout=None, chunksize=1) -> t.Iterator:
+    def map(self, fn: t.Callable, *iterables, timeout=None, chunksize=1) -> t.Iterator:  # type: ignore[override]
         """
         Globus Compute does not currently implement the `.map()`_ method of the `Executor
         interface`_.  In a naive implementation, this method would merely be

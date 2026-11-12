@@ -1009,6 +1009,7 @@ def _start_user_endpoint(
             del config_str
 
             if fn_allow_list != _no_fn_list_canary:
+                assert not isinstance(fn_allow_list, int)
                 ep_config.allowed_functions = fn_allow_list
 
             if not state.debug and ep_config.debug:
