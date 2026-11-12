@@ -3966,6 +3966,8 @@ New Functionality
 .. |nbsp| unicode:: 0xA0
    :trim:
 
+.. |Future.result()| replace:: ``Future.result()``
+.. _Future.result(): https://docs.python.org/3/library/concurrent.futures.html#concurrent.futures.Future.result
 .. |ProcessPoolExecutor| replace:: ``concurrent.futures.ProcessPoolExecutor``
 .. _ProcessPoolExecutor: https://docs.python.org/3/library/concurrent.futures.html#processpoolexecutor
 .. |ThreadPoolExecutor| replace:: ``concurrent.futures.ThreadPoolExecutor``
@@ -3973,6 +3975,9 @@ New Functionality
 
 .. |Batch| replace:: :class:`~globus_compute_sdk.sdk.batch.Batch`
 .. |Client| replace:: :class:`~globus_compute_sdk.Client`
+.. |Client.get_task()| replace:: :meth:`Client.get_task() <globus_compute_sdk.Client.get_task>`
+.. |Client.get_batch_result()| replace:: :meth:`Client.get_batch_result() <globus_compute_sdk.Client.get_batch_result>`
+.. |Client.get_result()| replace:: :meth:`Client.get_result() <globus_compute_sdk.Client.get_result>`
 .. |CombinedCode| replace:: :class:`~globus_compute_sdk.serialize.CombinedCode`
 .. |ComputeSerializer| replace:: :class:`~globus_compute_sdk.serialize.ComputeSerializer`
 .. |Executor| replace:: :class:`Executor <globus_compute_sdk.Executor>`
@@ -4030,3 +4035,5 @@ New Functionality
 .. _/v3/functions: https://compute.api.globus.org/redoc#tag/Functions/operation/register_function_v3_functions_post
 
 .. _High Assurance: https://docs.globus.org/guides/overviews/high-assurance/
+
+.. _GH #663: https://github.com/globus/globus-compute/issues/663

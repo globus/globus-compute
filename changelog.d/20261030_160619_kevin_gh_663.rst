@@ -1,0 +1,11 @@
+Bug Fixes
+^^^^^^^^^
+
+- Fix the behavior where collecting task results via the |Client| (e.g.,
+  `Client.get_task()`_/ `Client.get_batch_result()`_ /
+  `Client.get_result()`_) with task-specific exceptions would raise the
+  exception and stop the larger workflow.  Exceptional task results are
+  now properly stored in the data structure.  (The |Executor| behavior
+  remains the same; calling |Future.result()|_ will raise if the task
+  ends exceptionally.)  Fixes `GH #663`_
+
