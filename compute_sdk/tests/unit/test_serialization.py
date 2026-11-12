@@ -702,10 +702,10 @@ def test_validate_strategylike_enforces_subclass():
 
 
 @pytest.mark.parametrize(
-    "strategy_code", (s for s in concretes.SELECTABLE_STRATEGIES if s.for_code)
+    "strategy_code", [s for s in concretes.SELECTABLE_STRATEGIES if s.for_code]
 )
 @pytest.mark.parametrize(
-    "strategy_data", (s for s in concretes.SELECTABLE_STRATEGIES if not s.for_code)
+    "strategy_data", [s for s in concretes.SELECTABLE_STRATEGIES if not s.for_code]
 )
 @pytest.mark.parametrize(
     "function, args, kwargs",
