@@ -3,7 +3,6 @@ from __future__ import annotations
 from unittest import mock
 
 import pytest
-
 from globus_compute_endpoint.endpoint.rabbit_mq import (
     RabbitPublisherStatus,
     ResultPublisher,
