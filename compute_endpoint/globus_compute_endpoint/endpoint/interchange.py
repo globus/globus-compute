@@ -36,11 +36,6 @@ from parsl.version import VERSION as PARSL_VERSION
 log = logging.getLogger(__name__)
 
 
-class _ResultPassthroughType(t.TypedDict):
-    message: bytes
-    task_id: str
-
-
 class EndpointInterchange:
     """Interchange is a task orchestrator for distributed systems.
 
