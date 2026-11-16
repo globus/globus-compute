@@ -59,3 +59,15 @@ To install the globus-compute-endpoint test requirements
 
     cd compute_endpoint
     pip install '.[test]'
+
+## Git Blame Hygiene
+
+This repository includes a `.git-blame-ignore-revs` file, which contains a list of
+commits that clutter `git blame` output like code-formatter runs. To configure git to
+ignore those commits when blaming:
+
+    # for just this repository:
+    git config blame.ignoreRevsFile .git-blame-ignore-revs
+
+    # for your whole machine:
+    git config --global blame.ignoreRevsFile ':(optional).git-blame-ignore-revs'  # :(optional) -> don't error if another repository lacks this file
