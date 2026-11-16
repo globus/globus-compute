@@ -1,0 +1,11 @@
+9706b5f5ca2e84581b007c6c38036709eb674b06  # Rebrand funcx/funcx-endpoint as globus-compute-sdk/globus-compute-endpoint. (#1067)
+b851b7ad88393f3b860579bc694ea81f0ea2eb71  # Move precommit to ruff
+05844e3d93e26c9ffcaf826154679b9ae7c36fd3  # Changes applied by pre-commit autofixers
+cd4a752fe05f6bb15c2a949da6e2789030a2c8df  # Update linting config and fix
+73ffc5d7777f4623190739f829b083c870985173  # Rename links from funcx-faas GitHub org
+7a100a50795e9daae3b811334c75396b80f74f80  # Fix all pre-commmit lint failures
+b27bf49a552056cebd5f79f311af861c73c170e4  # [pre-commit.ci] pre-commit autoupdate (#2031)
+08309e7d2a8f13f1776383b70ae86a74e8db54f3  # Configure pyupgrade for Python 3.9+ compatibility
+12186335f47d77eb90b3af1eaddaa1f3e3c29070  # A bunch of flake8 fixes
+5a45c1bce688e8748a92a261b8d7645f27faf8a3  # Making flake8 happy
+bf8117433e6c285d127e7001c2d1e3f047e68d60  # Bunch of flake8 fixes
