@@ -330,3 +330,22 @@ def test_rp_on_connection_closed_logs(mock_log, attempt_limit):
         assert mock_log.debug.called, "Debug always emitted"
         assert not mock_log.info.called, "Log informed; don't spam it"
         assert not mock_log.warning.called, "Log informed; don't spam it"
+
+
+def test_rp_publishes_outstanding_results_before_stopping():
+    rp = ResultPublisher(cred_fn=dict)
+    rp._mq_conn = mock.Mock()
+    rp._mq_chan = mock.Mock()
+    rp.status = RabbitPublisherStatus.connected
+    rp._publish_kwargs = {"exchange": "results"}
+
+    with mock.patch.object(rp, "is_alive", return_value=True):
+        f = rp.publish(b"a failed task's result")
+    rp._stop_event.set()
+    rp._event_watcher()
+
+    rp._mq_chan.basic_publish.assert_called_once_with(
+        body=b"a failed task's result", exchange="results"
+    )
+    assert rp._outstanding.empty()
+    assert f in rp._awaiting_confirmation.values()
