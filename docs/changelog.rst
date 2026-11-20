@@ -3,6 +3,19 @@ Changelog
 
 .. scriv-insert-here
 
+.. _changelog-4.22.0:
+
+globus-compute-sdk & globus-compute-endpoint v4.22.0
+----------------------------------------------------
+
+Changed
+^^^^^^^
+
+- Following a service-side update to limit the number of tasks that may be
+  retrieved in any one REST call, |Client.get_batch_status|_ now retrieves
+  tasks from the Compute REST service in service-friendly sized chunks.  There
+  is no change to the SDK user-experience, just a under-the-covers update.
+
 .. _changelog-4.18.0:
 
 globus-compute-sdk & globus-compute-endpoint v4.18.0
