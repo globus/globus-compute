@@ -87,6 +87,8 @@ class ResultPublisher(threading.Thread):
         self._total_published = 0
         self._delivery_tag_index = 0
         self._stop_event = threading.Event()
+        # Deadline for waiting on broker confirmations during graceful shutdown.
+        self._shutdown_deadline: float | None = None
 
         # start closed ("connected" after connect)
         self.status = RabbitPublisherStatus.closed
@@ -332,6 +334,61 @@ class ResultPublisher(threading.Thread):
     def _event_watcher(self):
         if self._stop_event.is_set():
             log.debug("%r Shutting down due to stop event set.", self)
+
+            # Drain messages already accepted by publish() before closing the
+            # channel.  Otherwise a stop arriving between poll ticks can drop
+            # results that are still waiting in _outstanding.
+            if (
+                self.status == RabbitPublisherStatus.connected
+                and self._mq_chan is not None
+                and self._mq_chan.is_open
+            ):
+                while True:
+                    try:
+                        f, msg_bytes = self._outstanding.get(block=False)
+                    except queue.Empty:
+                        break
+
+                    try:
+                        self._mq_chan.basic_publish(
+                            body=msg_bytes, **self._publish_kwargs
+                        )
+                    except pika.exceptions.AMQPError as err:
+                        if not f.done():
+                            exc = RuntimeError(
+                                "Failed to publish result during shutdown "
+                                f"(delivery_tag: {self._delivery_tag_index})"
+                            )
+                            exc.__cause__ = err
+                            f.set_exception(exc)
+                        log.error(
+                            "Unable to deliver result during shutdown. "
+                            "Error text: %s; message: %r",
+                            err,
+                            msg_bytes,
+                        )
+                    else:
+                        self._delivery_tag_index += 1
+                        self._awaiting_confirmation[self._delivery_tag_index] = f
+                        self._total_published += 1
+            else:
+                # A disconnected publisher cannot deliver these messages. Do
+                # not leave their futures pending forever.
+                while True:
+                    try:
+                        f, _msg_bytes = self._outstanding.get(block=False)
+                    except queue.Empty:
+                        break
+                    if not f.done():
+                        f.set_exception(
+                            RuntimeError(
+                                "Result publisher stopped before the message "
+                                "could be sent"
+                            )
+                        )
+
+            if self._shutdown_deadline is None:
+                self._shutdown_deadline = time.monotonic() + 5.0
             self._stop_ioloop()
             return
 
@@ -388,6 +445,28 @@ class ResultPublisher(threading.Thread):
         stopping the ioloop.
         """
         if self._mq_conn:
+            if self._awaiting_confirmation:
+                deadline = self._shutdown_deadline or time.monotonic()
+                if time.monotonic() < deadline:
+                    self._mq_conn.ioloop.call_later(0.1, self._stop_ioloop)
+                    return
+
+                log.warning(
+                    "%r Timed out waiting for %d result publish confirmation(s); "
+                    "closing the AMQP channel.",
+                    self,
+                    len(self._awaiting_confirmation),
+                )
+                for future in self._awaiting_confirmation.values():
+                    if not future.done():
+                        future.set_exception(
+                            TimeoutError(
+                                "Timed out waiting for result publish confirmation "
+                                "during shutdown"
+                            )
+                        )
+                self._awaiting_confirmation.clear()
+
             self._mq_conn.ioloop.call_later(0.1, self._stop_ioloop)
             if self._mq_conn.is_open:
                 if self._mq_chan:
