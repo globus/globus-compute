@@ -139,13 +139,14 @@ def test_rp_channel_closed_retries_then_shuts_down(mock_log, randomstring):
     queue_info = {**q_info}
     rp = ResultPublisher(cred_fn=lambda: queue_info)
     rp._queue_info = rp.cred_fn()
-    rp._mq_chan = mock.Mock()
-    rp._mq_conn = mock.Mock()
+    rp._mq_chan = mock.MagicMock()
+    rp._mq_chan.connection = mock.MagicMock(spec=pika.SelectConnection)
+    rp._mq_conn = mock.MagicMock(spec=pika.SelectConnection)
 
     for i in range(1, rp.channel_close_window_limit):
         mock_log.warning.reset_mock()
         rp._mq_conn.ioloop.call_later.reset_mock()
-        rp._on_channel_closed(rp._mq_conn, exc)
+        rp._on_channel_closed(rp._mq_chan, exc)
         assert len(rp._channel_closes) == i
 
         assert not mock_log.error.called, "Not an outright error until death"

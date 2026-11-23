@@ -4,6 +4,8 @@ common elements to rabbitmq tools
 
 import enum
 
+import pika
+
 
 class RabbitPublisherStatus(enum.Enum):
     closed = enum.auto()
@@ -20,3 +22,10 @@ class SubscriberProcessStatus(enum.Enum):
     # the process is in the child proc and is closing down, it should not try to
     # reconnect or otherwise handle failures
     closing = enum.auto()
+
+
+# Utility method to verify type to avoid mypy typing error
+def verify_is_base_connection(conn: pika.connection.Connection) -> pika.BaseConnection:
+    if not isinstance(conn, pika.BaseConnection):
+        raise TypeError(f"Expected a BaseConnection, got {type(conn).__name__}")
+    return conn

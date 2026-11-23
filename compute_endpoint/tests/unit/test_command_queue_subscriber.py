@@ -27,8 +27,9 @@ class MockedCommandQueueSubscriber(cqs.CommandQueueSubscriber):
         assert self._test_mock_cqs_setup_complete.is_set()
 
     def run(self):
-        self._connection = mock.MagicMock()
         self._channel = mock.MagicMock()
+        self._connection = mock.MagicMock(spec=pika.SelectConnection)
+        self._channel.connection = self._connection
 
         self._test_mock_cqs_setup_complete.set()  # let tests know they may continue
         self._time_to_stop_mock.wait()  # simulate thread work
@@ -118,6 +119,8 @@ def test_cqs_stops_if_unable_to_connect(mock_rnd, attempt_limit):
         connect_attempt_limit=attempt_limit,
     )
     cq._connect = mock.Mock(spec=cqs.CommandQueueSubscriber._connect)
+    cq._channel = mock.MagicMock()
+    cq._channel._connection = mock.MagicMock(spec=pika.SelectConnection)
 
     cq.run()
     assert mock_rnd.uniform.call_count == attempt_limit - 1, "Random idle"
