@@ -1719,7 +1719,9 @@ class _ResultWatcher(threading.Thread):
                 on_open_callback=self._on_connection_open,
             )
 
-    def _on_open_failed(self, _mq_conn: pika.BaseConnection, exc: str | Exception):
+    def _on_open_failed(
+        self, _mq_conn: pika.connection.Connection, exc: BaseException | str
+    ):
         assert self._connection is not None, "Strictly called _by_ ioloop"
         count = f"[attempt {self._connection_tries} (of {self.connect_attempt_limit})]"
         pid = f"(pid: {os.getpid()})"
@@ -1734,13 +1736,15 @@ class _ResultWatcher(threading.Thread):
             self._cancellation_reason = exc
         self._connection.ioloop.stop()
 
-    def _on_connection_closed(self, _mq_conn: pika.BaseConnection, exc: Exception):
+    def _on_connection_closed(
+        self, _mq_conn: pika.connection.Connection, exc: BaseException
+    ):
         assert self._connection is not None, "Strictly called _by_ ioloop"
         log.debug("Connection closed: %s", exc)
         self._consumer_tag = None
         self._connection.ioloop.stop()
 
-    def _on_connection_open(self, _mq_conn: pika.BaseConnection):
+    def _on_connection_open(self, _mq_conn: pika.connection.Connection):
         log.debug("Connection established; creating channel")
         self._connection_tries = 0
         self._open_channel()
@@ -1795,7 +1799,7 @@ class _ResultWatcher(threading.Thread):
             on_message_callback=self._on_message,
         )
 
-    def _on_consumer_cancelled(self, frame: Method[Basic.CancelOk]):
+    def _on_consumer_cancelled(self, frame: Method[Basic.Cancel]):
         log.info("Consumer cancelled remotely, shutting down: %r", frame)
         if self._channel:
             self._channel.close()

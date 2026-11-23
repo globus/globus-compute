@@ -11,6 +11,8 @@ import typing as t
 import pika
 from globus_compute_endpoint.endpoint.utils import _redact_url_creds
 
+from .base import verify_is_base_connection
+
 if t.TYPE_CHECKING:
     from pika.channel import Channel
     from pika.frame import Method
@@ -187,7 +189,9 @@ class TaskQueueSubscriber(threading.Thread):
             on_open_callback=self._on_connection_open,
         )
 
-    def _on_open_failed(self, mq_conn: pika.BaseConnection, exc: str | Exception):
+    def _on_open_failed(
+        self, mq_conn: pika.connection.Connection, exc: str | BaseException
+    ):
         count = f"[attempt {self._connection_tries} (of {self.connect_attempt_limit})]"
         if isinstance(exc, pika.exceptions.ProbableAuthenticationError):
             count = "[invalid credentials; unrecoverable]"
@@ -203,9 +207,11 @@ class TaskQueueSubscriber(threading.Thread):
         if not (self._connection_tries < self.connect_attempt_limit):
             self._stop_event.set()
             logger.error(f"{self!r} {msg}")
-        mq_conn.ioloop.stop()
+        verify_is_base_connection(mq_conn).ioloop.stop()
 
-    def _on_connection_closed(self, mq_conn: pika.BaseConnection, exc: Exception):
+    def _on_connection_closed(
+        self, mq_conn: pika.connection.Connection, exc: BaseException
+    ):
         msg_fmt = "%r Connection closed: %s"
         logger.debug(msg_fmt, self, exc)
         if self._connection_tries == 1:
@@ -215,9 +221,9 @@ class TaskQueueSubscriber(threading.Thread):
                 logger.warning(f"{self!r} Unable to sustain connection; retrying ...")
 
         self._consumer_tag = None
-        mq_conn.ioloop.stop()
+        verify_is_base_connection(mq_conn).ioloop.stop()
 
-    def _on_connection_open(self, _mq_conn: pika.BaseConnection):
+    def _on_connection_open(self, _mq_conn: pika.connection.Connection):
         logger.debug("%r Connection established; creating channel", self)
         self._open_channel()
 
@@ -251,7 +257,9 @@ class TaskQueueSubscriber(threading.Thread):
             msg = f"{self} Channel closed  [{mq_chan}\n  ({exc})]"
             logger.debug(msg, exc_info=exc)
             logger.warning(msg)
-            mq_chan.connection.ioloop.call_later(1, self._open_channel)
+            verify_is_base_connection(mq_chan.connection).ioloop.call_later(
+                1, self._open_channel
+            )
 
         else:
             logger.error(
@@ -260,7 +268,7 @@ class TaskQueueSubscriber(threading.Thread):
             )
             self._stop_event.set()
 
-    def _on_consumer_cancelled(self, frame: Method[Basic.CancelOk]):
+    def _on_consumer_cancelled(self, frame: Method[Basic.Cancel]):
         logger.debug("%s Consumer cancelled remotely, shutting down: %r", self, frame)
         if self._channel:
             self._channel.close()
@@ -317,6 +325,7 @@ class TaskQueueSubscriber(threading.Thread):
     ):
         try:
             d_tag = basic_deliver.delivery_tag
+            assert d_tag is not None
         except Exception as e:
             logger.debug(
                 "Invalid Basic.Deliver; unable to process message.  (%s) %s",

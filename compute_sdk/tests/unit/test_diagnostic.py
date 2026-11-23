@@ -548,7 +548,8 @@ def test_mem_swap_info():
     sinfo = swap_info()
 
     assert "iB " in minfo, "Expect humanization of output"
-    assert "iB " in sinfo, "Expect humanization of output"
+    # Some occasions in test have 0 bytes
+    assert "iB " in sinfo or " 0 B " in sinfo, "Expect humanization of output"
 
 
 def test_get_recent_endpoints(fs):

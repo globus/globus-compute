@@ -14,7 +14,7 @@ import pika.channel
 import pika.exceptions
 from pika.spec import Basic, BasicProperties
 
-from .base import RabbitPublisherStatus
+from .base import RabbitPublisherStatus, verify_is_base_connection
 
 if t.TYPE_CHECKING:
     from pika.channel import Channel
@@ -196,7 +196,9 @@ class ResultPublisher(threading.Thread):
             on_open_error_callback=self._on_open_failed,
         )
 
-    def _on_open_failed(self, mq_conn: pika.BaseConnection, exc: str | Exception):
+    def _on_open_failed(
+        self, mq_conn: pika.connection.Connection, exc: BaseException | str
+    ):
         count = f"[attempt {self._connection_tries} (of {self.connect_attempt_limit})]"
         if isinstance(exc, pika.exceptions.ProbableAuthenticationError):
             count = "[invalid credentials; unrecoverable]"
@@ -213,9 +215,12 @@ class ResultPublisher(threading.Thread):
             log.error(f"{self!r} {msg}")
             if not isinstance(exc, Exception):
                 exc = Exception(str(exc))
-        mq_conn.ioloop.stop()
 
-    def _on_connection_closed(self, mq_conn: pika.BaseConnection, exc: Exception):
+        verify_is_base_connection(mq_conn).ioloop.stop()
+
+    def _on_connection_closed(
+        self, mq_conn: pika.connection.Connection, exc: BaseException
+    ):
         msg_fmt = "%r Connection closed: %s"
         log.debug(msg_fmt, self, exc)
         if self._connection_tries == 1:
@@ -225,9 +230,10 @@ class ResultPublisher(threading.Thread):
                 log.warning(f"{self!r} Unable to sustain connection; retrying ...")
 
         self.status = RabbitPublisherStatus.closed
-        mq_conn.ioloop.stop()
 
-    def _on_connection_open(self, _mq_conn: pika.BaseConnection):
+        verify_is_base_connection(mq_conn).ioloop.stop()
+
+    def _on_connection_open(self, _mq_conn: pika.connection.Connection):
         log.debug("%r Connection established; creating channel", self)
         self._open_channel()
 
@@ -253,7 +259,7 @@ class ResultPublisher(threading.Thread):
             callback=self._on_exchange_verified,
         )
 
-    def _on_consumer_cancelled(self, frame: Method[Basic.CancelOk]):
+    def _on_consumer_cancelled(self, frame: Method[Basic.Cancel]):
         log.info("Consumer cancelled remotely, shutting down: %r", frame)
         if self._mq_chan:
             self._mq_chan.close()
@@ -271,7 +277,9 @@ class ResultPublisher(threading.Thread):
             msg = f"{self} Channel closed  [{mq_chan}\n  ({exc})]"
             log.debug(msg, exc_info=exc)
             log.warning(msg)
-            mq_chan.connection.ioloop.call_later(1, self._open_channel)
+            verify_is_base_connection(mq_chan.connection).ioloop.call_later(
+                1, self._open_channel
+            )
 
         else:
             log.error(

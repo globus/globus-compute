@@ -27,8 +27,9 @@ class MockedCommandQueueSubscriber(cqs.CommandQueueSubscriber):
         assert self._test_mock_cqs_setup_complete.is_set()
 
     def run(self):
-        self._connection = mock.MagicMock()
         self._channel = mock.MagicMock()
+        self._connection = mock.MagicMock(spec=pika.SelectConnection)
+        self._channel.connection = self._connection
 
         self._test_mock_cqs_setup_complete.set()  # let tests know they may continue
         self._time_to_stop_mock.wait()  # simulate thread work
@@ -118,6 +119,8 @@ def test_cqs_stops_if_unable_to_connect(mock_rnd, attempt_limit):
         connect_attempt_limit=attempt_limit,
     )
     cq._connect = mock.Mock(spec=cqs.CommandQueueSubscriber._connect)
+    cq._channel = mock.MagicMock()
+    cq._channel._connection = mock.MagicMock(spec=pika.SelectConnection)
 
     cq.run()
     assert mock_rnd.uniform.call_count == attempt_limit - 1, "Random idle"
@@ -432,3 +435,18 @@ def test_cqs_event_watcher_initiates_shutdown(mock_cqs):
     assert not mcqs._channel.close.called, "Verify test setup"
     mcqs._event_watcher()
     assert mcqs._channel.close.called
+
+def _format_psmem(psdata) -> str:
+    data = psdata._asdict()
+    max_name_len = max(map(len, data.keys()))
+    max_val_len = max(map(len, map(str, data.values())))
+    lines = []
+    for fname, fval in data.items():
+        fname = fname.capitalize()
+        if fname == "Percent":
+            val = f"{fval:>6} % (used)"
+        else:
+            v, u = simple_humanize(fval)
+            val = f"{v:>6} {u + 'B':<3} ({fval:>{max_val_len}})"
+        lines.append(f"{fname:>{max_name_len}}: {val}")
+    return "\n".join(lines)
