@@ -16,7 +16,7 @@ REQUIRES = [
     # packaging, allowing version parsing
     # set a version floor but no ceiling as the library offers a stable API under CalVer
     "packaging>=21.1",
-    "pika>=1.3",
+    "pika>=1.3,<1.5",
     "tblib>=3",
     "texttable>=1.7",
     # 3 below for color highlighting related console print
