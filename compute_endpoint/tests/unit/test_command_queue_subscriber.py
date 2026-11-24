@@ -436,6 +436,7 @@ def test_cqs_event_watcher_initiates_shutdown(mock_cqs):
     mcqs._event_watcher()
     assert mcqs._channel.close.called
 
+
 def _format_psmem(psdata) -> str:
     data = psdata._asdict()
     max_name_len = max(map(len, data.keys()))
