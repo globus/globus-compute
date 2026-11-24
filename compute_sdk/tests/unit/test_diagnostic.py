@@ -7,7 +7,9 @@ import io
 import os
 import pathlib
 import platform
+import random
 import sys
+from collections import namedtuple
 from unittest import mock
 
 import pytest
@@ -543,14 +545,28 @@ def test_python_host_info():
     assert f"uid: {os.getuid()}" in info
 
 
-def test_mem_swap_info():
+def test_mem_swap_info(mocker):
     minfo = mem_info()
+
+    # swap_memory() output is platform independent unlike virtual_memory(), also
+    # may have all 0 values in some test environments, better to mock output
+    used_mem_kb = random.randint(1, 1000)
+    tup = namedtuple("tup", "total used free percent sin sout")
+    fake_mem_info = tup(
+        total=8000000000,
+        used=used_mem_kb * 1024 + 100,
+        free=4000000000,
+        percent=50,
+        sin=0,
+        sout=0,
+    )
+    mocker.patch("psutil.swap_memory", return_value=fake_mem_info)
+
     sinfo = swap_info()
 
     assert "iB " in minfo, "Expect humanization of output"
-    # Some new GH action containers return 0 bytes for swap_info()
-    # TODO refactor humanization algorithm or mock swap_memory() output
-    assert "iB " in sinfo or " 0 B " in sinfo, "Expect humanization of output"
+    assert f"{used_mem_kb}.1 KiB" in sinfo, "Expect humanization of output"
+    assert f" 0 B " in sinfo, "Expect humanization of output"
 
 
 def test_get_recent_endpoints(fs):
